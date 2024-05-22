@@ -1,0 +1,106 @@
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/descriptive/> 
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+prefix prov: <http://www.w3.org/ns/prov#>
+# EBUCore - the Dublin Core for media
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+# premis_IntellectualEntity
+SELECT
+?iri
+?schema_identifier
+?schema_name
+?schema_alternate_name
+?schema_description
+?schema_abstract
+?schema_is_part_of
+?schema_position
+?ha_des_number_of_pages
+?premis_identifier
+?ha_des_primary_identifier
+?schema_maintainer
+?dcterms_available
+?schema_date_created
+?schema_date_published
+?ebucore_has_object_type
+?schema_genre
+?schema_in_language
+?schema_spatial
+?schema_temporal
+?schema_copyright_holder
+?schema_copyright_notice
+?schema_copyright_year
+?dcterms_rights
+?schema_credit_text
+?schema_mentions
+WHERE {
+    {
+      SELECT DISTINCT ?iri ?schema_identifier ?schema_name ?schema_maintainer ?modified
+      WHERE {
+        ?iri a premis:IntellectualEntity;
+           schema:identifier ?schema_identifier ;
+           schema:name ?schema_name ;
+           schema:dateCreated ?schema_date_created;
+           schema:maintainer ?schema_maintainer;
+           schema:license ?schema_license_res . 
+
+        FILTER langMatches(lang(?schema_name), "nl")
+        
+        VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+
+        ?iri prov:wasDerivedFrom/schema:dateModified ?modified
+         
+      }
+      LIMIT 10
+    }
+
+    OPTIONAL{ 
+      ?iri schema:alternateName ?schema_alternate_name
+      FILTER langMatches(lang(?schema_alternateName), "nl")
+    }
+  
+    OPTIONAL{ 
+      ?iri schema:description ?schema_description
+      FILTER langMatches(lang(?schema_description), "nl")
+    }
+  
+    OPTIONAL{ 
+      ?iri schema:abstract ?schema_abstract 
+      FILTER langMatches(lang(?schema_abstract), "nl")
+    }
+  
+    OPTIONAL { ?iri schema:isPartOf ?schema_isPartOf }
+    OPTIONAL { ?iri haDes:pageNumber ?schema_position }
+    OPTIONAL { ?iri haDes:numberOfPages ?ha_des_number_of_pages }
+    OPTIONAL { ?iri premis:identifier ?premis_identifier }
+    OPTIONAL { ?iri haDes:primaryIdentifier ?ha_des_primary_identifier }
+    OPTIONAL { ?iri rel:isp ?relation_is_part_of }
+    OPTIONAL { ?iri dct:available ?dcterms_available }
+    OPTIONAL { ?iri schema:datePublished ?schema_date_published }
+    OPTIONAL { ?iri ebucore:hasObjectType ?ebucore_has_object_type }
+    OPTIONAL { ?iri schema:genre ?schema_genre }
+    OPTIONAL { ?iri schema:inLanguage ?schema_in_language }
+    OPTIONAL { ?iri schema:spatial ?schema_spatial }
+    OPTIONAL { ?iri schema:temporal ?schema_temporal }
+    OPTIONAL { ?iri schema:copyrightYear ?schema_copyright_year }
+    OPTIONAL { ?iri schema:copyrightNotice ?schema_copyright_notice }
+    OPTIONAL { ?iri schema:copyrightHolder ?schema_copyright_holder }
+    OPTIONAL { ?iri dct:rights ?dcterms_rights }
+    OPTIONAL { ?iri schema:creditText ?schema_credit_text }    
+    OPTIONAL { ?iri schema:creator ?creator_role }  
+    OPTIONAL { ?iri schema:contributor ?contributor_role }  
+    OPTIONAL { ?iri schema:publisher ?publisher_role }
+    OPTIONAL { ?iri ebucore:synopsis ?ebucore_synopsis }
+    # krant
+    OPTIONAL{ ?iri bf:issuance/skos:prefLabel ?bf_issuance }
+}
+
+
