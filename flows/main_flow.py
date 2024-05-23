@@ -7,7 +7,7 @@ from prefect_sqlalchemy.credentials import DatabaseCredentials
 import datetime
 
 @task()
-def upsert_page(table_name, csv_url, postgres_creds, triply_creds, since = None):
+def upsert_pages(table_name, csv_url, postgres_creds, triply_creds, since = None):
     # Load logger
     logger = get_run_logger()
 
@@ -96,7 +96,7 @@ def main_flow(
 
     # For each entry in config table: start sync task
     for table_name, csv_url in table_config.items():
-        upsert_page(table_name=table_name, csv_url=csv_url, triply_creds=triply_creds, postgres_creds=postgres_creds, since=since).submit()
+        upsert_pages(table_name=table_name, csv_url=csv_url, triply_creds=triply_creds, postgres_creds=postgres_creds, since=since).submit()
 
 
 
