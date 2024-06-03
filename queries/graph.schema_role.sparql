@@ -1,0 +1,44 @@
+PREFIX schema: <https://schema.org/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+
+SELECT ?intellectual_entity_id ?type ?role_label ?thing_id
+WHERE {
+    {
+      ?intellectual_entity_id schema:publisher ?id; schema:license ?schema_license_res.
+  
+      VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    
+      ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
+      FILTER (!isLiteral(?since) || ?modified >= ?since )
+
+      ?id a schema:Role; 
+          schema:roleName ?role_label;
+          schema:publisher ?thing_id
+      BIND ("schema_publisher" as ?type)
+    } UNION {
+      ?intellectual_entity_id schema:contributor ?id; schema:license ?schema_license_res.
+  
+      VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      
+      ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
+      FILTER (!isLiteral(?since) || ?modified >= ?since )
+
+      ?id a schema:Role; 
+          schema:roleName ?role_label;
+          schema:contributor ?thing_id
+      BIND ("schema_contributor" as ?type)
+    } UNION {
+      ?intellectual_entity_id schema:creator ?id; schema:license ?schema_license_res.
+  
+      VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      
+      ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
+      FILTER (!isLiteral(?since) || ?modified >= ?since )
+
+      ?id a schema:Role; 
+          schema:roleName ?role_label;
+          schema:creator ?thing_id
+      BIND ("schema_creator" as ?type)
+    }
+}

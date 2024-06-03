@@ -2,6 +2,12 @@ PREFIX schema: <https://schema.org/>
 
 SELECT DISTINCT ?id ?schema_name
 WHERE {
-  ?id a schema:Thing; schema:name ?schema_name.
-  FILTER langMatches(lang(?schema_name), "nl")
+  {
+    ?id a schema:Thing; schema:name ?schema_name.
+    FILTER langMatches(lang(?schema_name), "nl")
+  }
+  UNION {
+    ?id a schema:Person; schema:name ?schema_name.
+    FILTER langMatches(lang(?schema_name), "nl")
+  }
 }

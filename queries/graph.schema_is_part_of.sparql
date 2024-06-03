@@ -1,0 +1,3 @@
+PREFIX schema: <https://schema.org/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX prov: <http://www.w3.org/ns/prov#>

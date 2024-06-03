@@ -49,6 +49,7 @@ WHERE {
     VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
 
     ?id prov:wasDerivedFrom/schema:dateModified ?modified .
+    FILTER (!isLiteral(?since) || ?modified >= ?since )
   
     OPTIONAL{ 
       ?id schema:description ?schema_description

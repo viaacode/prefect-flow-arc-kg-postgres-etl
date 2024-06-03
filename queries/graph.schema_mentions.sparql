@@ -1,0 +1,13 @@
+PREFIX schema: <https://schema.org/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+
+SELECT DISTINCT ?intellectual_entity_id ?thing_id
+WHERE {
+    ?intellectual_entity_id schema:mentions ?thing_id; schema:license ?schema_license_res.
+  
+    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    
+    ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
+    FILTER (!isLiteral(?since) || ?modified >= ?since )
+}

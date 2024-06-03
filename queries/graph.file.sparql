@@ -1,0 +1,61 @@
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/descriptive/> 
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+prefix prov: <http://www.w3.org/ns/prov#>
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+# EBUCore - the Dublin Core for media
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+prefix edm: <http://www.europeana.eu/schemas/edm/>
+
+SELECT DISTINCT
+?id
+?ebucore_has_media_fragment
+?ebucore_has_mime_type
+?edm_is_next_in_sequence
+?premis_original_name
+?premis_stored_at
+?relation_is_included_in
+?schema_duration
+?schema_name
+?schema_thumbnail_url
+WHERE {
+    ?id a premis:File;
+          schema:name ?schema_name ;
+          premis:originalName ?premis_original_name;
+          premis:storedAt/rdf:value ?premis_stored_at ;
+          ebucore:hasMimeType ?ebucore_has_mime_type ;
+          rel:isi ?relation_is_included_in.
+    
+    ?relation_is_included_in rel:rep/schema:license ?schema_license_res . 
+
+    FILTER langMatches(lang(?schema_name), "nl")
+        
+    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+
+    ?id prov:wasDerivedFrom/schema:dateModified ?modified .
+    FILTER (!isLiteral(?since) || ?modified >= ?since )
+
+    OPTIONAL {
+      ?id ebucore:hasMediaFragment ?ebucore_has_media_fragment 
+    }
+
+    OPTIONAL {
+      ?id edm:isNextInSequence ?edm_is_next_in_sequence 
+    }
+
+    OPTIONAL {
+      ?id schema:thumbnailUrl ?schema_thumbnail_url;
+    }
+
+    OPTIONAL {
+      ?id schema:duration ?schema_duration 
+    }
+}
