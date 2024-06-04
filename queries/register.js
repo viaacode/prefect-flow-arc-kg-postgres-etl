@@ -3,7 +3,7 @@ import App from '@triply/triplydb'
 
 
 import { readdir, readFile } from 'fs/promises'
-import { join, extname } from 'path'
+import { join, extname, basename } from 'path'
 
 // Directory containing the .sparql files
 const directoryPath = './' // change this to your directory path
@@ -11,7 +11,7 @@ const directoryPath = './' // change this to your directory path
 const triply = App.get({ token: process.env.TOKEN })
 async function run() {
   const user = await triply.getUser()
-  const myDataset = await user.getDataset('my-dataset')
+  const myDataset = await user.getDataset(process.env.DATASET)
 
   try {
     const files = await readdir(dirPath)
@@ -23,16 +23,17 @@ async function run() {
       if (extname(file) === '.sparql') {
         try {
           const queryString = await readFile(filePath, 'utf8')
-          console.log(`Contents of ${file}:\n`)
-          console.log(queryString)
-          console.log('\n--------------------------------------------\n')
-
+          const queryName = basename(queryString)
+          console.log(`Adding contents of ${file} as ${queryName}\n`)
+          
           const query = await user.addQuery(file, {
             dataset: myDataset,
             queryString,
 
             output: 'response',
           })
+          console.log(`Available on ${query.getRunLink()}\n`)
+          console.log('\n--------------------------------------------\n')
         } catch (readErr) {
           console.error('Unable to read file: ' + readErr)
         }

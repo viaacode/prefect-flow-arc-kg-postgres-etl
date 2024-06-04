@@ -1,7 +1,7 @@
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 
-SELECT ?intellectual_entity_id ?role_label ?thing_id
+SELECT ?intellectual_entity_id ?role_name ?thing_id
 WHERE {
     ?intellectual_entity_id schema:contributor ?id;
         schema:license ?schema_license_res.
@@ -12,6 +12,6 @@ WHERE {
     FILTER (!isLiteral(?since) || ?modified >= ?since )
 
     ?id a schema:Role; 
-          schema:roleName ?role_label;
+          schema:roleName ?role_name;
           schema:contributor ?thing_id
 }

@@ -13,3 +13,46 @@ PREFIX org: <http://www.w3.org/ns/org#>
 PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
+SELECT DISTINCT
+?id
+?premis_identifier
+?premis_medium
+?schema_height
+?schema_identifier
+?schema_material
+?schema_material_extent
+?schema_name
+?schema_width
+WHERE {
+    ?id a haObj:PhysicalCarrier;
+    schema:name ?schema_name;
+    premis:medium/skos:prefLabel ?premis_medium;
+
+    OPTIONAL {
+      ?id schema:identifier    ?schema_identifier
+    }
+
+    OPTIONAL {
+      ?id premis:identifier ?premis_identifier
+    }
+  
+    OPTIONAL {
+      ?id schema:height ?height.
+      ?height schema:value ?height_value;
+              schema:unitText ?height_unit.
+    }
+    BIND( CONCAT(?height_value, ' ', ?height_unit) as ?schema_height)
+  
+    OPTIONAL {
+      ?id schema:width ?width.
+      ?width schema:value ?width_value;
+              schema:unitText ?width_unit.
+    }
+    BIND( CONCAT(?width_value, ' ', ?width_unit) as ?schema_width)
+    OPTIONAL {
+      ?id schema:materialExtent ?schema_material_extent
+    }
+    OPTIONAL {
+      ?id schema:material ?schema_material
+    }
+}

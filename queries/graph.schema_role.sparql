@@ -2,7 +2,7 @@ PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 
-SELECT ?intellectual_entity_id ?type ?role_label ?thing_id
+SELECT ?intellectual_entity_id ?type ?role_name ?thing_id
 WHERE {
     {
       ?intellectual_entity_id schema:publisher ?id; schema:license ?schema_license_res.
@@ -13,7 +13,7 @@ WHERE {
       FILTER (!isLiteral(?since) || ?modified >= ?since )
 
       ?id a schema:Role; 
-          schema:roleName ?role_label;
+          schema:roleName ?role_name;
           schema:publisher ?thing_id
       BIND ("schema_publisher" as ?type)
     } UNION {
@@ -25,7 +25,7 @@ WHERE {
       FILTER (!isLiteral(?since) || ?modified >= ?since )
 
       ?id a schema:Role; 
-          schema:roleName ?role_label;
+          schema:roleName ?role_name;
           schema:contributor ?thing_id
       BIND ("schema_contributor" as ?type)
     } UNION {
@@ -37,7 +37,7 @@ WHERE {
       FILTER (!isLiteral(?since) || ?modified >= ?since )
 
       ?id a schema:Role; 
-          schema:roleName ?role_label;
+          schema:roleName ?role_name;
           schema:creator ?thing_id
       BIND ("schema_creator" as ?type)
     }

@@ -1,3 +1,10 @@
-PREFIX schema: <https://schema.org/>
-PREFIX haLicId: <https://data.hetarchief.be/id/license/>
-PREFIX prov: <http://www.w3.org/ns/prov#>
+prefix schema: <https://schema.org/>
+
+SELECT ?intellectual_entity_id ?type ?val ?newspaper
+WHERE {
+  ?intellectual_entity_id schema:isPartOf ?id.
+  ?id schema:name ?val; 
+  a ?type .
+
+  VALUES ?type { schema:CreativeWorkSeries schema:Newspaper schema:CreativeWorkSeason  }
+}
