@@ -1,6 +1,7 @@
 {
   "name": "queries",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "register.js",
   "scripts": {
@@ -9,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@triply/triplydb": "^8.0.4"
+    "@triply/triplydb": "^8.0.4",
+    "dotenv": "^16.4.5"
   }
 }

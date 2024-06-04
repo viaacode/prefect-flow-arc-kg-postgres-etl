@@ -1,41 +1,41 @@
-require('source-map-support/register')
+//require('source-map-support/register')
 import App from '@triply/triplydb'
 
-
+import 'dotenv/config';
 import { readdir, readFile } from 'fs/promises'
-import { join, extname, basename } from 'path'
+import { join, extname, parse } from 'path'
 
 // Directory containing the .sparql files
 const directoryPath = './' // change this to your directory path
 
 const triply = App.get({ token: process.env.TOKEN })
 async function run() {
-  const user = await triply.getUser()
-  const myDataset = await user.getDataset(process.env.DATASET)
+  const account = await triply.getAccount(process.env.ACCOUNT)
+  const dataset = await account.getDataset(process.env.DATASET)
 
   try {
-    const files = await readdir(dirPath)
+    const files = await readdir(directoryPath)
 
     for (const file of files) {
-      const filePath = join(dirPath, file)
+      const filePath = join(directoryPath, file)
 
       // Check if the file has a .sparql extension
       if (extname(file) === '.sparql') {
         try {
           const queryString = await readFile(filePath, 'utf8')
-          const queryName = basename(queryString)
+          const queryName = `get-${parse(filePath).name}`
           console.log(`Adding contents of ${file} as ${queryName}\n`)
           
-          const query = await user.addQuery(file, {
-            dataset: myDataset,
+          const query = await account.addQuery(queryName, {
+            dataset,
             queryString,
-
+            serviceType: 'virtuoso',
             output: 'response',
           })
-          console.log(`Available on ${query.getRunLink()}\n`)
+          console.log(`Available on ${await query.getRunLink()}\n`)
           console.log('\n--------------------------------------------\n')
         } catch (readErr) {
-          console.error('Unable to read file: ' + readErr)
+          console.error(readErr)
         }
       }
     }

@@ -17,7 +17,6 @@ prefix edm: <http://www.europeana.eu/schemas/edm/>
 
 SELECT DISTINCT
 ?id
-?ebucore_has_media_fragment
 ?ebucore_has_mime_type
 ?edm_is_next_in_sequence
 ?premis_original_name
