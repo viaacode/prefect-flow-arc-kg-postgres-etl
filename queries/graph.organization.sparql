@@ -17,7 +17,7 @@ SELECT DISTINCT
 ?org_identifier
 ?skos_pref_label
 WHERE {
-  ?id a org:Organization;
+  ?id a haOrg:ContentPartner;
       org:identifier ?org_identifier;
       skos:prefLabel ?skos_pref_label.
 
