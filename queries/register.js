@@ -2,9 +2,25 @@
 import App from '@triply/triplydb'
 
 import 'dotenv/config';
-import { writeFileSync } from 'fs'
-import { readdir, readFile } from 'fs/promises'
-import { join, extname, parse } from 'path'
+import { writeFileSync, createWriteStream, existsSync } from 'fs'
+import { readdir, readFile, mkdir } from 'fs/promises'
+import { join, extname, parse, resolve } from 'path'
+import { Readable }  from 'stream'
+import { finished }  from 'stream/promises'
+
+async function downloadFile(url, fileName) {
+  const res = await fetch(url, {
+    headers: {
+      Accept: 'text/csv', 
+      Authorization: `Bearer ${process.env.TOKEN}`
+    }
+  });
+  if (!existsSync("tables")) 
+    await mkdir("tables"); //Optional if you already have downloads directory
+  const destination = resolve("./tables", fileName);
+  const fileStream = createWriteStream(destination, { flags: 'wx' });
+  await finished(Readable.fromWeb(res.body).pipe(fileStream));
+}
 
 // Directory containing the .sparql files
 const directoryPath = './' // change this to your directory path
@@ -26,7 +42,7 @@ async function run() {
         try {
           const queryString = await readFile(filePath, 'utf8')
           const tableName = parse(filePath).name
-          const queryName = `get-${tableName.replace(/[._]/g, '-')}`
+          const queryName = `get-${tableName.replace(/[._]/g, '-')}`.substring(0,40) // querynames can only be 40 chars long
           
           console.log(`Registering contents of ${file} as Saved Query '${queryName}'\n`)
           
@@ -36,6 +52,13 @@ async function run() {
             queryString,
             serviceType: 'virtuoso',
             output: 'response',
+            variables: [
+              {
+                name: 'since',
+                termType: 'Literal',
+                datatype: 'http://www.w3.org/2001/XMLSchema#dateTime'
+              }
+            ]
           }
 
           try {
@@ -50,6 +73,12 @@ async function run() {
 
           result[tableName] = runLink
           console.log(`Available on ${runLink}\n`)
+          
+          if (process.env.FETCH_RESULT) {
+            const path = `${tableName}.csv`
+            console.log(`Downloading result from ${runLink} to ${path} \n`)
+            downloadFile(runLink, path)
+          }
           console.log('\n--------------------------------------------\n')
         } catch (readErr) {
           console.error(readErr)

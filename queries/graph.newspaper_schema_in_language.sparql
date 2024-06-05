@@ -5,6 +5,6 @@ SELECT DISTINCT
   ?collection_id
   ?schema_in_language 
 WHERE {
-    ?id a schema:Newspaper;
+    ?collection_id a schema:Newspaper;
         schema:inLanguage ?schema_in_language.
 }

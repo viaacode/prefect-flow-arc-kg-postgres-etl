@@ -5,6 +5,6 @@ SELECT DISTINCT
   ?collection_id
   ?schema_alternate_name 
 WHERE {
-    ?id a schema:Newspaper;
+    ?collection_id a schema:Newspaper;
         schema:alternateName ?schema_alternate_name.
 }

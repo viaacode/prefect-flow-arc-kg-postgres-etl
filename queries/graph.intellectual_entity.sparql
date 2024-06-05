@@ -20,7 +20,6 @@ SELECT DISTINCT
 ?schema_name
 ?schema_description
 ?schema_abstract
-?schema_is_part_of
 ?schema_position
 ?ha_des_number_of_pages
 ?ha_des_primary_identifier
@@ -34,7 +33,6 @@ SELECT DISTINCT
 ?schema_copyright_year
 ?dcterms_rights
 ?schema_credit_text
-?modified
 WHERE {
   
     ?id a premis:IntellectualEntity;
@@ -61,7 +59,6 @@ WHERE {
       FILTER langMatches(lang(?schema_abstract), "nl")
     }
   
-    OPTIONAL { ?id schema:isPartOf ?schema_isPartOf }
     OPTIONAL { ?id haDes:pageNumber ?schema_position }
     OPTIONAL { ?id haDes:numberOfPages ?ha_des_number_of_pages }
     OPTIONAL { ?id haDes:primaryIdentifier ?ha_des_primary_identifier }
