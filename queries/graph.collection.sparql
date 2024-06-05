@@ -1,0 +1,44 @@
+prefix schema: <https://schema.org/>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+
+SELECT DISTINCT 
+  ?id
+  ?schema_identifier 
+  ?schema_name 
+  ?schema_alternate_name 
+  ?schema_publisher 
+  ?schema_location_created 
+  ?schema_start_date 
+  ?schema_end_date 
+  ?bibframe_preceeded_by 
+  ?bibframe_succeeded_by 
+  ?bibframe_supplement_to 
+WHERE {
+  {
+    ?id a schema:Newspaper;
+        schema:identifier ?schema_identifier;
+        schema:name ?schema_name;
+        #schema:alternateName ?schema_alternate_name;
+        schema:publisher ?schema_publisher;
+        schema:locationCreated ?schema_location_created;
+        schema:startDate ?schema_start_date;
+        schema:endDate ?schema_end_date.
+
+    #OPTIONAL { ?id schema:alternateName ?schema_alternate_name }
+
+    OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
+
+    OPTIONAL { ?id bf:succeededBy ?bibframe_succeeded_by }
+
+    OPTIONAL { ?id bf:supplementTo ?bibframe_supplement_to } 
+  }
+  UNION {
+    ?id a schema:Episode; schema:name ?schema_name;
+  }
+  UNION {
+    ?id a schema:CreativeWorkSeries; schema:name ?schema_name;
+  }
+  UNION {
+    ?id a schema:CreativeWorkSeason; schema:name ?schema_name;
+  }
+}
