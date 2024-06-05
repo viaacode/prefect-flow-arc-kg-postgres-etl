@@ -1,0 +1,10 @@
+prefix schema: <https://schema.org/>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+
+SELECT DISTINCT 
+  ?collection_id
+  ?schema_in_language 
+WHERE {
+    ?id a schema:Newspaper;
+        schema:inLanguage ?schema_in_language.
+}

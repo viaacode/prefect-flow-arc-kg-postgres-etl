@@ -18,13 +18,12 @@ WHERE {
     ?id a schema:Newspaper;
         schema:identifier ?schema_identifier;
         schema:name ?schema_name;
-        #schema:alternateName ?schema_alternate_name;
         schema:publisher ?schema_publisher;
-        schema:locationCreated ?schema_location_created;
+        schema:locationCreated/schema:name ?schema_location_created;
         schema:startDate ?schema_start_date;
         schema:endDate ?schema_end_date.
 
-    #OPTIONAL { ?id schema:alternateName ?schema_alternate_name }
+    FILTER langMatches(lang(?schema_location_created), "nl")
 
     OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
 
