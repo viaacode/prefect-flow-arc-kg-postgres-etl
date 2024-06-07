@@ -5,7 +5,7 @@ from io import StringIO
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from prefect.blocks.system import JSON
-import datetime
+from datetime import datetime
 
 
 @task()
