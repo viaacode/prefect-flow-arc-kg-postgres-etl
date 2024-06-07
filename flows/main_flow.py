@@ -81,7 +81,7 @@ def upsert_pages(table_name, csv_url, postgres_creds, triply_creds, since=None):
     return logger.info(f"Table {table_name} successfully synced.")
 
 
-@flow(name="FILL_IN_FLOW_NAME_HERE!")
+@flow(name="prefect-flow-arc-kg-postgres-etl")
 def main_flow(
     triplydb_block_name: str = "triplydb",
     postgres_block_name: str = "hasura",
