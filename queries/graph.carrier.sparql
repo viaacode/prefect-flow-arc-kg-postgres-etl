@@ -26,7 +26,9 @@ SELECT DISTINCT
 WHERE {
     ?id a haObj:PhysicalCarrier;
     schema:name ?schema_name;
-    premis:medium/skos:prefLabel ?premis_medium;
+    premis:medium/skos:prefLabel ?premis_medium.
+
+    FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "nl"))
 
     OPTIONAL {
       ?id schema:identifier    ?schema_identifier
@@ -40,15 +42,17 @@ WHERE {
       ?id schema:height ?height.
       ?height schema:value ?height_value;
               schema:unitText ?height_unit.
+      BIND( CONCAT(?height_value, ' ', ?height_unit) as ?schema_height)
     }
-    BIND( CONCAT(?height_value, ' ', ?height_unit) as ?schema_height)
+    
   
     OPTIONAL {
       ?id schema:width ?width.
       ?width schema:value ?width_value;
               schema:unitText ?width_unit.
+      BIND( CONCAT(?width_value, ' ', ?width_unit) as ?schema_width)
     }
-    BIND( CONCAT(?width_value, ' ', ?width_unit) as ?schema_width)
+    
     OPTIONAL {
       ?id schema:materialExtent ?schema_material_extent
     }
