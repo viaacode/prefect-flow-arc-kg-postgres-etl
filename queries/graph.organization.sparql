@@ -23,18 +23,18 @@ WHERE {
 
   OPTIONAL { ?id dct:description ?dcterms_description }
   OPTIONAL { ?id dct:description ?dcterms_description }
-  OPTIONAL { ?iri foaf:homepage ?foaf_homepage }
-  OPTIONAL { ?iri haOrg:hasLogo ?ha_org_has_logo }
+  OPTIONAL { ?id foaf:homepage ?foaf_homepage }
+  OPTIONAL { ?id haOrg:hasLogo ?ha_org_has_logo }
   OPTIONAL { 
-    ?iri haOrg:allowsOverlay ?ha_org_allows_overlay_res 
+    ?id haOrg:allowsOverlay ?ha_org_allows_overlay_res 
   }
   BIND( IF(?ha_org_allows_overlay_res, "true", "false") as ?ha_org_allows_overlay)
-  OPTIONAL { ?iri haOrg:allowsBZT ?ha_org_allows_bzt_res }
+  OPTIONAL { ?id haOrg:allowsBZT ?ha_org_allows_bzt_res }
   BIND( IF(?ha_org_allows_bzt_res, "true", "false") as ?ha_org_allows_bzt)
-  OPTIONAL { ?iri haOrg:requestForm ?ha_org_request_form } 
-  OPTIONAL { ?iri haOrg:sector ?ha_org_sector } 
+  OPTIONAL { ?id haOrg:requestForm ?ha_org_request_form } 
+  OPTIONAL { ?id haOrg:sector ?ha_org_sector } 
   OPTIONAL { 
-    ?iri org:classification/skos:prefLabel ?org_classification .
+    ?id org:classification/skos:prefLabel ?org_classification .
     FILTER langMatches(lang(?org_classification), "nl") 
   }
 }

@@ -3,7 +3,7 @@ import App from '@triply/triplydb'
 
 import 'dotenv/config';
 import { writeFileSync, createWriteStream, existsSync } from 'fs'
-import { readdir, readFile, mkdir } from 'fs/promises'
+import { readdir, readFile, mkdir, rm } from 'fs/promises'
 import { join, extname, parse, resolve } from 'path'
 import { Readable }  from 'stream'
 import { finished }  from 'stream/promises'
@@ -18,6 +18,9 @@ async function downloadFile(url, fileName) {
   if (!existsSync("tables")) 
     await mkdir("tables"); //Optional if you already have downloads directory
   const destination = resolve("./tables", fileName);
+
+  if (existsSync(destination))
+    await rm(destination);
   const fileStream = createWriteStream(destination, { flags: 'wx' });
   await finished(Readable.fromWeb(res.body).pipe(fileStream));
 }
