@@ -3,7 +3,9 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 
 SELECT DISTINCT 
   ?collection_id
-  ?schema_in_language 
+  ?schema_in_language
+  ?created_at
+  ?updated_at
 WHERE {
     ?collection_id a schema:Newspaper;
         schema:inLanguage ?schema_in_language.

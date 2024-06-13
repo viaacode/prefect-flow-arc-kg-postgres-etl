@@ -3,7 +3,11 @@ PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#> # SKOS Vocabulary
 PREFIX prov: <http://www.w3.org/ns/prov#>
 
-SELECT DISTINCT ?intellectual_entity_id ?schema_license
+SELECT DISTINCT 
+?intellectual_entity_id 
+?schema_license
+?created_at
+?updated_at
 WHERE {
     ?intellectual_entity_id schema:license ?schema_license_res.
     ?schema_license_res skos:notation ?schema_license; 

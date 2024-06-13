@@ -4,7 +4,12 @@ PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 prefix prov: <http://www.w3.org/ns/prov#>
 prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-SELECT DISTINCT ?type ?value ?intellectual_entity_id 
+SELECT DISTINCT 
+?type 
+?value 
+?intellectual_entity_id
+?created_at
+?updated_at
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
      schema:license ?schema_license_res;

@@ -1,0 +1,4 @@
+prefect==2.14.12
+prefect-sqlalchemy
+prefect-meemoo[triplydb]==0.7.9
+psycopg2-binary==2.9.5

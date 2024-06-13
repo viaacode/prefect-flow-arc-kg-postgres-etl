@@ -16,6 +16,8 @@ SELECT DISTINCT
 ?org_classification
 ?org_identifier
 ?skos_pref_label
+?created_at
+?updated_at
 WHERE {
   ?id a haOrg:ContentPartner;
       org:identifier ?org_identifier;

@@ -1,6 +1,11 @@
 prefix schema: <https://schema.org/>
 
-SELECT ?intellectual_entity_id ?collection_id ?type
+SELECT 
+?intellectual_entity_id 
+?collection_id 
+?type
+?created_at
+?updated_at
 WHERE {
   ?intellectual_entity_id schema:isPartOf ?collection_id.
   ?collection_id a ?type .

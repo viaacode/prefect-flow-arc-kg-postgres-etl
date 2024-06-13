@@ -3,7 +3,9 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 
 SELECT DISTINCT 
   ?collection_id
-  ?schema_alternate_name 
+  ?schema_alternate_name
+  ?created_at
+  ?updated_at
 WHERE {
     ?collection_id a schema:Newspaper;
         schema:alternateName ?schema_alternate_name.

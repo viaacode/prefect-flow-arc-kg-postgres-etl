@@ -1,6 +1,11 @@
 prefix skos: <http://www.w3.org/2004/02/skos/core#>
 
-SELECT ?subject ?predicate ?object
+SELECT 
+?subject 
+?predicate 
+?object
+?created_at
+?updated_at
 WHERE {
     ?subject a skos:Concept; ?predicate ?object.
 }

@@ -25,6 +25,8 @@ SELECT DISTINCT
 ?schema_duration
 ?schema_name
 ?schema_thumbnail_url
+?created_at
+?updated_at
 WHERE {
     ?id a premis:File;
           schema:name ?schema_name ;

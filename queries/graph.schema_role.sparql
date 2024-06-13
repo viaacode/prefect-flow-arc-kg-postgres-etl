@@ -2,7 +2,13 @@ PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 
-SELECT DISTINCT ?intellectual_entity_id ?type ?schema_role_name ?thing_id
+SELECT DISTINCT 
+?intellectual_entity_id 
+?type 
+?schema_role_name 
+?thing_id
+?created_at
+?updated_at
 WHERE {
     {
       ?intellectual_entity_id schema:publisher ?id; schema:license ?schema_license_res.

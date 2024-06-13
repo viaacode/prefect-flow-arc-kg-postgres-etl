@@ -23,12 +23,14 @@ SELECT DISTINCT
 ?schema_material_extent
 ?schema_name
 ?schema_width
+?created_at
+?updated_at
 WHERE {
     ?id a haObj:PhysicalCarrier;
     schema:name ?schema_name;
     premis:medium/skos:prefLabel ?premis_medium.
 
-    FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "nl"))
+    FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "en"))
 
     OPTIONAL {
       ?id schema:identifier    ?schema_identifier
