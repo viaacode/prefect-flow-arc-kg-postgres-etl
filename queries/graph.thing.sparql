@@ -1,6 +1,10 @@
 PREFIX schema: <https://schema.org/>
 
-SELECT DISTINCT ?id ?schema_name
+SELECT DISTINCT 
+?id 
+?schema_name
+?created_at
+?updated_at
 WHERE {
   {
     ?id a schema:Thing; schema:name ?schema_name.
