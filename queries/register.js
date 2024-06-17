@@ -74,7 +74,7 @@ async function run() {
           query = await account.addQuery(queryName, params)
           const runLink = await query.getRunLink()
 
-          result[tableName] = runLink
+          result[tableName] = { url: runLink }
           console.log(`Available on ${runLink}\n`)
           
           if (process.env.FETCH_RESULT) {
