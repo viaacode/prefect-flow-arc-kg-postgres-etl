@@ -33,7 +33,6 @@ def upsert_pages(
 
     def fetch_and_insert_page(url, cursor, temp_table_name):
         """Fetch a single page of CSV data and insert it into the temporary table."""
-        params = {"since": since.isoformat()} if since is not None else {}
         logger.info(f"Fetch and insert page {url} into {table_name}")
         response = requests.get(
             url,
@@ -126,7 +125,7 @@ def main_flow(
         Blocks:
             - triplydb (TriplyDBCredentials): Credentials to connect to MediaHaven
             - hetarchief-tst (PostgresCredentials): Credentials to connect to the postgres database
-            - saved-query-config (JSON): JSON object mapping postgres table to TriplyDB saved query run link
+            - saved-query-config (JSON): JSON object mapping postgres table to TriplyDB saved query run link. JSON must be of format { [table_name]: { url: runlink, position: ...}}
     """
     # Load logger
     logger = get_run_logger()
@@ -142,10 +141,10 @@ def main_flow(
     last_modified_date = get_last_run_config("%Y-%m-%d")
 
     # For each entry in config table: start sync task
-    for table_name, csv_url in table_config.value.items():
+    for table_name, csv_url in sorted(table_config.value.items(), key=lambda t: t["position"] if "position" in t else 0):
         upsert_pages.submit(
             table_name=table_name,
-            csv_url=csv_url,
+            csv_url=csv_url.url,
             triply_credentials=triply_creds,
             postgres_credentials=postgres_creds,
             since=last_modified_date,
