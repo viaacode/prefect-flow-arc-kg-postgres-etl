@@ -3,21 +3,21 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 
 SELECT DISTINCT 
   ?id
-  ?schema_identifier 
-  ?schema_name 
-  ?schema_alternate_name 
-  ?schema_publisher 
-  ?schema_location_created 
-  ?schema_start_date 
-  ?schema_end_date 
   ?bibframe_preceeded_by 
   ?bibframe_succeeded_by 
   ?bibframe_supplement_to
-  ?collection_type 
+  ?collection_type
+  ?schema_alternate_name 
+  ?schema_end_date
+  ?schema_identifier 
+  ?schema_is_part_of
+  ?schema_location_created
+  ?schema_name
+  ?schema_publisher 
+  ?schema_season_number 
+  ?schema_start_date 
   ?created_at
   ?updated_at
-  ?schema_is_part_of
-  ?schema_season_number
 WHERE {
   {
     ?id a schema:Newspaper;

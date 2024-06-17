@@ -4,9 +4,9 @@ PREFIX prov: <http://www.w3.org/ns/prov#>
 
 SELECT DISTINCT 
 ?intellectual_entity_id 
-?type 
 ?schema_role_name 
 ?thing_id
+?type 
 ?created_at
 ?updated_at
 WHERE {

@@ -8,10 +8,10 @@ SELECT DISTINCT
 ?id
 ?dcterms_description
 ?foaf_homepage
-?ha_org_request_form
 ?ha_org_allows_bzt
 ?ha_org_allows_overlay
 ?ha_org_has_logo
+?ha_org_request_form
 ?ha_org_sector
 ?org_classification
 ?org_identifier

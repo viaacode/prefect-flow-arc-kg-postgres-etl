@@ -2,8 +2,8 @@ prefix schema: <https://schema.org/>
 
 SELECT 
 ?intellectual_entity_id 
-?collection_id 
 ?type
+?collection_id 
 ?created_at
 ?updated_at
 WHERE {
