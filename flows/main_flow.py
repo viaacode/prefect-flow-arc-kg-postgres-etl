@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from prefect import task, flow, get_run_logger
 import requests
 import psycopg2
