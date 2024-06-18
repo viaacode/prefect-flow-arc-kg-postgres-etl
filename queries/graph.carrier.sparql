@@ -15,6 +15,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
 SELECT DISTINCT
 ?id
+(MIN(?ha_des_coloring_type_res) AS ?ha_des_coloring_type)
 ?premis_identifier
 ?premis_medium
 ?schema_height
@@ -61,4 +62,20 @@ WHERE {
     OPTIONAL {
       ?id schema:material ?schema_material
     }
+
+    OPTIONAL {
+      ?id haDes:coloringType/skos:prefLabel  ?ha_des_coloring_type_res
+      FILTER langMatches(lang(?ha_des_coloring_type_res), "nl")
+    }
 }
+GROUP BY ?id
+?premis_identifier
+?premis_medium
+?schema_height
+?schema_identifier
+?schema_material
+?schema_material_extent
+?schema_name
+?schema_width
+?created_at
+?updated_at

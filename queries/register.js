@@ -25,6 +25,12 @@ async function downloadFile(url, fileName) {
   await finished(Readable.fromWeb(res.body).pipe(fileStream));
 }
 
+function getFirstLine(text) {
+  var index = text.indexOf("\n");
+  if (index === -1) index = undefined;
+  return text.substring(0, index);
+}
+
 // Directory containing the .sparql files
 const directoryPath = './' // change this to your directory path
 
@@ -44,6 +50,15 @@ async function run() {
       if (extname(file) === '.sparql') {
         try {
           const queryString = await readFile(filePath, 'utf8')
+
+          // Get dependencies from first line
+          let position = 0
+          const match = getFirstLine(queryString).match(/# position:\s*(\d)/)
+          if (match) {
+            // Split the captured string by commas and strip any extra whitespace
+            position = parseInt(match[1],10);
+          }
+
           const tableName = parse(filePath).name
           const queryName = `get-${tableName.replace(/[._]/g, '-')}`.substring(0,40) // querynames can only be 40 chars long
           
@@ -74,7 +89,7 @@ async function run() {
           query = await account.addQuery(queryName, params)
           const runLink = await query.getRunLink()
 
-          result[tableName] = { url: runLink }
+          result[tableName] = { url: runLink, position }
           console.log(`Available on ${runLink}\n`)
           
           if (process.env.FETCH_RESULT) {

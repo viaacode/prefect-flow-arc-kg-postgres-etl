@@ -34,6 +34,7 @@ def upsert_pages(
     def fetch_and_insert_page(url, cursor, temp_table_name):
         """Fetch a single page of CSV data and insert it into the temporary table."""
         logger.info(f"Fetch and insert page {url} into {table_name}")
+        params = {"since": since.isoformat()} if since is not None else {}
         response = requests.get(
             url,
             params=params,
@@ -90,7 +91,7 @@ def upsert_pages(
     # Get primary keys
     get_primary_keys_query = f"""
     SELECT COLUMN_NAME from information_schema.key_column_usage 
-    WHERE table_name='{temp_table_name}'
+    WHERE table_name='{temp_table_name}' AND constraint_name LIKE '%pkey'
     """
     cur.execute(get_primary_keys_query)
     primary_keys = [row[0] for row in cur]
@@ -103,6 +104,7 @@ def upsert_pages(
     ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
     SET {', '.join(column_map)};
     """
+    logger.debug(f"Executing upsert query {upsert_query}")
     cur.execute(upsert_query)
     conn.commit()
 
@@ -141,14 +143,22 @@ def main_flow(
     last_modified_date = get_last_run_config("%Y-%m-%d")
 
     # For each entry in config table: start sync task
-    for table_name, csv_url in sorted(table_config.value.items(), key=lambda t: t["position"] if "position" in t else 0):
-        upsert_pages.submit(
+    tasks = {}
+    for table_name, csv_url in sorted(table_config.value.items(), key=lambda t: t[1]["position"]):
+        dependencies = tasks[csv_url["position"] - 1] if csv_url["position"] - 1 in tasks else []
+        task = upsert_pages.submit(
             table_name=table_name,
-            csv_url=csv_url.url,
+            csv_url=csv_url["url"],
             triply_credentials=triply_creds,
             postgres_credentials=postgres_creds,
             since=last_modified_date,
+            wait_for=dependencies
         )
+        # Initialize entry in task dict if not exists
+        if csv_url["position"] not in tasks:
+            tasks[csv_url["position"]] = []
+        # append to array
+        tasks[csv_url["position"]].append(task)
 
 if __name__ == "__main__":
     main_flow()
