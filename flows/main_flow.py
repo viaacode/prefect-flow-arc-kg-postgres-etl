@@ -24,6 +24,7 @@ def upsert_pages(
     def get_next_page_link(response):
         """Extract the next page link from the Link header if it exists."""
         link_header = response.headers.get("Link", None)
+        logger.debug(response.headers)
         if link_header:
             links = requests.utils.parse_header_links(link_header.strip("<>"))
             for link in links:
@@ -32,7 +33,7 @@ def upsert_pages(
         return None
 
     def fetch_and_insert_page(url, cursor, temp_table_name):
-        """Fetch a single page of CSV data and insert it into the temporary table."""
+        """Fetch a single page of CSV data and insert it into the temporary table. Returns the nex page url if there is one."""
         logger.info(f"Fetch and insert page {url} into {table_name}")
         params = {"since": since.isoformat()} if since is not None else {}
         response = requests.get(
@@ -50,6 +51,7 @@ def upsert_pages(
         COPY {temp_table_name} FROM STDIN WITH CSV HEADER DELIMITER ',';
         """
         cursor.copy_expert(copy_query, csv_data)
+        return get_next_page_link(response=response)
 
     # Step 1: Establish a connection to the PostgreSQL database
     conn = psycopg2.connect(
@@ -73,9 +75,8 @@ def upsert_pages(
     # Step 3: Fetch and insert each page of the CSV data
     url = csv_url
     while url:
-        fetch_and_insert_page(url, cur, temp_table_name)
+        url = fetch_and_insert_page(url, cur, temp_table_name)
         conn.commit()
-        url = get_next_page_link(requests.get(url))
 
     # Step 4: Upsert from the temporary table to the actual table
     logger.info(f"Upsert from the temporary table {temp_table_name} to the actual table {table_name}")

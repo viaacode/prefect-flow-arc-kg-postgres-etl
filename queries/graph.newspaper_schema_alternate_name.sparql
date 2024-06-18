@@ -1,6 +1,5 @@
 # position: 3
 prefix schema: <https://schema.org/>
-PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 
 SELECT DISTINCT 
   ?collection_id
