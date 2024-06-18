@@ -11,7 +11,6 @@ WHERE {
     VALUES ?predicate { skos:prefLabel }
     FILTER langMatches(lang(?object_res), "nl")
     # TEMP FIX: filter out literals with newlines until CSV ouput is fixed
-    #FILTER (!(regex(?object, "(\r\n|\r|\n)", "i")))
     BIND (IF(regex(?object_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?object_res,"\""),?object_res) AS ?object)
 }
 GROUP BY ?subject 
