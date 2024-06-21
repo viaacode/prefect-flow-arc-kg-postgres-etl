@@ -141,7 +141,8 @@ def main_flow(
     postgres_creds = DatabaseCredentials.load(postgres_block_name)
 
     # Figure out start time
-    last_modified_date = get_last_run_config("%Y-%m-%d")
+    if not full_sync:
+        last_modified_date = get_last_run_config("%Y-%m-%d")
 
     # For each entry in config table: start sync task
     tasks = {}
@@ -152,7 +153,7 @@ def main_flow(
             csv_url=csv_url["url"],
             triply_credentials=triply_creds,
             postgres_credentials=postgres_creds,
-            since=last_modified_date,
+            since=last_modified_date if not full_sync else None,
             wait_for=dependencies
         )
         # Initialize entry in task dict if not exists
