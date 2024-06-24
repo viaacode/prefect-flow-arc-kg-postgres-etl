@@ -36,11 +36,12 @@ WHERE {
           ebucore:hasMimeType ?ebucore_has_mime_type ;
           rel:isi ?relation_is_included_in.
     
-    ?relation_is_included_in rel:rep/schema:license ?schema_license_res . 
+    ?relation_is_included_in rel:rep/schema:license ?schema_license_res.
 
     FILTER langMatches(lang(?schema_name), "nl")
         
     VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    VALUES ?ebucore_has_mime_type { "application/json" "video/mp4" "audio/mp4" "image/jpeg" "application/xml" }
 
     ?id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )

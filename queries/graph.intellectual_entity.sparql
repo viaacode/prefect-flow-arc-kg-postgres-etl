@@ -44,12 +44,13 @@ WHERE {
   
     ?id a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
-           schema:name ?schema_name ;
+           schema:name ?schema_name_res ;
            schema:dateCreated ?schema_date_created;
            schema:maintainer ?schema_maintainer;
            schema:license ?schema_license_res . 
 
-    FILTER langMatches(lang(?schema_name), "nl")
+    FILTER langMatches(lang(?schema_name_res), "nl")
+    BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
     VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
 
@@ -59,13 +60,16 @@ WHERE {
     FILTER (!isLiteral(?since) || ?modified >= ?since )
   
     OPTIONAL{ 
-      ?id schema:description ?schema_description
-      FILTER langMatches(lang(?schema_description), "nl")
+      ?id schema:description ?schema_description_res
+      FILTER langMatches(lang(?schema_description_res), "nl")
+      # TEMP workaround for CSV issue
+      BIND (IF(regex(?schema_description_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_description_res,"\""),?schema_description_res) AS ?schema_description)
     }
   
     OPTIONAL{ 
-      ?id schema:abstract ?schema_abstract 
-      FILTER langMatches(lang(?schema_abstract), "nl")
+      ?id schema:abstract ?schema_abstract_res 
+      FILTER langMatches(lang(?schema_abstract_res), "nl")
+      BIND (IF(regex(?schema_abstract_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_abstract_res,"\""),?schema_abstract_res) AS ?schema_abstract)
     }
   
     OPTIONAL { ?id haDes:pageNumber ?schema_position }
