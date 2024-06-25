@@ -1,4 +1,4 @@
-# position: 3
+# position: 2
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX schema: <https://schema.org/>
 PREFIX dct: <http://purl.org/dc/terms/>
@@ -20,7 +20,7 @@ SELECT DISTINCT
 ?id
 ?edm_is_next_in_sequence 
 ?is_media_fragment_of
-?premis_represents 
+?represents 
 ?relation_has_root 
 ?relation_has_source 
 ?schema_caption 
@@ -32,59 +32,81 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?id a ?type;
-          schema:name ?schema_name ;
-          rel:rep ?premis_represents.
 
-    VALUES ?type {haObj:DigitalRepresentation haObj:FragmentRepresentation}
+    { 
+      ?id a haObj:DigitalRepresentation;
+          schema:name ?schema_name_res;
+          haObj:isAccessCopyOf ?represents.
+
+      FILTER langMatches(lang(?schema_name_res), "nl")
+      BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
+
+      FILTER EXISTS {
+            ?represents schema:license ?schema_license
+            VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      }
+      
+      ?id prov:wasDerivedFrom/schema:dateModified ?modified .
+      FILTER (!isLiteral(?since) || ?modified >= ?since )
+
+      OPTIONAL {
+        ?id schema:inLanguage ?schema_in_language
+      }
+
+      OPTIONAL {
+        ?id rel:hsr ?relation_has_root
+      }
+
+      OPTIONAL {
+        ?id rel:hss ?relation_has_source
+      }
+
+      OPTIONAL {
+        ?id edm:isNextInSequence ?edm_is_next_in_sequence 
+      }
+
+      OPTIONAL {
+        ?id schema:thumbnailUrl ?schema_thumbnail_url;
+      }
+
+      OPTIONAL {
+        ?id schema:duration ?schema_duration 
+      }
+
+      OPTIONAL {
+        ?id schema:caption ?schema_caption 
+      }
+
+      OPTIONAL {
+        ?id schema:transcript ?schema_transcript 
+      }
+    }
+    UNION
+    {
+      ?id a haObj:FragmentRepresentation;
+          schema:name ?schema_name_res;
+          rel:rep ?represents.
+
+      FILTER langMatches(lang(?schema_name_res), "nl")
+      BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
+            
+      FILTER EXISTS {
+            ?represents schema:license ?schema_license
+            VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      }
+
+      ?id prov:wasDerivedFrom/schema:dateModified ?modified .
+      FILTER (!isLiteral(?since) || ?modified >= ?since )
+
+      OPTIONAL {
+        ?id schema:startTime ?schema_start_time;
+            schema:endTime ?schema_end_time 
+      }
+
+      OPTIONAL {
+        ?id ebucore:isMediaFragmentOf ?is_media_fragment_of 
+      }
+    }
           
-    ?premis_represents schema:license ?schema_license_res . 
-
-    FILTER langMatches(lang(?schema_name), "nl")
-        
-    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
-
-    ?id prov:wasDerivedFrom/schema:dateModified ?modified .
-    FILTER (!isLiteral(?since) || ?modified >= ?since )
-
-    OPTIONAL {
-      ?id ebucore:isMediaFragmentOf ?is_media_fragment_of 
-    }
-
-    OPTIONAL {
-      ?id schema:inLanguage ?schema_in_language
-    }
-
-    OPTIONAL {
-      ?id rel:hsr ?relation_has_root
-    }
-
-    OPTIONAL {
-      ?id rel:hss ?relation_has_source
-    }
-
-    OPTIONAL {
-      ?id edm:isNextInSequence ?edm_is_next_in_sequence 
-    }
-
-    OPTIONAL {
-      ?id schema:thumbnailUrl ?schema_thumbnail_url;
-    }
-
-    OPTIONAL {
-      ?id schema:duration ?schema_duration 
-    }
-
-    OPTIONAL {
-      ?id schema:caption ?schema_caption 
-    }
-
-    OPTIONAL {
-      ?id schema:transcript ?schema_transcript 
-    }
-          
-    OPTIONAL {
-      ?id schema:startTime ?schema_start_time;
-          schema:endTime ?schema_end_time 
-    }
+    
 }

@@ -13,7 +13,9 @@ SELECT DISTINCT
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
      schema:license ?schema_license_res;
-    schema:alternateName ?schema_alternate_name.
+    schema:alternateName ?schema_alternate_name_res.
+
+  BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
   
   VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
 

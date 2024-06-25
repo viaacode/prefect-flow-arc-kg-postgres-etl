@@ -39,7 +39,7 @@ WHERE {
     BIND ("newspaper" AS ?collection_type)
   }
   UNION {
-    ?id a schema:Episode; schema:name ?schema_name_res;
+    ?id a schema:Episode; schema:name ?schema_name_res.
     BIND ("episode" AS ?collection_type)
   }
   UNION {

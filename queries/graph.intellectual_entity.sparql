@@ -45,7 +45,6 @@ WHERE {
     ?id a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name_res ;
-           schema:dateCreated ?schema_date_created;
            schema:maintainer ?schema_maintainer;
            schema:license ?schema_license_res . 
 
@@ -59,6 +58,10 @@ WHERE {
     #?fragment schema:identifier ?mh_fragment_identifier.
     FILTER (!isLiteral(?since) || ?modified >= ?since )
   
+    OPTIONAL {
+      ?id schema:dateCreated ?schema_date_created .
+    }
+
     OPTIONAL{ 
       ?id schema:description ?schema_description_res
       FILTER langMatches(lang(?schema_description_res), "nl")

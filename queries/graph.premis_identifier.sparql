@@ -4,6 +4,7 @@ PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 prefix prov: <http://www.w3.org/ns/prov#>
 prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix haObj: <https://data.hetarchief.be/ns/object/>
 
 SELECT DISTINCT 
 ?intellectual_entity_id
@@ -16,8 +17,10 @@ WHERE {
      schema:license ?schema_license_res;
     premis:identifier ?premis_identifier.
 
-  ?premis_identifier a ?type; rdf:value ?value.
-  
+  ?premis_identifier a ?type_res; rdf:value ?value.
+  FILTER (?type_res != haObj:LocalIdentifier)
+  BIND (REPLACE(STR(?type_res), "^.*/([^/]*)$", "$1") as ?type)
+
   VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
 
   ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified.

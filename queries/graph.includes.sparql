@@ -1,4 +1,4 @@
-# position: 1
+# position: 3
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX schema: <https://schema.org/>
 PREFIX dct: <http://purl.org/dc/terms/>
@@ -17,46 +17,24 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 prefix edm: <http://www.europeana.eu/schemas/edm/>
 
 SELECT DISTINCT
-?id
-?ebucore_has_mime_type
-?edm_is_next_in_sequence
-?premis_original_name
-?premis_stored_at
-?schema_duration
-?schema_name
-?schema_thumbnail_url
+?representation_id
+?file_id
 ?created_at
 ?updated_at
 WHERE {
-    ?id a premis:File;
-          schema:name ?schema_name ;
-          premis:originalName ?premis_original_name;
-          premis:storedAt/rdf:value ?premis_stored_at ;
-          ebucore:hasMimeType ?ebucore_has_mime_type ;
-          prov:wasDerivedFrom/schema:dateModified ?modified .
-        
-    FILTER (
-      langMatches(lang(?schema_name), "nl") && 
-      (?ebucore_has_mime_type IN ( "application/json", "video/mp4", "audio/mp4", "image/jpeg", "application/xml", "audio/mpeg", "audio/m4a" ))
-    )
-
+    ?file_id a premis:File;
+        ebucore:hasMimeType ?ebucore_has_mime_type ;
+        rel:isi ?representation_id.
+    
     FILTER EXISTS {
-      ?id rel:isi/rel:rep/schema:license ?schema_license
+      ?representation_id haObj:isAccessCopyOf/schema:license ?schema_license
       VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
     }
 
+    FILTER (
+      (?ebucore_has_mime_type IN ( "application/json", "video/mp4", "audio/mp4", "image/jpeg", "application/xml", "audio/mpeg", "audio/m4a" ))
+    )
+
+    ?file_id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
-
-    OPTIONAL {
-      ?id edm:isNextInSequence ?edm_is_next_in_sequence 
-    }
-
-    OPTIONAL {
-      ?id schema:thumbnailUrl ?schema_thumbnail_url;
-    }
-
-    OPTIONAL {
-      ?id schema:duration ?schema_duration_res.
-      BIND ((0 + ?schema_duration_res) AS ?schema_duration)
-    }
 }
