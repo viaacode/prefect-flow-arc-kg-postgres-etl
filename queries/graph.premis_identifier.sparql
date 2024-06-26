@@ -14,14 +14,16 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
-     schema:license ?schema_license_res;
     premis:identifier ?premis_identifier.
 
   ?premis_identifier a ?type_res; rdf:value ?value.
   FILTER (?type_res != haObj:LocalIdentifier)
   BIND (REPLACE(STR(?type_res), "^.*/([^/]*)$", "$1") as ?type)
 
-  VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+  FILTER EXISTS {
+      ?intellectual_entity_id schema:license ?schema_license
+      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+  }
 
   ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified.
   FILTER (!isLiteral(?since) || ?modified >= ?since )

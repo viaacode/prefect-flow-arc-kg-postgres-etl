@@ -45,13 +45,15 @@ WHERE {
     ?id a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name_res ;
-           schema:maintainer ?schema_maintainer;
-           schema:license ?schema_license_res . 
+           schema:maintainer ?schema_maintainer. 
 
     FILTER langMatches(lang(?schema_name_res), "nl")
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
-    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    FILTER EXISTS {
+      ?id schema:license ?schema_license
+      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    }
 
     ?id prov:wasDerivedFrom ?fragment.
     ?fragment schema:dateModified ?modified .
