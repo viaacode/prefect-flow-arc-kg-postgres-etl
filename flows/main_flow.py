@@ -102,7 +102,7 @@ def upsert_pages(
     # When full sync: truncate table first
     if since is None:
         truncate_query = f"""
-        TRUNCATE {table_name}
+        TRUNCATE {table_name} CASCADE
         """
         logger.info(f"Truncating {table_name} because full sync is enabled.")
         cur.execute(truncate_query)
