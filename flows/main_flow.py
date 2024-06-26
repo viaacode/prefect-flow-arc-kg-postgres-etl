@@ -99,6 +99,15 @@ def upsert_pages(
 
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}",column_names))
 
+    # When full sync: truncate table first
+    if since is None:
+        truncate_query = f"""
+        TRUNCATE ONLY {table_name}
+        """
+        logger.info(f"Truncating {table_name} because full sync is enabled.")
+        cur.execute(truncate_query)
+        conn.commit()
+    
     upsert_query = f"""
     INSERT INTO {table_name}
     SELECT * FROM {temp_table_name}
