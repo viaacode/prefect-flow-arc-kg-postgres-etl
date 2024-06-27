@@ -28,22 +28,34 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
+  {
     ?id a premis:File;
           schema:name ?schema_name ;
           premis:originalName ?premis_original_name;
           premis:storedAt/rdf:value ?premis_stored_at ;
           ebucore:hasMimeType ?ebucore_has_mime_type ;
           prov:wasDerivedFrom/schema:dateModified ?modified .
+
+    FILTER EXISTS {
+      ?id rel:isi/rel:rep/schema:license ?schema_license
+      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    }
+  } UNION {
+    ?media_fragment ebucore:isMediaFragmentOf ?id. 
+    ?id a premis:File;
+          schema:name ?schema_name ;
+          premis:originalName ?premis_original_name;
+          premis:storedAt/rdf:value ?premis_stored_at ;
+          ebucore:hasMimeType ?ebucore_has_mime_type ;
+          prov:wasDerivedFrom/schema:dateModified ?modified .
+  }
         
     FILTER (
       langMatches(lang(?schema_name), "nl") && 
       (?ebucore_has_mime_type IN ( "application/json", "video/mp4", "audio/mp4", "image/jpeg", "application/xml", "audio/mpeg", "audio/m4a" ))
     )
 
-    FILTER EXISTS {
-      ?id rel:isi/rel:rep/schema:license ?schema_license
-      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
-    }
+
 
     FILTER (!isLiteral(?since) || ?modified >= ?since )
 

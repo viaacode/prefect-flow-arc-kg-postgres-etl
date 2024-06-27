@@ -15,6 +15,8 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
 # premis_IntellectualEntity
+SELECT DISTINCT * 
+WHERE {{
 SELECT DISTINCT
 ?id
 ?dcterms_available
@@ -52,9 +54,7 @@ WHERE {
       VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
     }
 
-    ?id prov:wasDerivedFrom ?fragment.
-    ?fragment schema:dateModified ?modified .
-    #?fragment schema:identifier ?mh_fragment_identifier.
+    ?id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
   
     OPTIONAL {
@@ -90,5 +90,5 @@ WHERE {
     # krant
     OPTIONAL{ ?id bf:issuance/skos:prefLabel ?bf_issuance }
 }
-
+}}
 

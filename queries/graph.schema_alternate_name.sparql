@@ -5,6 +5,7 @@ PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 prefix prov: <http://www.w3.org/ns/prov#>
 prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
+SELECT DISTINCT * {{
 SELECT DISTINCT 
 ?intellectual_entity_id 
 ?schema_alternate_name
@@ -13,6 +14,8 @@ SELECT DISTINCT
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
     schema:alternateName ?schema_alternate_name_res.
+
+  FILTER langMatches(lang(?schema_alternate_name_res), "nl")
 
   BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
   
@@ -24,3 +27,4 @@ WHERE {
   ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified.
   FILTER (!isLiteral(?since) || ?modified >= ?since )
 }
+}}
