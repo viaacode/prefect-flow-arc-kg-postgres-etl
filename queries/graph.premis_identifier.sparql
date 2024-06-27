@@ -13,12 +13,20 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
+  {
   ?intellectual_entity_id a premis:IntellectualEntity;
     premis:identifier ?premis_identifier.
 
   ?premis_identifier a ?type_res; rdf:value ?value.
   FILTER (?type_res != haObj:LocalIdentifier)
   BIND (REPLACE(STR(?type_res), "^.*/([^/]*)$", "$1") as ?type)
+  }
+  UNION {
+    ?intellectual_entity_id a premis:IntellectualEntity;
+                  haObj:primaryIdentifier/rdf:value ?value .
+
+    BIND ("primary" as ?type)
+  }
 
   FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license

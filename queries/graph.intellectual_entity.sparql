@@ -23,11 +23,8 @@ SELECT DISTINCT
 ?ebucore_has_object_type
 ?ebucore_synopsis
 ?ha_des_number_of_pages
-?ha_des_primary_identifier
-?mh_fragment_identifier
 ?relation_is_part_of
 ?schema_abstract
-?schema_copyright_holder
 ?schema_copyright_notice
 ?schema_copyright_year
 ?schema_credit_text
@@ -79,7 +76,6 @@ WHERE {
   
     OPTIONAL { ?id haDes:pageNumber ?schema_position }
     OPTIONAL { ?id haDes:numberOfPages ?ha_des_number_of_pages }
-    OPTIONAL { ?id haDes:primaryIdentifier ?ha_des_primary_identifier }
     OPTIONAL { ?id rel:isp ?relation_is_part_of }
     OPTIONAL { ?id dct:available ?dcterms_available }
     OPTIONAL { ?id schema:datePublished ?schema_date_published }
@@ -88,7 +84,6 @@ WHERE {
     OPTIONAL { ?id schema:inLanguage ?schema_in_language }
     OPTIONAL { ?id schema:copyrightYear ?schema_copyright_year }
     OPTIONAL { ?id schema:copyrightNotice ?schema_copyright_notice }
-    OPTIONAL { ?id schema:copyrightHolder ?schema_copyright_holder }
     OPTIONAL { ?id dct:rights ?dcterms_rights }
     OPTIONAL { ?id schema:creditText ?schema_credit_text }    
     OPTIONAL { ?id ebucore:synopsis ?ebucore_synopsis }

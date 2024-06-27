@@ -57,6 +57,6 @@ WHERE {
 
     OPTIONAL {
       ?id schema:duration ?schema_duration_res.
-      BIND ((0 + ?schema_duration_res) AS ?schema_duration)
+      BIND (xsd:double(?schema_duration_res) AS ?schema_duration)
     }
 }
