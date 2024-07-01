@@ -36,7 +36,7 @@ WHERE {
     { 
       ?id a haObj:DigitalRepresentation;
           schema:name ?schema_name_res;
-          haObj:isAccessCopyOf ?represents.
+          haObj:isAccessCopyOf|^haObj:hasIIIFCopy ?represents.
 
       FILTER langMatches(lang(?schema_name_res), "nl")
       BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
