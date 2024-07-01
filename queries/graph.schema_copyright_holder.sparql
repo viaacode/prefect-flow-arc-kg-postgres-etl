@@ -4,20 +4,18 @@ PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 prefix prov: <http://www.w3.org/ns/prov#>
 prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
-SELECT DISTINCT * {{
 SELECT DISTINCT 
 ?intellectual_entity_id 
-?schema_alternate_name
+?schema_copyright_holder
 ?created_at
 ?updated_at
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
-    schema:alternateName ?schema_alternate_name_res.
+    schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder_res.
 
-  FILTER langMatches(lang(?schema_alternate_name_res), "nl")
-
-  BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
+  BIND (IF(regex(?schema_copyright_holder_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_copyright_holder_res,"\""),?schema_copyright_holder_res) AS ?schema_copyright_holder)
   
   FILTER EXISTS {
     ?intellectual_entity_id schema:license ?schema_license
@@ -27,4 +25,3 @@ WHERE {
   ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified.
   FILTER (!isLiteral(?since) || ?modified >= ?since )
 }
-}}

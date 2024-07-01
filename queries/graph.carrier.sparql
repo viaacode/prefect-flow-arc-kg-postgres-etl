@@ -15,8 +15,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
 SELECT DISTINCT
 ?id
-(MIN(?ha_des_coloring_type_res) AS ?ha_des_coloring_type)
-?premis_identifier
+?intellectual_entity_id
 ?premis_medium
 ?schema_height
 ?schema_identifier
@@ -27,18 +26,20 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
+    ?intellectual_entity_id rel:isr/premis:storedAt ?id.
     ?id a haObj:PhysicalCarrier;
     schema:name ?schema_name;
     premis:medium/skos:prefLabel ?premis_medium.
+
+    FILTER EXISTS {
+      ?intellectual_entity_id schema:license ?schema_license
+      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    }
 
     FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "en"))
 
     OPTIONAL {
       ?id schema:identifier    ?schema_identifier
-    }
-
-    OPTIONAL {
-      ?id premis:identifier ?premis_identifier
     }
   
     OPTIONAL {
@@ -62,20 +63,4 @@ WHERE {
     OPTIONAL {
       ?id schema:material ?schema_material
     }
-
-    OPTIONAL {
-      ?id haDes:coloringType/skos:prefLabel  ?ha_des_coloring_type_res
-      FILTER langMatches(lang(?ha_des_coloring_type_res), "nl")
-    }
 }
-GROUP BY ?id
-?premis_identifier
-?premis_medium
-?schema_height
-?schema_identifier
-?schema_material
-?schema_material_extent
-?schema_name
-?schema_width
-?created_at
-?updated_at

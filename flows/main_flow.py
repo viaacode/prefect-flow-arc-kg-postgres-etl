@@ -67,6 +67,7 @@ def upsert_pages(
     # Step 2: Create a temporary table for upserting
     temp_table_name = f"temp_{table_name.split('.',1)[1]}"
     create_temp_table_query = f"""
+    DROP TABLE IF EXISTS {temp_table_name};
     CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL);
     """
     cur.execute(create_temp_table_query)
@@ -99,6 +100,15 @@ def upsert_pages(
 
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}",column_names))
 
+    # When full sync: truncate table first
+    if since is None:
+        truncate_query = f"""
+        TRUNCATE {table_name} CASCADE
+        """
+        logger.info(f"Truncating {table_name} because full sync is enabled.")
+        cur.execute(truncate_query)
+        conn.commit()
+    
     upsert_query = f"""
     INSERT INTO {table_name}
     SELECT * FROM {temp_table_name}
