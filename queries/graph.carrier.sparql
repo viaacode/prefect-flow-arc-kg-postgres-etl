@@ -16,6 +16,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 SELECT DISTINCT
 ?id
 ?intellectual_entity_id
+?bf_production_method
 ?premis_medium
 ?schema_height
 ?schema_identifier
@@ -26,7 +27,8 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id rel:isr/premis:storedAt ?id.
+    ?intellectual_entity_id rel:isr ?rep.
+    ?rep premis:storedAt ?id.
     ?id a haObj:PhysicalCarrier;
     schema:name ?schema_name;
     premis:medium/skos:prefLabel ?premis_medium.
@@ -40,6 +42,11 @@ WHERE {
 
     OPTIONAL {
       ?id schema:identifier    ?schema_identifier
+    }
+
+    OPTIONAL {
+      ?rep bf:productionMethod/skos:prefLabel ?bf_production_method.
+      FILTER (langMatches(lang(?bf_production_method), "nl"))
     }
   
     OPTIONAL {

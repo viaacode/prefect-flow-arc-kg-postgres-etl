@@ -34,6 +34,7 @@ SELECT DISTINCT
 ?schema_date_published
 ?schema_description
 ?schema_identifier
+?schema_issue_number
 ?schema_maintainer
 ?schema_name
 ?schema_position
@@ -76,6 +77,7 @@ WHERE {
   
     OPTIONAL { ?id haDes:pageNumber ?schema_position }
     OPTIONAL { ?id haDes:numberOfPages ?ha_des_number_of_pages }
+    OPTIONAL { ?id schema:issueNumber ?schema_issue_number }
     OPTIONAL { ?id rel:isp ?relation_is_part_of }
     OPTIONAL { ?id dct:available ?dcterms_available }
     OPTIONAL { ?id schema:datePublished ?schema_date_published }
