@@ -14,7 +14,7 @@ SELECT DISTINCT
   ?schema_is_part_of
   (SAMPLE(?schema_location_created_res) AS ?schema_location_created)
   (SAMPLE(?schema_name_res) AS ?schema_name) # TEMP FIX for multiple newspaper names
-  ?schema_publisher 
+  (SAMPLE(?schema_publisher_res) AS ?schema_publisher)
   ?schema_season_number 
   (MIN(?schema_start_date_res) AS ?schema_start_date)
   ?created_at
@@ -26,13 +26,22 @@ WHERE {
         schema:name ?schema_name_res;
         schema:hasPart ?serie.
 
-    ?serie 
-        schema:locationCreated/schema:name ?schema_location_created_res;
-        schema:startDate ?schema_start_date_res;
-        schema:endDate ?schema_end_date_res;
-        schema:publisher ?schema_publisher.
+    OPTIONAL {
+      ?serie schema:locationCreated/schema:name ?schema_location_created_res.
+      FILTER langMatches(lang(?schema_location_created_res), "nl")
+    }
 
-    FILTER langMatches(lang(?schema_location_created_res), "nl")
+    OPTIONAL {    
+      ?serie  schema:endDate ?schema_end_date_res.
+    }
+
+    OPTIONAL {
+      ?serie schema:startDate ?schema_start_date_res.
+    }
+
+    OPTIONAL {
+      ?serie schema:publisher ?schema_publisher_res.
+    }
 
     #OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
 
@@ -70,8 +79,6 @@ GROUP BY ?id
   ?schema_alternate_name 
   ?schema_identifier 
   ?schema_is_part_of
-  #?schema_location_created
-  ?schema_publisher 
   ?schema_season_number 
   ?created_at
   ?updated_at
