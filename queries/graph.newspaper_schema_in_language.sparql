@@ -9,5 +9,6 @@ SELECT DISTINCT
   ?updated_at
 WHERE {
     ?collection_id a schema:Newspaper;
+        schema:hasPart ?part;
         schema:inLanguage ?schema_in_language.
 }
