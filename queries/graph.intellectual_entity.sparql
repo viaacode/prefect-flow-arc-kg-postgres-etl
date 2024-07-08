@@ -76,7 +76,6 @@ WHERE {
     OPTIONAL { ?id schema:datePublished ?schema_date_published }
     OPTIONAL { ?id ebucore:hasObjectType ?ebucore_has_object_type }
     OPTIONAL { ?id ebucore:hasCastMember ?ebucore_has_cast_member }
-    OPTIONAL { ?id schema:inLanguage ?schema_in_language }
     OPTIONAL { ?id schema:copyrightYear ?schema_copyright_year }
     OPTIONAL { ?id schema:copyrightNotice ?schema_copyright_notice }
     OPTIONAL { ?id schema:copyrightHolder ?schema_copyright_holder }
