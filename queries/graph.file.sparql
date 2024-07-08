@@ -1,4 +1,4 @@
-# position: 2
+# position: 1
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX schema: <https://schema.org/>
 PREFIX dct: <http://purl.org/dc/terms/>
@@ -22,31 +22,48 @@ SELECT DISTINCT
 ?edm_is_next_in_sequence
 ?premis_original_name
 ?premis_stored_at
-?relation_is_included_in
 ?schema_duration
 ?schema_name
 ?schema_thumbnail_url
 ?created_at
 ?updated_at
 WHERE {
-    ?id a premis:File;
+
+    {
+      ?id a premis:File;
           schema:name ?schema_name ;
           premis:originalName ?premis_original_name;
           premis:storedAt/rdf:value ?premis_stored_at ;
           ebucore:hasMimeType ?ebucore_has_mime_type ;
-          rel:isi ?relation_is_included_in.
-    
-    ?relation_is_included_in rel:rep/schema:license ?schema_license_res . 
+          prov:wasDerivedFrom/schema:dateModified ?modified .
+      
+      FILTER (!isLiteral(?since) || ?modified >= ?since )
 
-    FILTER langMatches(lang(?schema_name), "nl")
-        
-    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      FILTER (
+        langMatches(lang(?schema_name), "nl") && 
+        (?ebucore_has_mime_type IN ( "application/json", "video/mp4", "audio/mp4", "image/jpeg", "application/xml", "audio/mpeg", "audio/m4a", "image/jph" ))
+      )
 
-    ?id prov:wasDerivedFrom/schema:dateModified ?modified .
-    FILTER (!isLiteral(?since) || ?modified >= ?since )
+      FILTER EXISTS {
+        ?id rel:isi/rel:rep/schema:license ?schema_license
+        VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      }
 
-    OPTIONAL {
-      ?id ebucore:hasMediaFragment ?ebucore_has_media_fragment 
+    } UNION {
+      ?media_fragment ebucore:isMediaFragmentOf ?id.
+      ?id a premis:File;
+          schema:name ?schema_name ;
+          premis:originalName ?premis_original_name;
+          premis:storedAt/rdf:value ?premis_stored_at ;
+          ebucore:hasMimeType ?ebucore_has_mime_type ;
+          prov:wasDerivedFrom/schema:dateModified ?modified .
+
+      FILTER (langMatches(lang(?schema_name), "nl"))
+
+      FILTER EXISTS {
+        ?fragment rel:rep/schema:license ?schema_license
+        VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      }
     }
 
     OPTIONAL {
@@ -58,6 +75,7 @@ WHERE {
     }
 
     OPTIONAL {
-      ?id schema:duration ?schema_duration 
+      ?id schema:duration ?schema_duration_res.
+      BIND (xsd:double(?schema_duration_res) AS ?schema_duration)
     }
 }

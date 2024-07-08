@@ -15,6 +15,8 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
 # premis_IntellectualEntity
+SELECT DISTINCT * 
+WHERE {{
 SELECT DISTINCT
 ?id
 ?dcterms_available
@@ -23,11 +25,8 @@ SELECT DISTINCT
 ?ebucore_has_object_type
 ?ebucore_synopsis
 ?ha_des_number_of_pages
-?ha_des_primary_identifier
-?mh_fragment_identifier
 ?relation_is_part_of
 ?schema_abstract
-?schema_copyright_holder
 ?schema_copyright_notice
 ?schema_copyright_year
 ?schema_credit_text
@@ -44,33 +43,39 @@ WHERE {
   
     ?id a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
-           schema:name ?schema_name ;
-           schema:dateCreated ?schema_date_created;
-           schema:maintainer ?schema_maintainer;
-           schema:license ?schema_license_res . 
+           schema:name ?schema_name_res ;
+           schema:maintainer ?schema_maintainer. 
 
-    FILTER langMatches(lang(?schema_name), "nl")
+    FILTER langMatches(lang(?schema_name_res), "nl")
+    BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
-    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    FILTER EXISTS {
+      ?id schema:license ?schema_license
+      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    }
 
-    ?id prov:wasDerivedFrom ?fragment.
-    ?fragment schema:dateModified ?modified .
-    #?fragment schema:identifier ?mh_fragment_identifier.
+    ?id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
   
+    OPTIONAL {
+      ?id schema:dateCreated ?schema_date_created .
+    }
+
     OPTIONAL{ 
-      ?id schema:description ?schema_description
-      FILTER langMatches(lang(?schema_description), "nl")
+      ?id schema:description ?schema_description_res
+      FILTER langMatches(lang(?schema_description_res), "nl")
+      # TEMP workaround for CSV issue
+      BIND (IF(regex(?schema_description_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_description_res,"\""),?schema_description_res) AS ?schema_description)
     }
   
     OPTIONAL{ 
-      ?id schema:abstract ?schema_abstract 
-      FILTER langMatches(lang(?schema_abstract), "nl")
+      ?id schema:abstract ?schema_abstract_res 
+      FILTER langMatches(lang(?schema_abstract_res), "nl")
+      BIND (IF(regex(?schema_abstract_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_abstract_res,"\""),?schema_abstract_res) AS ?schema_abstract)
     }
   
     OPTIONAL { ?id haDes:pageNumber ?schema_position }
     OPTIONAL { ?id haDes:numberOfPages ?ha_des_number_of_pages }
-    OPTIONAL { ?id haDes:primaryIdentifier ?ha_des_primary_identifier }
     OPTIONAL { ?id rel:isp ?relation_is_part_of }
     OPTIONAL { ?id dct:available ?dcterms_available }
     OPTIONAL { ?id schema:datePublished ?schema_date_published }
@@ -78,12 +83,11 @@ WHERE {
     OPTIONAL { ?id ebucore:hasCastMember ?ebucore_has_cast_member }
     OPTIONAL { ?id schema:copyrightYear ?schema_copyright_year }
     OPTIONAL { ?id schema:copyrightNotice ?schema_copyright_notice }
-    OPTIONAL { ?id schema:copyrightHolder ?schema_copyright_holder }
     OPTIONAL { ?id dct:rights ?dcterms_rights }
     OPTIONAL { ?id schema:creditText ?schema_credit_text }    
     OPTIONAL { ?id ebucore:synopsis ?ebucore_synopsis }
     # krant
     OPTIONAL{ ?id bf:issuance/skos:prefLabel ?bf_issuance }
 }
-
+}}
 
