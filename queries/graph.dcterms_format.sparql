@@ -8,12 +8,12 @@ prefix prov: <http://www.w3.org/ns/prov#>
 # premis_IntellectualEntity
 SELECT DISTINCT
 ?intellectual_entity_id 
-?dct_format
+?dcterms_format
 ?created_at
 ?updated_at
 WHERE {
     ?intellectual_entity_id a premis:IntellectualEntity;
-           dct:format ?dct_format.
+           dct:format ?dcterms_format.
 
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license

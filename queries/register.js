@@ -1,12 +1,14 @@
 //require('source-map-support/register')
 import App from '@triply/triplydb'
 
-import 'dotenv/config';
 import { writeFileSync, createWriteStream, existsSync } from 'fs'
 import { readdir, readFile, mkdir, rm } from 'fs/promises'
 import { join, extname, parse, resolve } from 'path'
 import { Readable }  from 'stream'
 import { finished }  from 'stream/promises'
+
+const ENV = process.env.ENV ? "-" + process.env.ENV : ""
+const OUTPUT_DIR = `tables${ENV}`
 
 async function downloadFile(url, fileName) {
   const res = await fetch(url, {
@@ -15,9 +17,9 @@ async function downloadFile(url, fileName) {
       Authorization: `Bearer ${process.env.TOKEN}`
     }
   });
-  if (!existsSync("tables")) 
-    await mkdir("tables"); //Optional if you already have downloads directory
-  const destination = resolve("./tables", fileName);
+  if (!existsSync(OUTPUT_DIR)) 
+    await mkdir(OUTPUT_DIR); //Optional if you already have downloads directory
+  const destination = resolve("./",OUTPUT_DIR, fileName);
 
   if (existsSync(destination))
     await rm(destination);
@@ -106,7 +108,7 @@ async function run() {
   } catch (dirErr) {
     console.error('Unable to scan directory: ' + dirErr)
   }
-  writeFileSync('config.json', JSON.stringify(result))
+  writeFileSync(`config${ENV}.json`, JSON.stringify(result))
 }
 run(directoryPath).catch(e => {
   console.error(e)

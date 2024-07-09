@@ -16,7 +16,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 SELECT DISTINCT
 ?id
 ?intellectual_entity_id
-?bf_production_method
+?bibframe_production_method
 ?premis_medium
 ?schema_height
 ?schema_identifier
@@ -41,11 +41,11 @@ WHERE {
     FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "en"))
 
     OPTIONAL {
-      ?id schema:identifier    ?schema_identifier
+      ?id schema:identifier ?schema_identifier
     }
 
     OPTIONAL {
-      ?rep bf:productionMethod/skos:prefLabel ?bf_production_method.
+      ?rep bf:productionMethod/skos:prefLabel ?bibframe_production_method.
       FILTER (langMatches(lang(?bf_production_method), "nl"))
     }
   
