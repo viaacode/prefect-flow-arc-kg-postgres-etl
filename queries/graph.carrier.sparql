@@ -16,7 +16,6 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 SELECT DISTINCT
 ?id
 ?intellectual_entity_id
-?bibframe_production_method
 ?premis_medium
 ?schema_height
 ?schema_identifier
@@ -26,6 +25,7 @@ SELECT DISTINCT
 ?schema_width
 ?created_at
 ?updated_at
+?bibframe_production_method
 WHERE {
     ?intellectual_entity_id rel:isr ?rep.
     ?rep premis:storedAt ?id.
