@@ -40,6 +40,7 @@ SELECT DISTINCT
 ?schema_position
 ?created_at
 ?updated_at
+?bibframe_edition
 WHERE {
   
     ?id a premis:IntellectualEntity;
@@ -89,7 +90,10 @@ WHERE {
     OPTIONAL { ?id schema:creditText ?schema_credit_text }    
     OPTIONAL { ?id ebucore:synopsis ?ebucore_synopsis }
     # krant
-    OPTIONAL{ ?id bf:issuance/skos:prefLabel ?bf_issuance }
+    OPTIONAL{ 
+      ?id bf:edition/skos:prefLabel ?bibframe_edition .
+      FILTER langMatches(lang(?bibframe_edition), "nl")
+    }
 }
 }}
 
