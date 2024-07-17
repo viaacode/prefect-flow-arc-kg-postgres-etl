@@ -5,11 +5,14 @@ SELECT DISTINCT
 ?organization_id
 ?schema_contact_type
 ?schema_email
+?schema_telephone
 #?created_at
 #?updated_at
 WHERE {
   ?organization_id a haOrg:ContentPartner;
       schema:contactPoint ?point.
+      
   ?point schema:contactType ?schema_contact_type;
-  schema:email ?schema_email .
+    schema:email ?schema_email ;
+    schema:telephone ?schema_telephone .
 }
