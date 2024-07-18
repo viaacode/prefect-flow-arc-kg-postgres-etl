@@ -1,4 +1,3 @@
-from datetime import datetime
 from prefect import task, flow, get_run_logger
 import requests
 import psycopg2
@@ -17,7 +16,7 @@ def upsert_pages(
     csv_url: str, 
     postgres_credentials: DatabaseCredentials, 
     triply_credentials:TriplyDBCredentials, 
-    since: datetime=None):
+    since: str = None):
     # Load logger
     logger = get_run_logger()
 
