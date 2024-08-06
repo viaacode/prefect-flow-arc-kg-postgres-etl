@@ -1,3 +1,4 @@
 psycopg2-binary==2.9.5
 prefect-meemoo[triplydb]==0.8.1
 prefect-sqlalchemy
+prefect==2.14.12
