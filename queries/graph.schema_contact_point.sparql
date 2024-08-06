@@ -11,8 +11,16 @@ SELECT DISTINCT
 WHERE {
   ?organization_id a haOrg:ContentPartner;
       schema:contactPoint ?point.
-      
-  ?point schema:contactType ?schema_contact_type;
-    schema:email ?schema_email ;
-    schema:telephone ?schema_telephone .
+  
+  OPTIONAL {
+    ?point schema:contactType ?schema_contact_type.
+  }
+  
+  OPTIONAL {
+     ?point schema:email ?schema_email ;
+  }
+
+  OPTIONAL {
+     ?point schema:telephone ?schema_telephone .
+  } 
 }
