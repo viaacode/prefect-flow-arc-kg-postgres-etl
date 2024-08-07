@@ -26,6 +26,8 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 ?bibframe_production_method
+?ebucore_has_captioning
+?type
 WHERE {
     ?intellectual_entity_id rel:isr ?rep.
     ?rep premis:storedAt ?id.
@@ -46,7 +48,7 @@ WHERE {
 
     OPTIONAL {
       ?rep bf:productionMethod/skos:prefLabel ?bibframe_production_method.
-      FILTER (langMatches(lang(?bf_production_method), "nl"))
+      FILTER (langMatches(lang(?bibframe_production_method), "nl"))
     }
   
     OPTIONAL {
@@ -70,4 +72,16 @@ WHERE {
     OPTIONAL {
       ?id schema:material ?schema_material
     }
+
+    BIND(EXISTS {
+      ?id ebucore:hasCaptioning/rdf:type ebucore:OpenCaptions 
+    } AS ?ebucore_has_captioning)
+
+    OPTIONAL {
+      ?id a ?type_res.
+      VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
+      ?type_res rdfs:label ?type.
+      FILTER (langMatches(lang(?type), "nl"))
+    }
+
 }
