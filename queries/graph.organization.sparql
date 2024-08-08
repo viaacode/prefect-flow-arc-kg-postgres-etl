@@ -1,8 +1,9 @@
-prefix org: <http://www.w3.org/ns/org#>
-prefix skos: <http://www.w3.org/2004/02/skos/core#>
-prefix dct: <http://purl.org/dc/terms/>
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX haPref: <https://data.hetarchief.be/id/organization-preferences/>
 
 SELECT DISTINCT 
 ?id
@@ -27,12 +28,8 @@ WHERE {
   OPTIONAL { ?id dct:description ?dcterms_description }
   OPTIONAL { ?id foaf:homepage ?foaf_homepage }
   OPTIONAL { ?id haOrg:hasLogo ?ha_org_has_logo }
-  OPTIONAL { 
-    ?id haOrg:allowsOverlay ?ha_org_allows_overlay_res 
-  }
-  BIND( IF(?ha_org_allows_overlay_res, "true", "false") as ?ha_org_allows_overlay)
-  OPTIONAL { ?id haOrg:allowsBZT ?ha_org_allows_bzt_res }
-  BIND( IF(?ha_org_allows_bzt_res, "true", "false") as ?ha_org_allows_bzt)
+  BIND (IF(EXISTS { ?id haOrg:hasPreference haPref:logo-embedding }, "true", "false") AS ?ha_org_allows_overlay)
+  BIND (IF(EXISTS { ?id haOrg:hasPreference haPref:visitor-space-publication }, "true", "false") AS ?ha_org_allows_overlay)
   OPTIONAL { ?id haOrg:requestForm ?ha_org_request_form } 
   OPTIONAL { ?id haOrg:sector ?ha_org_sector } 
   OPTIONAL { 
