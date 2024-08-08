@@ -17,6 +17,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 # premis_IntellectualEntity
 SELECT DISTINCT * 
 WHERE {{
+#! paginate: true
 SELECT DISTINCT
 ?id
 ?dcterms_available
