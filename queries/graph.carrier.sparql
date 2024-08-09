@@ -17,6 +17,8 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT DISTINCT
 ?id
+?bibframe_production_method
+?ebucore_has_captioning
 ?intellectual_entity_id
 ?premis_medium
 ?schema_height
@@ -25,11 +27,9 @@ SELECT DISTINCT
 ?schema_material_extent
 ?schema_name
 ?schema_width
+?type
 ?created_at
 ?updated_at
-?bibframe_production_method
-?ebucore_has_captioning
-?type
 WHERE {
     ?intellectual_entity_id rel:isr ?rep.
     ?rep premis:storedAt ?id.
