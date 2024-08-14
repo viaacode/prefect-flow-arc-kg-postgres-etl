@@ -13,9 +13,7 @@ WHERE {
   ?organization_id a haOrg:ContentPartner;
       schema:contactPoint ?point.
   
-  OPTIONAL {
-    ?point schema:contactType ?schema_contact_type.
-  }
+  ?point schema:contactType ?schema_contact_type.
   
   OPTIONAL {
      ?point schema:email ?schema_email ;
