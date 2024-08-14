@@ -2,7 +2,7 @@ PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX schema: <https://schema.org/>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
-PREFIX haDes: <https://data.hetarchief.be/ns/descriptive/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
@@ -12,9 +12,13 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
 PREFIX org: <http://www.w3.org/ns/org#>
 PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT DISTINCT
 ?id
+?bibframe_production_method
+?ebucore_has_captioning
 ?intellectual_entity_id
 ?premis_medium
 ?schema_height
@@ -23,9 +27,9 @@ SELECT DISTINCT
 ?schema_material_extent
 ?schema_name
 ?schema_width
+?type
 ?created_at
 ?updated_at
-?bibframe_production_method
 WHERE {
     ?intellectual_entity_id rel:isr ?rep.
     ?rep premis:storedAt ?id.
@@ -46,7 +50,7 @@ WHERE {
 
     OPTIONAL {
       ?rep bf:productionMethod/skos:prefLabel ?bibframe_production_method.
-      FILTER (langMatches(lang(?bf_production_method), "nl"))
+      FILTER (langMatches(lang(?bibframe_production_method), "nl"))
     }
   
     OPTIONAL {
@@ -70,4 +74,16 @@ WHERE {
     OPTIONAL {
       ?id schema:material ?schema_material
     }
+
+    BIND(EXISTS {
+      ?id ebucore:hasCaptioning/rdf:type ebucore:OpenCaptions 
+    } AS ?ebucore_has_captioning)
+
+    OPTIONAL {
+      ?id a ?type_res.
+      VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
+      ?type_res rdfs:label ?type.
+      FILTER (langMatches(lang(?type), "nl"))
+    }
+
 }
