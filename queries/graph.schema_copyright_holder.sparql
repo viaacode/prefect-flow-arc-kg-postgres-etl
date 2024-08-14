@@ -19,7 +19,17 @@ WHERE {
   
   FILTER EXISTS {
     ?intellectual_entity_id schema:license ?schema_license
-    VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    VALUES ?schema_license { 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL
+        haLicId:VIAA-PUBLIEK-CONTENT
+        haLicId:BEZOEKERTOOL-METADATA-ALL
+        haLicId:BEZOEKERTOOL-CONTENT 
+        haLicId:VIAA-INTRA_CP-METADATA-ALL 
+        haLicId:VIAA-INTRA_CP-CONTENT 
+        haLicId:Publiek-Domein
+        haLicId:COPYRIGHT-UNDETERMINED
+    }
   }
   
   ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified.
