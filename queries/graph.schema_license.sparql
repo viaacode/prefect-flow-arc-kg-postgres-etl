@@ -11,9 +11,10 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
     ?intellectual_entity_id schema:license ?schema_license_res.
+    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+
     BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
 
-    VALUES ?schema_license_res { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
 
     ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
