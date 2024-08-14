@@ -99,7 +99,10 @@ WHERE {
     OPTIONAL { ?id schema:copyrightNotice ?schema_copyright_notice }
     OPTIONAL { ?id dct:rights ?dcterms_rights }
     OPTIONAL { ?id schema:creditText ?schema_credit_text }    
-    OPTIONAL { ?id ebucore:synopsis ?ebucore_synopsis }
+    OPTIONAL { 
+      ?id ebucore:synopsis ?ebucore_synopsis_res 
+      BIND (IF(regex(?ebucore_synopsis_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?ebucore_synopsis_res,"\""),?schema_ebucore_synopsis_resname_res) AS ?ebucore_synopsis)
+    }
     # krant
     OPTIONAL{ 
       ?id bf:edition/skos:prefLabel ?bibframe_edition .
