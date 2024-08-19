@@ -23,6 +23,10 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     }
 
+    FILTER NOT EXISTS {
+      ?intellectual_entity_id dct:format "image".
+    }
+
     BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
 
 

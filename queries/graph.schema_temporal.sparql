@@ -11,7 +11,9 @@ SELECT DISTINCT
 WHERE {
     ?intellectual_entity_id schema:temporal ?schema_temporal.
   
-    FILTER EXISTS {
+    FILTER (NOT EXISTS {
+      ?intellectual_entity_id dct:format "image".
+    } || EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
       VALUES ?schema_license { 
           haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -24,7 +26,7 @@ WHERE {
           haLicId:Publiek-Domein
           haLicId:COPYRIGHT-UNDETERMINED
       }
-    }
+    })
 
     ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )

@@ -44,20 +44,22 @@ WHERE {
         (?ebucore_has_mime_type IN ( "application/json", "video/mp4", "audio/mp4", "image/jpeg", "application/xml", "audio/mpeg", "audio/m4a", "image/jph" ))
       )
 
-      FILTER EXISTS {
-        ?id rel:isi/rel:rep/schema:license ?schema_license
-        VALUES ?schema_license { 
-        haLicId:VIAA-PUBLIEK-METADATA-LTD 
-        haLicId:VIAA-PUBLIEK-METADATA-ALL
-        haLicId:VIAA-PUBLIEK-CONTENT
-        haLicId:BEZOEKERTOOL-METADATA-ALL
-        haLicId:BEZOEKERTOOL-CONTENT 
-        haLicId:VIAA-INTRA_CP-METADATA-ALL 
-        haLicId:VIAA-INTRA_CP-CONTENT 
-        haLicId:Publiek-Domein
-        haLicId:COPYRIGHT-UNDETERMINED
-    }
-      }
+      FILTER (NOT EXISTS {
+        ?id rel:isi/rel:rep/dct:format "image".
+        } || EXISTS {
+          ?id rel:isi/rel:rep/schema:license ?schema_license
+          VALUES ?schema_license { 
+          haLicId:VIAA-PUBLIEK-METADATA-LTD 
+          haLicId:VIAA-PUBLIEK-METADATA-ALL
+          haLicId:VIAA-PUBLIEK-CONTENT
+          haLicId:BEZOEKERTOOL-METADATA-ALL
+          haLicId:BEZOEKERTOOL-CONTENT 
+          haLicId:VIAA-INTRA_CP-METADATA-ALL 
+          haLicId:VIAA-INTRA_CP-CONTENT 
+          haLicId:Publiek-Domein
+          haLicId:COPYRIGHT-UNDETERMINED
+          }
+        })
       OPTIONAL {
         ?id edm:isNextInSequence ?edm_is_next_in_sequence 
       }
@@ -79,7 +81,9 @@ WHERE {
 
       FILTER (langMatches(lang(?schema_name), "nl"))
 
-      FILTER EXISTS {
+      FILTER (NOT EXISTS {
+        ?fragment rel:rep/dct:format "image"
+        } || EXISTS {
         ?fragment rel:rep/schema:license ?schema_license
         VALUES ?schema_license { 
           haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -92,7 +96,7 @@ WHERE {
           haLicId:Publiek-Domein
           haLicId:COPYRIGHT-UNDETERMINED
         }
-      }
+      })
       OPTIONAL {
         ?id edm:isNextInSequence ?edm_is_next_in_sequence 
       }
