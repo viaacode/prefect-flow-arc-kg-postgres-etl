@@ -43,7 +43,7 @@ WHERE {
     )
 
     FILTER EXISTS {
-      ?id (rel:isi|edm:hasMediaFragment)/rel:rep/schema:license ?schema_license
+      ?id (rel:isi|ebucore:hasMediaFragment)/rel:rep/schema:license ?schema_license
       VALUES ?schema_license { 
           haLicId:VIAA-PUBLIEK-METADATA-LTD 
           haLicId:VIAA-PUBLIEK-METADATA-ALL
