@@ -19,9 +19,12 @@ WHERE {
 
   BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
   
-  FILTER (NOT EXISTS {
+  #Do not include images
+  FILTER NOT EXISTS {
     ?intellectual_entity_id dct:format "image".
-  } || EXISTS {
+  }
+  # Only include the right licenses
+  FILTER EXISTS {
     ?intellectual_entity_id schema:license ?schema_license
     VALUES ?schema_license { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -34,7 +37,7 @@ WHERE {
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
     }
-  })
+  }
   
   ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified.
   FILTER (!isLiteral(?since) || ?modified >= ?since )

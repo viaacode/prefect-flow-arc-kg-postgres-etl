@@ -11,10 +11,13 @@ SELECT DISTINCT
 WHERE {
     ?intellectual_entity_id schema:inLanguage ?schema_in_language.
   
-    FILTER (NOT EXISTS {
+    # Do not include images
+    FILTER NOT EXISTS {
       ?intellectual_entity_id dct:format "image".
-    } || EXISTS {
-      ?intellectual_entity_id schema:license ?schema_license.
+    }
+    # Only include the right licenses
+    FILTER EXISTS {
+      ?intellectual_entity_id schema:license ?schema_license
       VALUES ?schema_license { 
           haLicId:VIAA-PUBLIEK-METADATA-LTD 
           haLicId:VIAA-PUBLIEK-METADATA-ALL
@@ -26,7 +29,7 @@ WHERE {
           haLicId:Publiek-Domein
           haLicId:COPYRIGHT-UNDETERMINED
       }
-    })
+    }
 
     ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )

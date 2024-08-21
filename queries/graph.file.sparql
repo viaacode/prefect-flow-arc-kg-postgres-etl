@@ -81,9 +81,12 @@ WHERE {
 
       FILTER (langMatches(lang(?schema_name), "nl"))
 
-      FILTER (NOT EXISTS {
+      # Do not include images
+      FILTER NOT EXISTS {
         ?fragment rel:rep/dct:format "image"
-        } || EXISTS {
+      } 
+      # Only include the right licenses
+      FILTER EXISTS {
         ?fragment rel:rep/schema:license ?schema_license
         VALUES ?schema_license { 
           haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -96,7 +99,8 @@ WHERE {
           haLicId:Publiek-Domein
           haLicId:COPYRIGHT-UNDETERMINED
         }
-      })
+      }
+
       OPTIONAL {
         ?id edm:isNextInSequence ?edm_is_next_in_sequence 
       }

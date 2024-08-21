@@ -28,9 +28,12 @@ WHERE {
     
     ?representation_id haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?intellectual_entity_id
     
-    FILTER (NOT EXISTS {
+    # Do not include images
+    FILTER NOT EXISTS {
       ?intellectual_entity_id dct:format "image".
-    } || EXISTS {
+    } 
+    # Only include the right licenses
+    FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
       VALUES ?schema_license { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -43,7 +46,7 @@ WHERE {
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
       }
-    })
+    }
 
     FILTER (
       (?ebucore_has_mime_type IN ( "application/json", "video/mp4", "audio/mp4", "image/jpeg", "application/xml", "audio/mpeg", "audio/m4a", "image/jph" ))

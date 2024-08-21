@@ -16,9 +16,12 @@ WHERE {
     ?intellectual_entity_id a premis:IntellectualEntity;
            prov:wasDerivedFrom ?fragment.
 
-    FILTER (NOT EXISTS {
+    # Do not include images
+    FILTER NOT EXISTS {
       ?intellectual_entity_id dct:format "image".
-    } || EXISTS {
+    } 
+    # Only include the right licenses
+    FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
       VALUES ?schema_license { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -30,8 +33,8 @@ WHERE {
         haLicId:VIAA-INTRA_CP-CONTENT 
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
+      }
     }
-    })
 
     ?fragment a mh:Fragment;
               schema:dateModified ?modified;
