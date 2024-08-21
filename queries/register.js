@@ -17,6 +17,10 @@ async function downloadFile(url, fileName) {
       Authorization: `Bearer ${process.env.TOKEN}`
     }
   });
+
+  if (!res.ok)
+    return console.log(`Error while downloading ${url}: ${await res.text()}`)
+
   if (!existsSync(OUTPUT_DIR)) 
     await mkdir(OUTPUT_DIR); //Optional if you already have downloads directory
   const destination = resolve("./",OUTPUT_DIR, fileName);
@@ -25,6 +29,7 @@ async function downloadFile(url, fileName) {
     await rm(destination);
   const fileStream = createWriteStream(destination, { flags: 'wx' });
   await finished(Readable.fromWeb(res.body).pipe(fileStream));
+  
 }
 
 function getFirstLine(text) {
