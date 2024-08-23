@@ -47,15 +47,24 @@ WHERE {
     ?id a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name_res ;
-           schema:maintainer ?schema_maintainer. 
+           schema:maintainer ?schema_maintainer;
+           schema:license ?schema_license.
 
     FILTER langMatches(lang(?schema_name_res), "nl")
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
-    FILTER EXISTS {
-      ?id schema:license ?schema_license
-      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+    VALUES ?schema_license { 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL
+        haLicId:VIAA-PUBLIEK-CONTENT
+        haLicId:BEZOEKERTOOL-METADATA-ALL
+        haLicId:BEZOEKERTOOL-CONTENT 
+        haLicId:VIAA-INTRA_CP-METADATA-ALL 
+        haLicId:VIAA-INTRA_CP-CONTENT 
+        haLicId:Publiek-Domein
+        haLicId:COPYRIGHT-UNDETERMINED
     }
+  
 
     ?id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
@@ -84,12 +93,18 @@ WHERE {
     OPTIONAL { ?id dct:available ?dcterms_available }
     OPTIONAL { ?id schema:datePublished ?schema_date_published }
     OPTIONAL { ?id ebucore:hasObjectType ?ebucore_has_object_type }
-    OPTIONAL { ?id ebucore:hasCastMember ?ebucore_has_cast_member }
+    OPTIONAL { 
+      ?id ebucore:hasCastMember ?ebucore_has_cast_member_res .
+      BIND (IF(regex(?ebucore_has_cast_member_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?ebucore_has_cast_member_res,"\""),?ebucore_has_cast_member_res) AS ?ebucore_has_cast_member)
+    }
     OPTIONAL { ?id schema:copyrightYear ?schema_copyright_year }
     OPTIONAL { ?id schema:copyrightNotice ?schema_copyright_notice }
     OPTIONAL { ?id dct:rights ?dcterms_rights }
     OPTIONAL { ?id schema:creditText ?schema_credit_text }    
-    OPTIONAL { ?id ebucore:synopsis ?ebucore_synopsis }
+    OPTIONAL { 
+      ?id ebucore:synopsis ?ebucore_synopsis_res 
+      BIND (IF(regex(?ebucore_synopsis_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?ebucore_synopsis_res,"\""),?ebucore_synopsis_res) AS ?ebucore_synopsis)
+    }
     # krant
     OPTIONAL{ 
       ?id bf:edition/skos:prefLabel ?bibframe_edition .
@@ -97,4 +112,3 @@ WHERE {
     }
 }
 }}
-

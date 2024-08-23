@@ -9,11 +9,22 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id schema:keywords ?schema_keywords.
+    ?intellectual_entity_id schema:keywords ?schema_keywords_res.
+    BIND (IF(regex(?schema_keywords_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_keywords_res,"\""),?schema_keywords_res) AS ?schema_keywords)
   
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
-      VALUES ?schema_license { haLicId:VIAA-PUBLIEK-METADATA-LTD haLicId:VIAA-PUBLIEK-METADATA-ALL haLicId:MEEMOO-BEZOEKERTOOL-METADATA haLicId:MEEMOO-BEZOEKERTOOL-CONTENT haLicId:VIAA-INTRA_CP-METADATA-ALL haLicId:VIAA-INTRA_CP-CONTENT }
+      VALUES ?schema_license { 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL
+        haLicId:VIAA-PUBLIEK-CONTENT
+        haLicId:BEZOEKERTOOL-METADATA-ALL
+        haLicId:BEZOEKERTOOL-CONTENT 
+        haLicId:VIAA-INTRA_CP-METADATA-ALL 
+        haLicId:VIAA-INTRA_CP-CONTENT 
+        haLicId:Publiek-Domein
+        haLicId:COPYRIGHT-UNDETERMINED
+      }
     }
 
     ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
