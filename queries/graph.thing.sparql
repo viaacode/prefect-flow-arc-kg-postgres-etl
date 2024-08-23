@@ -3,6 +3,10 @@ PREFIX schema: <https://schema.org/>
 SELECT DISTINCT 
 ?id 
 ?schema_name
+?schema_birth_date
+?schema_birth_place
+?schema_death_date
+?schema_death_place
 ?created_at
 ?updated_at
 WHERE {
@@ -13,6 +17,22 @@ WHERE {
   UNION {
     ?id a schema:Person; schema:name ?schema_name_res.
     FILTER langMatches(lang(?schema_name_res), "nl")
+
+    OPTIONAL {
+      ?id schema:deathDate ?schema_death_date
+    }
+
+    OPTIONAL {
+      ?id schema:birthDate ?schema_birth_date
+    }
+
+    OPTIONAL {
+      ?id schema:birthPlace/schema:name ?schema_birth_place
+    }
+
+    OPTIONAL {
+      ?id schema:deathPlace/schema:name ?schema_death_place
+    }
   }
 
   BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)

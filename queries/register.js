@@ -75,7 +75,7 @@ async function run() {
           const params = {
             dataset,
             queryString,
-            serviceType: 'virtuoso',
+            serviceType: process.env.SERVICE_TYPE || 'virtuoso',
             output: 'response',
             variables: [
               {

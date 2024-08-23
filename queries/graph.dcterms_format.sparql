@@ -13,13 +13,12 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
     ?intellectual_entity_id a premis:IntellectualEntity;
-           dct:format ?dcterms_format.
+           dct:format ?dcterms_format;
+          schema:license ?schema_license.
 
     FILTER (?dcterms_format != "image")
 
-    FILTER EXISTS {
-      ?intellectual_entity_id schema:license ?schema_license
-      VALUES ?schema_license { 
+    VALUES ?schema_license { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
         haLicId:VIAA-PUBLIEK-METADATA-ALL
         haLicId:VIAA-PUBLIEK-CONTENT
@@ -30,10 +29,8 @@ WHERE {
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
     }
-    }
+    
 
     ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
 }
-
-
