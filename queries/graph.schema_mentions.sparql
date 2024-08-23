@@ -2,14 +2,30 @@
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 
 SELECT DISTINCT 
 ?intellectual_entity_id 
 ?thing_id
+?confidence
+?height
+?width
+?x
+?y
 ?created_at
 ?updated_at
 WHERE {
     ?intellectual_entity_id schema:mentions ?thing_id.
+
+    ?annotation ebucore:isAnnotatedMediaResource ?resource;
+                ebucore:width ?width;
+                ebucore:height ?height;
+                ebucore:regionDelimX ?x;
+                ebucore:regionDelimY ?y.
+                
+    
+    ?resource ebucore:annotationConfidence ?confidence;
+              ebucore:hasAnnotationAgent ?thing_id.                
   
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
