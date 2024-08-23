@@ -7,11 +7,11 @@ PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 SELECT DISTINCT 
 ?intellectual_entity_id 
 ?thing_id
+?confidence
+?height
+?width
 ?x
 ?y
-?width
-?height
-?confidence
 ?created_at
 ?updated_at
 WHERE {
