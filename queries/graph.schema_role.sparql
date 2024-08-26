@@ -45,6 +45,11 @@ WHERE {
     } UNION {
       ?intellectual_entity_id schema:contributor ?id.
 
+      # Do not include images
+      FILTER NOT EXISTS {
+        ?intellectual_entity_id dct:format "image".
+      }
+
       FILTER EXISTS {
         ?intellectual_entity_id schema:license ?schema_license
         VALUES ?schema_license { 
@@ -68,7 +73,12 @@ WHERE {
           schema:contributor ?thing_id
       BIND ("schema_contributor" as ?type)
     } UNION {
-      ?intellectual_entity_id schema:creator ?id.      
+      ?intellectual_entity_id schema:creator ?id.   
+
+      # Do not include images
+      FILTER NOT EXISTS {
+        ?intellectual_entity_id dct:format "image".
+      }   
       
       FILTER EXISTS {
         ?intellectual_entity_id schema:license ?schema_license
