@@ -2,6 +2,7 @@
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX dct: <http://purl.org/dc/terms/>
 
 SELECT DISTINCT 
 ?intellectual_entity_id 
@@ -11,19 +12,24 @@ SELECT DISTINCT
 WHERE {
     ?intellectual_entity_id schema:genre ?schema_genre.
   
+    # Do not include images
+    FILTER NOT EXISTS {
+      ?intellectual_entity_id dct:format "image".
+    }
+    # Only include the right licenses
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
       VALUES ?schema_license { 
-        haLicId:VIAA-PUBLIEK-METADATA-LTD 
-        haLicId:VIAA-PUBLIEK-METADATA-ALL
-        haLicId:VIAA-PUBLIEK-CONTENT
-        haLicId:BEZOEKERTOOL-METADATA-ALL
-        haLicId:BEZOEKERTOOL-CONTENT 
-        haLicId:VIAA-INTRA_CP-METADATA-ALL 
-        haLicId:VIAA-INTRA_CP-CONTENT 
-        haLicId:Publiek-Domein
-        haLicId:COPYRIGHT-UNDETERMINED
-    }
+          haLicId:VIAA-PUBLIEK-METADATA-LTD 
+          haLicId:VIAA-PUBLIEK-METADATA-ALL
+          haLicId:VIAA-PUBLIEK-CONTENT
+          haLicId:BEZOEKERTOOL-METADATA-ALL
+          haLicId:BEZOEKERTOOL-CONTENT 
+          haLicId:VIAA-INTRA_CP-METADATA-ALL 
+          haLicId:VIAA-INTRA_CP-CONTENT 
+          haLicId:Publiek-Domein
+          haLicId:COPYRIGHT-UNDETERMINED
+      }
     }
 
     ?intellectual_entity_id prov:wasDerivedFrom/schema:dateModified ?modified .

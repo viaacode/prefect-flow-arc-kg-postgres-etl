@@ -53,6 +53,7 @@ WHERE {
     FILTER langMatches(lang(?schema_name_res), "nl")
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
+    # Only include the right licenses
     VALUES ?schema_license { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
         haLicId:VIAA-PUBLIEK-METADATA-ALL
@@ -65,6 +66,9 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     }
   
+    FILTER NOT EXISTS {
+      ?id dct:format "image".
+    } 
 
     ?id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )

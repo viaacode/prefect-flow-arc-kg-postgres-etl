@@ -47,6 +47,11 @@ WHERE {
     #     haLicId:Publiek-Domein
     #     haLicId:COPYRIGHT-UNDETERMINED
     # }
+
+    # Do not include images
+    FILTER NOT EXISTS {
+        ?id (rel:isi|ebucore:hasMediaFragment)/rel:rep/dct:format "image"
+    } 
   
     FILTER (!isLiteral(?since) || ?modified >= ?since )
 

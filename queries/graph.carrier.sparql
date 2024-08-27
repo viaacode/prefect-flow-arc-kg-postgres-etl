@@ -37,6 +37,11 @@ WHERE {
     schema:name ?schema_name;
     premis:medium/skos:prefLabel ?premis_medium.
 
+    # Do not include images
+    FILTER NOT EXISTS {
+      ?intellectual_entity_id dct:format "image".
+    } 
+    # Only include the right licenses
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
       VALUES ?schema_license { 
@@ -49,7 +54,7 @@ WHERE {
         haLicId:VIAA-INTRA_CP-CONTENT 
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
-      }
+    }
     }
 
     FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "en"))

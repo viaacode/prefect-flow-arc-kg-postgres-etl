@@ -2,6 +2,7 @@
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX dct: <http://purl.org/dc/terms/>
 
 SELECT DISTINCT 
 ?intellectual_entity_id 
@@ -14,6 +15,11 @@ WHERE {
     {
       ?intellectual_entity_id schema:publisher ?id.
 
+      # Do not include images
+      FILTER NOT EXISTS {
+        ?intellectual_entity_id dct:format "image".
+      }
+      # Only include the right licenses
       FILTER EXISTS {
         ?intellectual_entity_id schema:license ?schema_license
         VALUES ?schema_license { 
@@ -39,6 +45,11 @@ WHERE {
     } UNION {
       ?intellectual_entity_id schema:contributor ?id.
 
+      # Do not include images
+      FILTER NOT EXISTS {
+        ?intellectual_entity_id dct:format "image".
+      }
+
       FILTER EXISTS {
         ?intellectual_entity_id schema:license ?schema_license
         VALUES ?schema_license { 
@@ -62,7 +73,12 @@ WHERE {
           schema:contributor ?thing_id
       BIND ("schema_contributor" as ?type)
     } UNION {
-      ?intellectual_entity_id schema:creator ?id.      
+      ?intellectual_entity_id schema:creator ?id.   
+
+      # Do not include images
+      FILTER NOT EXISTS {
+        ?intellectual_entity_id dct:format "image".
+      }   
       
       FILTER EXISTS {
         ?intellectual_entity_id schema:license ?schema_license

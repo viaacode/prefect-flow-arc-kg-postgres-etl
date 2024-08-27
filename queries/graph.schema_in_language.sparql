@@ -2,6 +2,7 @@
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX dct: <http://purl.org/dc/terms/>
 
 SELECT DISTINCT 
 ?intellectual_entity_id 
@@ -9,10 +10,9 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id schema:inLanguage ?schema_in_language.
-  
-   
-    ?intellectual_entity_id schema:license ?schema_license.
+    ?intellectual_entity_id schema:inLanguage ?schema_in_language;
+            schema:license ?schema_license.
+    # Only include the right licenses
     VALUES ?schema_license { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
         haLicId:VIAA-PUBLIEK-METADATA-ALL
@@ -23,6 +23,10 @@ WHERE {
         haLicId:VIAA-INTRA_CP-CONTENT 
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
+    }
+    # Do not include images
+    FILTER NOT EXISTS {
+      ?intellectual_entity_id dct:format "image".
     }
     
 
