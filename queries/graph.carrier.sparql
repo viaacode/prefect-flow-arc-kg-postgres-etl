@@ -14,10 +14,12 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 
 SELECT DISTINCT
 ?id
 ?bibframe_production_method
+?digitization_date
 ?ebucore_has_captioning
 ?intellectual_entity_id
 ?premis_medium
@@ -70,6 +72,10 @@ WHERE {
 
     OPTIONAL {
       ?id schema:identifier ?schema_identifier
+    }
+
+    OPTIONAL {
+      ?id ^eror:sou/prov:startedAtTime ?digitization_date
     }
 
     OPTIONAL {
