@@ -33,8 +33,10 @@ WHERE {
         premis:originalName ?premis_original_name;
         premis:storedAt/rdf:value ?premis_stored_at ;
         ebucore:hasMimeType ?ebucore_has_mime_type ;
-        prov:wasDerivedFrom/schema:dateModified ?modified .
-        #(rel:isi|ebucore:hasMediaFragment)/rel:rep/schema:license ?schema_license.
+        prov:wasDerivedFrom/schema:dateModified ?modified ;
+        (rel:isi|ebucore:hasMediaFragment)/rel:rep ?ie.
+        
+        ?ie schema:license ?schema_license; dct:format ?format .
 
     # VALUES ?schema_license { 
     #     haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -49,8 +51,15 @@ WHERE {
     # }
 
     # Do not include images
-    FILTER NOT EXISTS {
-        ?id (rel:isi|ebucore:hasMediaFragment)/rel:rep/dct:format "image"
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
   
     FILTER (!isLiteral(?since) || ?modified >= ?since )
