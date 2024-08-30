@@ -24,9 +24,18 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     }
 
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
-    }
+    # Do not include images
+    ?intellectual_entity_id dct:format ?format.
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
+    } 
 
     BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
 

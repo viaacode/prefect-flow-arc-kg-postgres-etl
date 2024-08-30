@@ -13,9 +13,18 @@ WHERE {
     ?intellectual_entity_id schema:temporal ?schema_temporal.
   
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
-    }
+    ?intellectual_entity_id dct:format ?format.
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
+    } 
+    
     # Only include the right licenses
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license

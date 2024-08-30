@@ -31,16 +31,22 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id rel:isr ?rep;  schema:license ?schema_license.
-    ?rep premis:storedAt ?id.
-    ?id a haObj:PhysicalCarrier;
-    schema:name ?schema_name;
-    premis:medium/skos:prefLabel ?premis_medium.
+    ?intellectual_entity_id rel:isr ?rep;  
+      schema:license ?schema_license;
+      dct:format ?format.
 
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
+
     # Only include the right licenses
     VALUES ?schema_license { 
       haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -54,6 +60,11 @@ WHERE {
       haLicId:COPYRIGHT-UNDETERMINED
     }
     
+    ?rep premis:storedAt ?id.
+    
+    ?id a haObj:PhysicalCarrier;
+    schema:name ?schema_name;
+    premis:medium/skos:prefLabel ?premis_medium.
 
     FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "en"))
 
