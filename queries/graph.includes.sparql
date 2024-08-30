@@ -26,11 +26,10 @@ WHERE {
         ebucore:hasMimeType ?ebucore_has_mime_type ;
         rel:isi ?representation_id.
     
-    ?representation_id haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?intellectual_entity_id
+    ?representation_id haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?intellectual_entity_id .
     
     # Do not include images
     ?intellectual_entity_id dct:format ?format.
-    
     VALUES ?format {
       #"image"
       "video"
