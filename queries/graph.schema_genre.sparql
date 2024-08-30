@@ -10,12 +10,19 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id schema:genre ?schema_genre.
+    ?intellectual_entity_id schema:genre ?schema_genre; dct:format ?format .
   
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
-    }
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
+    } 
     # Only include the right licenses
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license
