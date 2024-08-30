@@ -1,3 +1,4 @@
+# position: 1
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 
@@ -7,7 +8,7 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-  ?id a haOrg:ContentPartner;
+  ?organization_id a haOrg:ContentPartner;
       haOrg:hasPreference ?ha_pref_res .
 
    BIND (REPLACE(STR(?ha_pref_res), "^.*/([^/]*)$", "$1") as ?ha_pref)
