@@ -8,5 +8,7 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
   ?id a haOrg:ContentPartner;
-      haOrg:hasPreference/skos:prefLabel ?ha_pref .
+      haOrg:hasPreference ?ha_pref_res .
+
+   BIND (REPLACE(STR(?ha_pref_res), "^.*/([^/]*)$", "$1") as ?ha_pref)
 }
