@@ -14,8 +14,16 @@ WHERE {
     BIND (IF(regex(?schema_keywords_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_keywords_res,"\""),?schema_keywords_res) AS ?schema_keywords)
   
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
+    ?intellectual_entity_id dct:format ?format.
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
     # Only include the right licenses
     FILTER EXISTS {

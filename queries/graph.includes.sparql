@@ -29,9 +29,19 @@ WHERE {
     ?representation_id haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?intellectual_entity_id
     
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
+    ?intellectual_entity_id dct:format ?format.
+    
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
+
     # Only include the right licenses
     FILTER EXISTS {
       ?intellectual_entity_id schema:license ?schema_license

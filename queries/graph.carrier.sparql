@@ -31,15 +31,22 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id rel:isr ?rep.
+    ?intellectual_entity_id rel:isr ?rep; dct:format ?format.
     ?rep premis:storedAt ?id.
     ?id a haObj:PhysicalCarrier;
     schema:name ?schema_name;
     premis:medium/skos:prefLabel ?premis_medium.
 
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
     # Only include the right licenses
     FILTER EXISTS {

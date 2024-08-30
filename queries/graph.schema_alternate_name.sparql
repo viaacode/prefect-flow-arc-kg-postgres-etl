@@ -21,9 +21,17 @@ WHERE {
   BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
   
   #Do not include images
-  FILTER NOT EXISTS {
-    ?intellectual_entity_id dct:format "image".
-  }
+  ?intellectual_entity_id dct:format ?format.
+  VALUES ?format {
+    #"image"
+    "video"
+    "videofragment"
+    "audiofragment"
+    "audio"
+    "film"
+    "newspaperpage"
+    "newspaper"
+  } 
   # Only include the right licenses
   FILTER EXISTS {
     ?intellectual_entity_id schema:license ?schema_license

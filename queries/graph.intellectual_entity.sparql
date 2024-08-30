@@ -48,7 +48,8 @@ WHERE {
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name_res ;
            schema:maintainer ?schema_maintainer;
-           schema:license ?schema_license.
+           schema:license ?schema_license;
+           dct:format ?format .
 
     FILTER langMatches(lang(?schema_name_res), "nl")
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
@@ -66,8 +67,15 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     }
   
-    FILTER NOT EXISTS {
-      ?id dct:format "image".
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
 
     ?id prov:wasDerivedFrom/schema:dateModified ?modified .

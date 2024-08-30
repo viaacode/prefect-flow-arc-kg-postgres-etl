@@ -30,8 +30,16 @@ WHERE {
     }
   
     # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
+    ?intellectual_entity_id dct:format ?format.
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
 
     ?fragment a mh:Fragment;

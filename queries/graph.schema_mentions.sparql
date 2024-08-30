@@ -28,9 +28,17 @@ WHERE {
     ?resource ebucore:annotationConfidence ?confidence;
               ebucore:hasAnnotationAgent ?thing_id.                
   
-        # Do not include images
-    FILTER NOT EXISTS {
-      ?intellectual_entity_id dct:format "image".
+    # Do not include images
+    ?intellectual_entity_id dct:format ?format.
+    VALUES ?format {
+      #"image"
+      "video"
+      "videofragment"
+      "audiofragment"
+      "audio"
+      "film"
+      "newspaperpage"
+      "newspaper"
     } 
     # Only include the right licenses
     FILTER EXISTS {
