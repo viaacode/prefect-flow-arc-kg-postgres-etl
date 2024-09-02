@@ -81,4 +81,4 @@ WHERE {
       BIND (xsd:double(?schema_duration_res) AS ?schema_duration)
     }
 }
-ORDER BY ?id 
+#ORDER BY ?id 
