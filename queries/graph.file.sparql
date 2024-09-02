@@ -80,6 +80,5 @@ WHERE {
       ?id schema:duration ?schema_duration_res.
       BIND (xsd:double(?schema_duration_res) AS ?schema_duration)
     }
-
 }
 ORDER BY ?id 
