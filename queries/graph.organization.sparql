@@ -9,8 +9,9 @@ SELECT DISTINCT
 ?id
 ?dcterms_description
 ?foaf_homepage
-?ha_org_allows_bzt
-?ha_org_allows_overlay
+# ?ha_org_allows_bzt
+# ?ha_org_allows_iiif
+# ?ha_org_allows_overlay
 ?ha_org_has_logo
 ?ha_org_request_form
 ?ha_org_sector
@@ -28,8 +29,9 @@ WHERE {
   OPTIONAL { ?id dct:description ?dcterms_description }
   OPTIONAL { ?id foaf:homepage ?foaf_homepage }
   OPTIONAL { ?id haOrg:hasLogo ?ha_org_has_logo }
-  BIND (EXISTS { ?id haOrg:hasPreference haPref:logo-embedding } AS ?ha_org_allows_overlay)
-  BIND (EXISTS { ?id haOrg:hasPreference haPref:visitor-space-publication } AS ?ha_org_allows_bzt)
+  # BIND (EXISTS { ?id haOrg:hasPreference haPref:logo-embedding } AS ?ha_org_allows_overlay)
+  # BIND (EXISTS { ?id haOrg:hasPreference haPref:visitor-space-publication } AS ?ha_org_allows_bzt)
+  # BIND (EXISTS { ?id haOrg:hasPreference haPref:iiif-dissemination } AS ?ha_org_allows_iiif)
   OPTIONAL { ?id haOrg:requestForm ?ha_org_request_form } 
   OPTIONAL { ?id haOrg:sector ?ha_org_sector } 
   OPTIONAL { 

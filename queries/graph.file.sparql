@@ -33,10 +33,11 @@ WHERE {
         premis:originalName ?premis_original_name;
         premis:storedAt/rdf:value ?premis_stored_at ;
         ebucore:hasMimeType ?ebucore_has_mime_type ;
-        prov:wasDerivedFrom/schema:dateModified ?modified ;
-        (rel:isi|ebucore:hasMediaFragment)/rel:rep ?ie.
+        prov:wasDerivedFrom/schema:dateModified ?modified .
+        # (rel:isi|ebucore:hasMediaFragment)/rel:rep ?ie.
         
-        ?ie schema:license ?schema_license; dct:format ?format .
+    #     ?ie dct:format ?format .
+    #     ?ie schema:license ?schema_license
 
     # VALUES ?schema_license { 
     #     haLicId:VIAA-PUBLIEK-METADATA-LTD 
@@ -51,16 +52,16 @@ WHERE {
     # }
 
     # Do not include images
-    VALUES ?format {
-      #"image"
-      "video"
-      "videofragment"
-      "audiofragment"
-      "audio"
-      "film"
-      "newspaperpage"
-      "newspaper"
-    } 
+    # VALUES ?format {
+    #   #"image"
+    #   "video"
+    #   "videofragment"
+    #   "audiofragment"
+    #   "audio"
+    #   "film"
+    #   "newspaperpage"
+    #   "newspaper"
+    # } 
   
     FILTER (!isLiteral(?since) || ?modified >= ?since )
 
@@ -79,5 +80,5 @@ WHERE {
       ?id schema:duration ?schema_duration_res.
       BIND (xsd:double(?schema_duration_res) AS ?schema_duration)
     }
-
 }
+ORDER BY ?id 

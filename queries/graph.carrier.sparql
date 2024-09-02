@@ -31,11 +31,9 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id rel:isr ?rep; dct:format ?format.
-    ?rep premis:storedAt ?id.
-    ?id a haObj:PhysicalCarrier;
-    schema:name ?schema_name;
-    premis:medium/skos:prefLabel ?premis_medium.
+    ?intellectual_entity_id rel:isr ?rep;  
+      schema:license ?schema_license;
+      dct:format ?format.
 
     # Do not include images
     VALUES ?format {
@@ -48,21 +46,25 @@ WHERE {
       "newspaperpage"
       "newspaper"
     } 
+
     # Only include the right licenses
-    FILTER EXISTS {
-      ?intellectual_entity_id schema:license ?schema_license
-      VALUES ?schema_license { 
-        haLicId:VIAA-PUBLIEK-METADATA-LTD 
-        haLicId:VIAA-PUBLIEK-METADATA-ALL
-        haLicId:VIAA-PUBLIEK-CONTENT
-        haLicId:BEZOEKERTOOL-METADATA-ALL
-        haLicId:BEZOEKERTOOL-CONTENT 
-        haLicId:VIAA-INTRA_CP-METADATA-ALL 
-        haLicId:VIAA-INTRA_CP-CONTENT 
-        haLicId:Publiek-Domein
-        haLicId:COPYRIGHT-UNDETERMINED
+    VALUES ?schema_license { 
+      haLicId:VIAA-PUBLIEK-METADATA-LTD 
+      haLicId:VIAA-PUBLIEK-METADATA-ALL
+      haLicId:VIAA-PUBLIEK-CONTENT
+      haLicId:BEZOEKERTOOL-METADATA-ALL
+      haLicId:BEZOEKERTOOL-CONTENT 
+      haLicId:VIAA-INTRA_CP-METADATA-ALL 
+      haLicId:VIAA-INTRA_CP-CONTENT 
+      haLicId:Publiek-Domein
+      haLicId:COPYRIGHT-UNDETERMINED
     }
-    }
+    
+    ?rep premis:storedAt ?id.
+    
+    ?id a haObj:PhysicalCarrier;
+    schema:name ?schema_name;
+    premis:medium/skos:prefLabel ?premis_medium.
 
     FILTER (langMatches(lang(?schema_name), "nl") && langMatches(lang(?premis_medium), "en"))
 
