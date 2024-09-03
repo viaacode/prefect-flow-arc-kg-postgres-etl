@@ -35,7 +35,7 @@ WHERE {
     haLicId:Publiek-Domein
     haLicId:COPYRIGHT-UNDETERMINED
   }
-  ?rep premis:storedAt ?id.
+  ?rep premis:storedAt ?carrier_id.
   ?carrier_id a haObj:PhysicalCarrier ;
       haDes:coloringType/skos:prefLabel  ?ha_des_coloring_type
   FILTER langMatches(lang(?ha_des_coloring_type), "nl")
