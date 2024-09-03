@@ -4,6 +4,7 @@ PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
 prefix prov: <http://www.w3.org/ns/prov#>
@@ -75,7 +76,9 @@ WHERE {
     }
 
     OPTIONAL {
-      ?id ^eror:sou/prov:startedAtTime ?digitization_date
+      ?event a haEvt:digitization; 
+        prov:startedAtTime ?digitization_date; 
+        eror:sou ?id .
     }
 
     OPTIONAL {
