@@ -32,7 +32,7 @@ SELECT DISTINCT
 ?type
 ?created_at
 ?updated_at
-?digitization_date
+(MIN(?digitization_date_res) as ?digitization_date)
 WHERE {
     ?intellectual_entity_id rel:isr ?rep;  
       schema:license ?schema_license;
@@ -77,7 +77,7 @@ WHERE {
 
     OPTIONAL {
       ?event a haEvt:digitization; 
-        prov:startedAtTime ?digitization_date; 
+        prov:startedAtTime ?digitization_date_res; 
         eror:sou ?id .
     }
 
@@ -120,3 +120,18 @@ WHERE {
     }
 
 }
+GROUP BY 
+?id
+?bibframe_production_method
+?ebucore_has_captioning
+?intellectual_entity_id
+?premis_medium
+?schema_height
+?schema_identifier
+?schema_material
+?schema_material_extent
+?schema_name
+?schema_width
+?type
+?created_at
+?updated_at
