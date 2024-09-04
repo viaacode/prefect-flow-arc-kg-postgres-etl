@@ -46,12 +46,23 @@ WHERE {
   
     ?id a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
-           schema:name ?schema_name_res ;
+           schema:name ?schema_name_nl ;
            schema:maintainer ?schema_maintainer;
            schema:license ?schema_license;
            dct:format ?format .
 
-    FILTER langMatches(lang(?schema_name_res), "nl")
+    # Only keep one name when
+    FILTER (
+      # the language is nl
+      langmatches(lang(?schema_name_res), "nl") || 
+      # or when the lanuage is 'fr' and there is no 'nl' name
+      (
+        langmatches(lang(?schema_name_res), "fr") && 
+        NOT EXISTS {
+          ?id schema:name ?schema_name_other. 
+          FILTER(langmatches(lang(?schema_name_other), "nl")) 
+        }
+      ))
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
     # Only include the right licenses
