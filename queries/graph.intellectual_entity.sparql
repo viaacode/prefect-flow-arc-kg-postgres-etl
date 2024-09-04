@@ -59,10 +59,19 @@ WHERE {
       (
         langmatches(lang(?schema_name_res), "fr") && 
         NOT EXISTS {
-          ?id schema:name ?schema_name_other. 
-          FILTER(langmatches(lang(?schema_name_other), "nl")) 
+          ?id schema:name ?schema_name_nl. 
+          FILTER(langmatches(lang(?schema_name_nl), "nl")) 
         }
-      ))
+      ) ||
+      # or when the lanuage is 'en' and there is no 'fr' name
+      (
+        langmatches(lang(?schema_name_res), "en") && 
+        NOT EXISTS {
+          ?id schema:name ?schema_name_fr. 
+          FILTER(langmatches(lang(?schema_name_fr), "fr")) 
+        }
+      )
+    )
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
     # Only include the right licenses
