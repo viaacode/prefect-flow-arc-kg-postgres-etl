@@ -11,8 +11,11 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id schema:license ?schema_license_res.
-    VALUES ?schema_license_res { 
+    {
+      SELECT *
+      WHERE {
+        ?intellectual_entity_id schema:license ?schema_license_res.
+         VALUES ?schema_license_res { 
         haLicId:VIAA-PUBLIEK-METADATA-LTD 
         haLicId:VIAA-PUBLIEK-METADATA-ALL
         haLicId:VIAA-PUBLIEK-CONTENT
@@ -22,6 +25,9 @@ WHERE {
         haLicId:VIAA-INTRA_CP-CONTENT 
         haLicId:Publiek-Domein
         haLicId:COPYRIGHT-UNDETERMINED
+    }
+
+      }
     }
 
     # Do not include images

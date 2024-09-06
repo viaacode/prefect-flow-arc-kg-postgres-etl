@@ -64,4 +64,3 @@ WHERE {
     ?file_id prov:wasDerivedFrom/schema:dateModified ?modified .
     FILTER (!isLiteral(?since) || ?modified >= ?since )
 }
-ORDER BY ?representation_id ?file_id

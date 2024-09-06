@@ -51,7 +51,12 @@ WHERE {
            schema:license ?schema_license;
            dct:format ?format .
 
-    FILTER langMatches(lang(?schema_name_res), "nl")
+        filter (
+            langmatches(lang(?schema_name_res), "nl") 
+            || (not exists {
+                    ?id schema:name ?schema_name_other. 
+                    filter(langmatches(lang(?schema_name_other), "nl")) 
+                }))
     BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
         
     # Only include the right licenses
