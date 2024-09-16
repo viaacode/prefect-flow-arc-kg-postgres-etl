@@ -18,11 +18,17 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-  ?id a org:Organization;
-      org:identifier ?org_identifier;
-      skos:prefLabel ?skos_pref_label.
-
-  FILTER strStarts(?org_identifier, "OR-")
+  {
+    SELECT ?id ?org_identifier (SAMPLE(?skos_pref_label_res) AS ?skos_pref_label)
+    WHERE {
+        ?id a org:Organization;
+            org:identifier ?org_identifier;
+            skos:prefLabel ?skos_pref_label_res.
+      
+        FILTER strStarts(?org_identifier, "OR-")
+    }
+    GROUP BY ?id ?org_identifier 
+  }
 
   OPTIONAL { ?id dct:description ?dcterms_description }
   OPTIONAL { ?id dct:description ?dcterms_description }
