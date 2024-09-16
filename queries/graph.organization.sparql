@@ -9,9 +9,6 @@ SELECT DISTINCT
 ?id
 ?dcterms_description
 ?foaf_homepage
-# ?ha_org_allows_bzt
-# ?ha_org_allows_iiif
-# ?ha_org_allows_overlay
 ?ha_org_has_logo
 ?ha_org_request_form
 ?ha_org_sector
@@ -21,17 +18,22 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-  ?id a haOrg:ContentPartner;
-      org:identifier ?org_identifier;
-      skos:prefLabel ?skos_pref_label.
+  {
+    SELECT ?id ?org_identifier (SAMPLE(?skos_pref_label_res) AS ?skos_pref_label)
+    WHERE {
+        ?id a org:Organization;
+            org:identifier ?org_identifier;
+            skos:prefLabel ?skos_pref_label_res.
+      
+        FILTER strStarts(?org_identifier, "OR-")
+    }
+    GROUP BY ?id ?org_identifier 
+  }
 
   OPTIONAL { ?id dct:description ?dcterms_description }
   OPTIONAL { ?id dct:description ?dcterms_description }
   OPTIONAL { ?id foaf:homepage ?foaf_homepage }
   OPTIONAL { ?id haOrg:hasLogo ?ha_org_has_logo }
-  # BIND (EXISTS { ?id haOrg:hasPreference haPref:logo-embedding } AS ?ha_org_allows_overlay)
-  # BIND (EXISTS { ?id haOrg:hasPreference haPref:visitor-space-publication } AS ?ha_org_allows_bzt)
-  # BIND (EXISTS { ?id haOrg:hasPreference haPref:iiif-dissemination } AS ?ha_org_allows_iiif)
   OPTIONAL { ?id haOrg:requestForm ?ha_org_request_form } 
   OPTIONAL { ?id haOrg:sector ?ha_org_sector } 
   OPTIONAL { 
