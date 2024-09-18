@@ -84,7 +84,7 @@ def upsert_pages(
     # Get column names
     get_columns_query = f"""
     SELECT COLUMN_NAME from information_schema.columns 
-    WHERE table_name='{temp_table_name}'
+    WHERE table_name='{table_name}'
     """
     cur.execute(get_columns_query)
     column_names = [row[0] for row in cur] 
@@ -92,7 +92,7 @@ def upsert_pages(
     # Get primary keys
     get_primary_keys_query = f"""
     SELECT COLUMN_NAME from information_schema.key_column_usage 
-    WHERE table_name='{temp_table_name}' AND constraint_name LIKE '%pkey'
+    WHERE table_name='{table_name}' AND constraint_name LIKE '%pkey'
     """
     cur.execute(get_primary_keys_query)
     primary_keys = [row[0] for row in cur]
