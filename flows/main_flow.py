@@ -64,7 +64,8 @@ def upsert_pages(
     cur = conn.cursor()
 
     # Step 2: Create a temporary table for upserting
-    temp_table_name = f"temp_{table_name.split('.',1)[1]}"
+    table_no_schema = table_name.split('.',1)[1]
+    temp_table_name = f"temp_{table_no_schema}"
     create_temp_table_query = f"""
     DROP TABLE IF EXISTS {temp_table_name};
     CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
@@ -84,7 +85,7 @@ def upsert_pages(
     # Get column names
     get_columns_query = f"""
     SELECT COLUMN_NAME from information_schema.columns 
-    WHERE table_name='{table_name}'
+    WHERE table_name='{table_no_schema}'
     """
     cur.execute(get_columns_query)
     column_names = [row[0] for row in cur] 
@@ -92,7 +93,7 @@ def upsert_pages(
     # Get primary keys
     get_primary_keys_query = f"""
     SELECT COLUMN_NAME from information_schema.key_column_usage 
-    WHERE table_name='{table_name}' AND constraint_name LIKE '%pkey'
+    WHERE table_name='{table_no_schema}' AND constraint_name LIKE '%pkey'
     """
     cur.execute(get_primary_keys_query)
     primary_keys = [row[0] for row in cur]
