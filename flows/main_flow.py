@@ -67,7 +67,7 @@ def upsert_pages(
     temp_table_name = f"temp_{table_name.split('.',1)[1]}"
     create_temp_table_query = f"""
     DROP TABLE IF EXISTS {temp_table_name};
-    CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL);
+    CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
     """
     cur.execute(create_temp_table_query)
     conn.commit()
