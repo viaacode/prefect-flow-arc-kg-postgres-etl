@@ -101,7 +101,6 @@ def upsert_pages(
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}",column_names))
 
     # Dedupe temp table
-    logger.info(f"Dedupe the temporary table {temp_table_name}")
     delete_duplicates = f"""
     WITH dupes AS (
         SELECT *, ROW_NUMBER() OVER(
@@ -116,6 +115,8 @@ def upsert_pages(
     WHERE row_num > 1;
     """
     cur.execute(delete_duplicates)
+    rows_deleted = cur.rowcount
+    logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
     conn.commit()
 
     # When full sync: truncate table first
