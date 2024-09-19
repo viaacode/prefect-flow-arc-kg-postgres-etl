@@ -109,7 +109,8 @@ def upsert_pages(
                 ORDER BY {', '.join(primary_keys)}
             ) AS row_num
         FROM {temp_table_name}
-        ORDER BY {', '.join(primary_keys)}
+        GROUP BY {', '.join(primary_keys)}
+        HAVING count(*) > 1
         LIMIT 10
     --)
     --DELETE FROM {temp_table_name} a
