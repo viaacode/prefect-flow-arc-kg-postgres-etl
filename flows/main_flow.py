@@ -100,6 +100,24 @@ def upsert_pages(
 
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}",column_names))
 
+    # Dedupe temp table
+    logger.info(f"Dedupe the temporary table {temp_table_name}")
+    delete_duplicates = f"""
+    WITH dupes AS (
+        SELECT *, ROW_NUMBER() OVER(
+                PARTITION BY {', '.join(primary_keys)}
+                ORDER BY (SELECT(0))
+            ) AS row_num
+        FROM {temp_table_name}
+    )
+    DELETE FROM {temp_table_name}
+    SELECT *
+    FROM dupes
+    WHERE row_num > 1;
+    """
+    cur.execute(delete_duplicates)
+    conn.commit()
+
     # When full sync: truncate table first
     if since is None:
         truncate_query = f"""
@@ -111,7 +129,7 @@ def upsert_pages(
     
     upsert_query = f"""
     INSERT INTO {table_name}
-    SELECT DISTINCT * FROM {temp_table_name}
+    SELECT * FROM {temp_table_name}
     ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
     SET {', '.join(column_map)};
     """
