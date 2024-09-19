@@ -103,17 +103,17 @@ def upsert_pages(
 
     # Dedupe temp table
     delete_duplicates = f"""
-    WITH dupes AS (
+    --WITH dupes AS (
         SELECT *, ROW_NUMBER() OVER(
                 PARTITION BY {', '.join(primary_keys)}
                 ORDER BY (SELECT(0))
             ) AS row_num
         FROM {temp_table_name}
-    )
-    DELETE FROM {temp_table_name} a
-    USING dupes b
-    WHERE b.row_num > 1 AND {' AND '.join(join_map)}
-    RETURNING *
+    --)
+    --DELETE FROM {temp_table_name} a
+    --USING dupes b
+    --WHERE b.row_num > 1 AND {' AND '.join(join_map)}
+    --RETURNING *
     """
     logger.info(f"Executing delete query {delete_duplicates}")
     cur.execute(delete_duplicates)
