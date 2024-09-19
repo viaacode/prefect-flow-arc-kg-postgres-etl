@@ -106,9 +106,10 @@ def upsert_pages(
     --WITH dupes AS (
         SELECT *, ROW_NUMBER() OVER(
                 PARTITION BY {', '.join(primary_keys)}
-                ORDER BY (SELECT(0))
+                ORDER BY {', '.join(primary_keys)}
             ) AS row_num
         FROM {temp_table_name}
+        LIMIT 10
     --)
     --DELETE FROM {temp_table_name} a
     --USING dupes b
