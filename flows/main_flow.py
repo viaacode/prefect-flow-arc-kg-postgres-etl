@@ -66,10 +66,9 @@ def upsert_pages(
     # Step 2: Create a temporary table for upserting
     table_no_schema = table_name.split('.',1)[1]
     temp_table_name = f"temp_{table_no_schema}"
-    # CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
     create_temp_table_query = f"""
     DROP TABLE IF EXISTS {temp_table_name};
-    CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL);
+    CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
     """
     cur.execute(create_temp_table_query)
     conn.commit()
@@ -112,7 +111,7 @@ def upsert_pages(
     
     upsert_query = f"""
     INSERT INTO {table_name}
-    SELECT * FROM {temp_table_name}
+    SELECT DISTINCT * FROM {temp_table_name}
     ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
     SET {', '.join(column_map)};
     """
