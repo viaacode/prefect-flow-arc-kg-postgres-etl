@@ -112,7 +112,8 @@ def upsert_pages(
     )
     DELETE FROM {temp_table_name} a
     USING dupes b
-    WHERE b.row_num > 1 AND {' AND '.join(join_map)}
+    WHERE b.row_num > 1 
+    -- AND {' AND '.join(join_map)}
     """
     logger.info(f"Executing delete query {delete_duplicates}")
     cur.execute(delete_duplicates)
