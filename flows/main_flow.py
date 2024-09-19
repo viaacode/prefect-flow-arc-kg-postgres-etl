@@ -98,7 +98,8 @@ def upsert_pages(
     cur.execute(get_primary_keys_query)
     primary_keys = [row[0] for row in cur]
 
-    column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}",column_names))
+    column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
+    join_map = list(map(lambda cn: f"a.{cn} = b.{cn}", column_names))
 
     # Dedupe temp table
     delete_duplicates = f"""
@@ -109,11 +110,12 @@ def upsert_pages(
             ) AS row_num
         FROM {temp_table_name}
     )
-    DELETE FROM {temp_table_name}
-    SELECT *
-    FROM dupes
-    WHERE row_num > 1;
+    DELETE FROM {temp_table_name} a
+    USING dupes b
+    WHERE  {' AND '.join(join_map)}
+    )
     """
+    logger.debug(delete_duplicates)
     cur.execute(delete_duplicates)
     rows_deleted = cur.rowcount
     logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
