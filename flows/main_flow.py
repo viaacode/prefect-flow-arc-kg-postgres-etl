@@ -104,11 +104,12 @@ def upsert_pages(
     # Dedupe temp table
     delete_duplicates = f"""
     --WITH dupes AS (
-        SELECT *, ROW_NUMBER() OVER(
+        SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
                 PARTITION BY {', '.join(primary_keys)}
                 ORDER BY {', '.join(primary_keys)}
             ) AS row_num
         FROM {temp_table_name}
+        ORDER BY {', '.join(primary_keys)}
         LIMIT 10
     --)
     --DELETE FROM {temp_table_name} a
