@@ -114,7 +114,7 @@ def upsert_pages(
     USING dupes b
     WHERE  {' AND '.join(join_map)}
     """
-    logger.debug(delete_duplicates)
+    logger.info(f"Executing upsert query {delete_duplicates}")
     cur.execute(delete_duplicates)
     rows_deleted = cur.rowcount
     logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
