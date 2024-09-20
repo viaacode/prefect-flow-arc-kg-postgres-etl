@@ -16,7 +16,8 @@ def upsert_pages(
     csv_url: str, 
     postgres_credentials: DatabaseCredentials, 
     triply_credentials:TriplyDBCredentials, 
-    since: str = None):
+    since: str = None,
+    dedupe: bool = False):
     # Load logger
     logger = get_run_logger()
 
@@ -68,7 +69,7 @@ def upsert_pages(
     temp_table_name = f"temp_{table_no_schema}"
     create_temp_table_query = f"""
     DROP TABLE IF EXISTS {temp_table_name};
-    CREATE TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
+    CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
     """
     cur.execute(create_temp_table_query)
     conn.commit()
@@ -97,6 +98,32 @@ def upsert_pages(
     """
     cur.execute(get_primary_keys_query)
     primary_keys = [row[0] for row in cur]
+
+    # Dedupe temp table
+    if dedupe:
+        join_map = list(map(lambda cn: f"a.{cn} = b.{cn}", primary_keys))
+        return_map = list(map(lambda cn: f"a.{cn}", primary_keys))
+        delete_duplicates = f"""
+        WITH dupes AS (
+            SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
+                    PARTITION BY {', '.join(primary_keys)}
+                    ORDER BY {', '.join(primary_keys)}
+                ) AS row_num
+            FROM (
+                SELECT DISTINCT * FROM {temp_table_name}
+            ) x
+        )
+        DELETE FROM {temp_table_name} a
+        USING dupes b
+        WHERE b.row_num > 1 AND {' AND '.join(join_map)}
+        RETURNING {', '.join(return_map)}, b.row_num
+        """
+        logger.debug(f"Executing delete query {delete_duplicates}")
+        cur.execute(delete_duplicates)
+        rows_deleted = cur.rowcount
+        logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
+        logger.debug(f"Deleted rows from {temp_table_name}: {cur.fetchall()}")
+        conn.commit()
 
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
 
