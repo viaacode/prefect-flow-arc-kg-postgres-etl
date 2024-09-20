@@ -33,7 +33,7 @@ def upsert_pages(
 
     def fetch_and_insert_page(url, cursor, temp_table_name):
         """Fetch a single page of CSV data and insert it into the temporary table. Returns the nex page url if there is one."""
-        logger.info(f"Fetch and insert page {url} into {table_name}")
+        logger.info(f"Fetch and insert page {url} into {temp_table_name}")
         params = {"since": since.isoformat()} if since is not None else {}
         response = requests.get(
             url,
@@ -100,27 +100,28 @@ def upsert_pages(
 
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
     join_map = list(map(lambda cn: f"a.{cn} = b.{cn}", primary_keys))
+    return_map = list(map(lambda cn: f"a.{cn}", primary_keys))
 
     # Dedupe temp table
-    delete_duplicates = f"""
-    WITH dupes AS (
-        SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
-                PARTITION BY {', '.join(primary_keys)}
-                ORDER BY {', '.join(primary_keys)}
-            ) AS row_num
-        FROM {temp_table_name}
-    )
-    DELETE FROM {temp_table_name} a
-    USING dupes b
-    WHERE b.row_num > 1 AND {' AND '.join(join_map)}
-    RETURNING *
-    """
-    logger.info(f"Executing delete query {delete_duplicates}")
-    cur.execute(delete_duplicates)
-    logger.info(cur.fetchall())
-    rows_deleted = cur.rowcount
-    logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
-    conn.commit()
+    # delete_duplicates = f"""
+    # WITH dupes AS (
+    #     SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
+    #             PARTITION BY {', '.join(primary_keys)}
+    #             ORDER BY {', '.join(primary_keys)}
+    #         ) AS row_num
+    #     FROM {temp_table_name}
+    # )
+    # DELETE FROM {temp_table_name} a
+    # USING dupes b
+    # WHERE b.row_num > 1 AND {' AND '.join(join_map)}
+    # RETURNING {', '.join(return_map)}, b.row_num
+    # """
+    # logger.info(f"Executing delete query {delete_duplicates}")
+    # cur.execute(delete_duplicates)
+    # logger.info(cur.fetchall())
+    # rows_deleted = cur.rowcount
+    # logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
+    # conn.commit()
 
     # When full sync: truncate table first
     if since is None:
