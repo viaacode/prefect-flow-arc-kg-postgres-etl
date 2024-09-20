@@ -63,7 +63,7 @@ def upsert_pages(
     )
     cur = conn.cursor()
 
-    # Step 2: Create a temporary table for upserting
+    # Step 2: Create a temporary table for upserting. Exclude all indexes to deal with duplicate rows
     table_no_schema = table_name.split('.',1)[1]
     temp_table_name = f"temp_{table_no_schema}"
     create_temp_table_query = f"""
@@ -99,33 +99,6 @@ def upsert_pages(
     primary_keys = [row[0] for row in cur]
 
     column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
-    join_map = list(map(lambda cn: f"a.{cn} = b.{cn}", primary_keys))
-    return_map = list(map(lambda cn: f"a.{cn}", primary_keys))
-
-    # Dedupe temp table
-    # delete_duplicates = f"""
-    # WITH dupes AS (
-    # --    SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
-    # --            PARTITION BY {', '.join(primary_keys)}
-    # --            ORDER BY {', '.join(primary_keys)}
-    # --        ) AS row_num
-    # --    FROM (
-    #     SELECT DISTINCT * FROM {temp_table_name}
-    # --    ) x
-    # )
-    # DELETE FROM {temp_table_name} a
-    # USING dupes b
-    # WHERE 
-    # -- b.row_num > 1 AND 
-    # {' AND '.join(join_map)}
-    # RETURNING {', '.join(return_map)}, b.row_num
-    # """
-    # logger.info(f"Executing delete query {delete_duplicates}")
-    # cur.execute(delete_duplicates)
-    # logger.info(cur.fetchall())
-    # rows_deleted = cur.rowcount
-    # logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
-    # conn.commit()
 
     # When full sync: truncate table first
     if since is None:
@@ -136,6 +109,7 @@ def upsert_pages(
         cur.execute(truncate_query)
         conn.commit()
     
+    # Upsert all rows from temp table. Use distinct to deal with possible duplicates
     upsert_query = f"""
     INSERT INTO {table_name}
     SELECT DISTINCT * FROM {temp_table_name}
