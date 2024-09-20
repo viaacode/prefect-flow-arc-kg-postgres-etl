@@ -159,7 +159,8 @@ def main_flow(
     triplydb_block_name: str = "triplydb",
     postgres_block_name: str = "local",#"hetarchief-tst",
     config_block_name: str = "saved-query-config",
-    full_sync: bool = False
+    full_sync: bool = False,
+    dedupe: bool = False
 ):
     """
         Flow to query the TriplyDB dataset and update the graphql database.
@@ -192,7 +193,8 @@ def main_flow(
             triply_credentials=triply_creds,
             postgres_credentials=postgres_creds,
             since=last_modified_date if not full_sync else None,
-            wait_for=dependencies
+            wait_for=dependencies,
+            dedupe=dedupe
         )
         # Initialize entry in task dict if not exists
         if csv_url["position"] not in tasks:
