@@ -33,7 +33,7 @@ def upsert_pages(
 
     def fetch_and_insert_page(url, cursor, temp_table_name):
         """Fetch a single page of CSV data and insert it into the temporary table. Returns the nex page url if there is one."""
-        logger.info(f"Fetch and insert page {url} into {table_name}")
+        logger.info(f"Fetch and insert page {url} into {temp_table_name}")
         params = {"since": since.isoformat()} if since is not None else {}
         response = requests.get(
             url,
@@ -63,11 +63,12 @@ def upsert_pages(
     )
     cur = conn.cursor()
 
-    # Step 2: Create a temporary table for upserting
-    temp_table_name = f"temp_{table_name.split('.',1)[1]}"
+    # Step 2: Create a temporary table for upserting. Exclude all indexes to deal with duplicate rows
+    table_no_schema = table_name.split('.',1)[1]
+    temp_table_name = f"temp_{table_no_schema}"
     create_temp_table_query = f"""
     DROP TABLE IF EXISTS {temp_table_name};
-    CREATE TEMP TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL);
+    CREATE TABLE {temp_table_name} (LIKE {table_name} INCLUDING ALL EXCLUDING INDEXES);
     """
     cur.execute(create_temp_table_query)
     conn.commit()
@@ -84,7 +85,7 @@ def upsert_pages(
     # Get column names
     get_columns_query = f"""
     SELECT COLUMN_NAME from information_schema.columns 
-    WHERE table_name='{temp_table_name}'
+    WHERE table_name='{table_no_schema}'
     """
     cur.execute(get_columns_query)
     column_names = [row[0] for row in cur] 
@@ -92,12 +93,12 @@ def upsert_pages(
     # Get primary keys
     get_primary_keys_query = f"""
     SELECT COLUMN_NAME from information_schema.key_column_usage 
-    WHERE table_name='{temp_table_name}' AND constraint_name LIKE '%pkey'
+    WHERE table_name='{table_no_schema}' AND constraint_name LIKE '%pkey'
     """
     cur.execute(get_primary_keys_query)
     primary_keys = [row[0] for row in cur]
 
-    column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}",column_names))
+    column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
 
     # When full sync: truncate table first
     if since is None:
@@ -108,9 +109,10 @@ def upsert_pages(
         cur.execute(truncate_query)
         conn.commit()
     
+    # Upsert all rows from temp table. Use distinct to deal with possible duplicates
     upsert_query = f"""
     INSERT INTO {table_name}
-    SELECT * FROM {temp_table_name}
+    SELECT DISTINCT * FROM {temp_table_name}
     ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
     SET {', '.join(column_map)};
     """
