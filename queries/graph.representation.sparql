@@ -35,11 +35,10 @@ WHERE {
 
     { 
       ?id a haObj:DigitalRepresentation;
-          schema:name ?schema_name_res;
+          schema:name ?schema_name;
           haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?represents.
 
-      FILTER langMatches(lang(?schema_name_res), "nl")
-      BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
+      FILTER langMatches(lang(?schema_name), "nl")
 
       # Do not include images
       ?represents dct:format ?format.
@@ -72,47 +71,23 @@ WHERE {
       ?id prov:wasDerivedFrom/schema:dateModified ?modified .
       FILTER (!isLiteral(?since) || ?modified >= ?since )
 
-      OPTIONAL {
-        ?id schema:inLanguage ?schema_in_language
-      }
-
-      OPTIONAL {
-        ?id rel:hsr ?relation_has_root
-      }
-
-      OPTIONAL {
-        ?id rel:hss ?relation_has_source
-      }
-
-      OPTIONAL {
-        ?id edm:isNextInSequence ?edm_is_next_in_sequence 
-      }
-
-      OPTIONAL {
-        ?id schema:thumbnailUrl ?schema_thumbnail_url;
-      }
-
-      OPTIONAL {
-        ?id schema:duration ?schema_duration 
-      }
-
-      OPTIONAL {
-        ?id schema:caption ?schema_caption 
-      }
-
-      OPTIONAL {
-        ?id schema:transcript ?schema_transcript 
-      }
+      OPTIONAL { ?id schema:inLanguage ?schema_in_language }
+      OPTIONAL { ?id rel:hsr ?relation_has_root }
+      OPTIONAL { ?id rel:hss ?relation_has_source }
+      OPTIONAL { ?id edm:isNextInSequence ?edm_is_next_in_sequence }
+      OPTIONAL { ?id schema:thumbnailUrl ?schema_thumbnail_url;}
+      OPTIONAL { ?id schema:duration ?schema_duration }
+      OPTIONAL { ?id schema:caption ?schema_caption }
+      OPTIONAL { ?id schema:transcript ?schema_transcript }
     }
     UNION
     {
       ?id a haObj:FragmentRepresentation;
-          schema:name ?schema_name_res;
+          schema:name ?schema_name;
           rel:rep ?represents.
 
-      FILTER langMatches(lang(?schema_name_res), "nl")
-      BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
-            
+      FILTER langMatches(lang(?schema_name), "nl")
+
       # Do not include images
       ?represents dct:format ?format.
       VALUES ?format {
@@ -155,6 +130,4 @@ WHERE {
         ?id ebucore:isMediaFragmentOf ?is_media_fragment_of 
       }
     }
-          
-    
 }

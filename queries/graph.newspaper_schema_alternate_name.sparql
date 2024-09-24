@@ -9,7 +9,5 @@ SELECT DISTINCT
 WHERE {
     ?collection_id a schema:Newspaper;
         schema:hasPart ?part;
-        schema:alternateName ?schema_alternate_name_res.
-
-    BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
+        schema:alternateName ?schema_alternate_name.
 }
