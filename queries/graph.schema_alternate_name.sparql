@@ -14,12 +14,10 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
-    schema:alternateName ?schema_alternate_name_res.
+    schema:alternateName ?schema_alternate_name.
 
-  FILTER langMatches(lang(?schema_alternate_name_res), "nl")
+  FILTER langMatches(lang(?schema_alternate_name), "nl")
 
-  BIND (IF(regex(?schema_alternate_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_alternate_name_res,"\""),?schema_alternate_name_res) AS ?schema_alternate_name)
-  
   #Do not include images
   ?intellectual_entity_id dct:format ?format.
   VALUES ?format {

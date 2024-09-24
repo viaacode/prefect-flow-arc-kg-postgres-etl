@@ -11,12 +11,12 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
   {
-    ?id a schema:Thing; schema:name ?schema_name_res.
-    FILTER langMatches(lang(?schema_name_res), "nl")
+    ?id a schema:Thing; schema:name ?schema_name.
+    FILTER langMatches(lang(?schema_name), "nl")
   }
   UNION {
-    ?id a schema:Person; schema:name ?schema_name_res.
-    FILTER langMatches(lang(?schema_name_res), "nl")
+    ?id a schema:Person; schema:name ?schema_name.
+    FILTER langMatches(lang(?schema_name), "nl")
 
     OPTIONAL {
       ?id schema:deathDate ?schema_death_date
@@ -34,6 +34,4 @@ WHERE {
       ?id schema:deathPlace/schema:name ?schema_death_place
     }
   }
-
-  BIND (IF(regex(?schema_name_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_name_res,"\""),?schema_name_res) AS ?schema_name)
 }
