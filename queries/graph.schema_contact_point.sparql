@@ -3,23 +3,24 @@ PREFIX schema: <https://schema.org/>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 
 SELECT DISTINCT 
+?id
 ?organization_id
 ?schema_contact_type
 ?schema_email
 ?schema_telephone
-#?created_at
-#?updated_at
+?created_at
+?updated_at
 WHERE {
   ?organization_id a haOrg:ContentPartner;
-      schema:contactPoint ?point.
+      schema:contactPoint ?id.
   
-  ?point schema:contactType ?schema_contact_type.
+  ?id schema:contactType ?schema_contact_type.
   
   OPTIONAL {
-     ?point schema:email ?schema_email ;
+     ?id schema:email ?schema_email ;
   }
 
   OPTIONAL {
-     ?point schema:telephone ?schema_telephone .
+     ?id schema:telephone ?schema_telephone .
   } 
 }
