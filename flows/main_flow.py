@@ -62,6 +62,9 @@ def upsert_pages(
         database=postgres_credentials.database,
         #connection_factory=LoggingConnection, 
     )
+    # disable autocommit mode
+    conn.autocommit = False
+
     cur = conn.cursor()
 
     # Step 2: Create a temporary table for upserting. Exclude all indexes to deal with duplicate rows
@@ -74,82 +77,91 @@ def upsert_pages(
     cur.execute(create_temp_table_query)
     conn.commit()
 
-    # Step 3: Fetch and insert each page of the CSV data
-    url = csv_url
-    while url:
-        url = fetch_and_insert_page(url, cur, temp_table_name)
-        conn.commit()
+    try:
 
-    # Step 4: Upsert from the temporary table to the actual table
-    logger.info(f"Upsert from the temporary table {temp_table_name} to the actual table {table_name}")
+        # Step 3: Fetch and insert each page of the CSV data
+        url = csv_url
+        while url:
+            url = fetch_and_insert_page(url, cur, temp_table_name)
+            conn.commit()
 
-    # Get column names
-    get_columns_query = f"""
-    SELECT COLUMN_NAME from information_schema.columns 
-    WHERE table_name='{table_no_schema}'
-    """
-    cur.execute(get_columns_query)
-    column_names = [row[0] for row in cur] 
+        # Step 4: Upsert from the temporary table to the actual table
+        logger.info(f"Upsert from the temporary table {temp_table_name} to the actual table {table_name}")
 
-    # Get primary keys
-    get_primary_keys_query = f"""
-    SELECT COLUMN_NAME from information_schema.key_column_usage 
-    WHERE table_name='{table_no_schema}' AND constraint_name LIKE '%pkey'
-    """
-    cur.execute(get_primary_keys_query)
-    primary_keys = [row[0] for row in cur]
-
-    # Dedupe temp table
-    if dedupe:
-        join_map = list(map(lambda cn: f"a.{cn} = b.{cn}", primary_keys))
-        return_map = list(map(lambda cn: f"a.{cn}", primary_keys))
-        delete_duplicates = f"""
-        WITH dupes AS (
-            SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
-                    PARTITION BY {', '.join(primary_keys)}
-                    ORDER BY {', '.join(primary_keys)}
-                ) AS row_num
-            FROM (
-                SELECT DISTINCT * FROM {temp_table_name}
-            ) x
-        )
-        DELETE FROM {temp_table_name} a
-        USING dupes b
-        WHERE b.row_num > 2 AND {' AND '.join(join_map)}
-        RETURNING {', '.join(return_map)}, b.row_num
+        # Get column names
+        get_columns_query = f"""
+        SELECT COLUMN_NAME from information_schema.columns 
+        WHERE table_name='{table_no_schema}'
         """
-        logger.debug(f"Executing delete query {delete_duplicates}")
-        cur.execute(delete_duplicates)
-        rows_deleted = cur.rowcount
-        logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
-        logger.debug(f"Deleted rows from {temp_table_name}: {cur.fetchall()}")
-        conn.commit()
+        cur.execute(get_columns_query)
+        column_names = [row[0] for row in cur] 
 
-    column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
-
-    # When full sync: truncate table first
-    if since is None:
-        truncate_query = f"""
-        TRUNCATE {table_name} CASCADE
+        # Get primary keys
+        get_primary_keys_query = f"""
+        SELECT COLUMN_NAME from information_schema.key_column_usage 
+        WHERE table_name='{table_no_schema}' AND constraint_name LIKE '%pkey'
         """
-        logger.info(f"Truncating {table_name} because full sync is enabled.")
-        cur.execute(truncate_query)
-        conn.commit()
-    
-    # Upsert all rows from temp table. Use distinct to deal with possible duplicates
-    upsert_query = f"""
-    INSERT INTO {table_name}
-    SELECT DISTINCT ON({', '.join(primary_keys)}) * FROM {temp_table_name}
-    ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
-    SET {', '.join(column_map)};
-    """
-    logger.debug(f"Executing upsert query {upsert_query}")
-    cur.execute(upsert_query)
-    conn.commit()
+        cur.execute(get_primary_keys_query)
+        primary_keys = [row[0] for row in cur]
 
-    # Step 5: Clean up and close the connection
-    cur.close()
-    conn.close()
+        # Dedupe temp table
+        if dedupe:
+            join_map = list(map(lambda cn: f"a.{cn} = b.{cn}", primary_keys))
+            return_map = list(map(lambda cn: f"a.{cn}", primary_keys))
+            delete_duplicates = f"""
+            WITH dupes AS (
+                SELECT {', '.join(primary_keys)}, ROW_NUMBER() OVER(
+                        PARTITION BY {', '.join(primary_keys)}
+                        ORDER BY {', '.join(primary_keys)}
+                    ) AS row_num
+                FROM (
+                    SELECT DISTINCT * FROM {temp_table_name}
+                ) x
+            )
+            DELETE FROM {temp_table_name} a
+            USING dupes b
+            WHERE b.row_num > 2 AND {' AND '.join(join_map)}
+            RETURNING {', '.join(return_map)}, b.row_num
+            """
+            logger.debug(f"Executing delete query {delete_duplicates}")
+            cur.execute(delete_duplicates)
+            rows_deleted = cur.rowcount
+            logger.info(f"Dedupe {rows_deleted} rows from temporary table {temp_table_name}")
+            logger.debug(f"Deleted rows from {temp_table_name}: {cur.fetchall()}")
+            conn.commit()
+
+        column_map = list(map(lambda cn: f"{cn} = EXCLUDED.{cn}", column_names))
+
+        # When full sync: truncate table first
+        if since is None:
+            truncate_query = f"""
+            TRUNCATE {table_name} CASCADE
+            """
+            logger.info(f"Truncating {table_name} because full sync is enabled.")
+            cur.execute(truncate_query)
+        
+        # Upsert all rows from temp table. Use distinct to deal with possible duplicates
+        upsert_query = f"""
+        INSERT INTO {table_name}
+        SELECT DISTINCT ON({', '.join(primary_keys)}) * FROM {temp_table_name}
+        ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
+        SET {', '.join(column_map)};
+        """
+        logger.debug(f"Executing upsert query {upsert_query}")
+        cur.execute(upsert_query)
+        conn.commit()
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error("Error in transaction, reverting all changes using rollback ", error)
+        conn.rollback()
+ 
+    finally:
+        # closing database connection.
+        if conn:
+
+            # Step 5: Clean up and close the connection
+            cur.close()
+            conn.close()
+            logger.info("PostgreSQL database connection is closed")
 
     return logger.info(f"Table {table_name} successfully synced.")
 
