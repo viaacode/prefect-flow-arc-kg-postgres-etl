@@ -139,7 +139,7 @@ def upsert_pages(
     # Upsert all rows from temp table. Use distinct to deal with possible duplicates
     upsert_query = f"""
     INSERT INTO {table_name}
-    SELECT DISTINCT * FROM {temp_table_name}
+    SELECT DISTINCT ON({', '.join(primary_keys)}) * FROM {temp_table_name}
     ON CONFLICT ({', '.join(primary_keys)}) DO UPDATE
     SET {', '.join(column_map)};
     """
