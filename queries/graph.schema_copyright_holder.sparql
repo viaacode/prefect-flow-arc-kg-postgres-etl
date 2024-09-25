@@ -14,14 +14,15 @@ SELECT DISTINCT
 ?updated_at
 WHERE {
   ?intellectual_entity_id a premis:IntellectualEntity;
-    schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
+    schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder_res.
   filter (
-      langmatches(lang(?schema_copyright_holder), "nl") 
+      langmatches(lang(?schema_copyright_holder_res), "nl") 
       || (not exists {
               ?intellectual_entity_id schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_name_other. 
               filter(langmatches(lang(?schema_name_other), "nl")) 
   }))
 
+  BIND (IF(regex(?schema_copyright_holder_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_copyright_holder_res,"\""),?schema_copyright_holder_res) AS ?schema_copyright_holder)
   # Do not include images
   ?intellectual_entity_id dct:format ?format.
   VALUES ?format {
