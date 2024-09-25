@@ -10,8 +10,9 @@ SELECT DISTINCT
 ?created_at
 ?updated_at
 WHERE {
-    ?intellectual_entity_id schema:keywords ?schema_keywords.
-
+    ?intellectual_entity_id schema:keywords ?schema_keywords_res.
+    BIND (IF(regex(?schema_keywords_res, "(\r\n|\r|\n)", "i"),CONCAT("\"",?schema_keywords_res,"\""),?schema_keywords_res) AS ?schema_keywords)
+  
     # Do not include images
     ?intellectual_entity_id dct:format ?format.
     VALUES ?format {
