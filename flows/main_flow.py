@@ -1,4 +1,5 @@
 from prefect import task, flow, get_run_logger
+from prefect.server.schemas.states import Failed
 import requests
 import psycopg2
 from psycopg2.extras import LoggingConnection
@@ -153,6 +154,7 @@ def upsert_pages(
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error("Error in transaction, reverting all changes using rollback ", error)
         conn.rollback()
+        return Failed(message=f"Table {table_name} not successfully synced; error in transaction.")
  
     finally:
         # closing database connection.
