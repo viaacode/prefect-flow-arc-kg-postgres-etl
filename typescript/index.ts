@@ -6,9 +6,9 @@ import { Quad } from 'rdf-js'
 import pg from 'pg'
 import { from } from 'pg-copy-streams'
 import { fromRdf } from 'rdf-literal'
-import { stringify } from 'csv-stringify';
+import { stringify } from 'csv-stringify'
 import { pipeline } from 'node:stream/promises'
-import { parse, toSeconds } from "iso8601-duration";
+import { parse, toSeconds } from "iso8601-duration"
 
 // PostgreSQL connection settings
 const dbConfig = {
@@ -26,15 +26,15 @@ const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
 const BATCH_SIZE = 100
 const LIMIT = null
 
-type TableInfo = {name: string, schema:string}
+type TableInfo = { name: string, schema: string }
 
 // Map RecordType to target tables and dynamic column configuration
 const recordTypeToTableMap: Map<string, string> = new Map(
     [
-        [`${NAMESPACE}IntellectualEntityRecord`, 'graph.intellectual_entity' ],
-        [`${NAMESPACE}CarrierRecord`, 'graph.carrier' ],
-        [`${NAMESPACE}RepresentationRecord`, 'graph.representation' ],
-        [`${NAMESPACE}FileRecord`, 'graph.file' ]
+        [`${NAMESPACE}IntellectualEntityRecord`, 'graph.intellectual_entity'],
+        [`${NAMESPACE}CarrierRecord`, 'graph.carrier'],
+        [`${NAMESPACE}RepresentationRecord`, 'graph.representation'],
+        [`${NAMESPACE}FileRecord`, 'graph.file']
     ]
 )
 
@@ -44,13 +44,13 @@ const columnCache: { [tableName: string]: string[] } = {}
 const pool = new pg.Pool(dbConfig)
 
 function getTempTableName(tableName: string) {
-    const tableInfo =  parseTableName(tableName)
+    const tableInfo = parseTableName(tableName)
     return `${tableInfo.schema}.temp_${tableInfo.name}`
 }
 
 function parseTableName(tableName: string): TableInfo {
     const parts = tableName.split('.')
-    return {name: parts[1], schema: parts[0]}
+    return { name: parts[1], schema: parts[0] }
 }
 
 // Helper function to create a table dynamically based on the columns
@@ -94,7 +94,7 @@ async function getTableColumns(tableName: string): Promise<string[]> {
     `
     console.log(query)
     try {
-        const {name, schema} =  parseTableName(tableName)
+        const { name, schema } = parseTableName(tableName)
         const result = await client.query(query, [name, schema])
         return result.rows.map((row: { column_name: string }) => row.column_name)
     } catch (err) {
@@ -128,7 +128,12 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         // Initialize the stringifier
         const sourceStream = stringify({
             delimiter: ",",
-        });
+            cast: {
+                date: function (value) {
+                    return value.toISOString()
+                },
+            },
+        })
 
         // Convert batch to CSV format
         for (const record of batch) {
@@ -146,7 +151,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
             batch.map(record => columns.map(col => record[col] || null)),
             console.error
         )
-       
+
     } finally {
         client.release()
     }
@@ -212,7 +217,7 @@ async function parseTrigGzAndInsertInBatches(url: string, token: string) {
                 .on('data', async (quad: Quad) => {
                     const subject = quad.subject.value
                     const predicate = quad.predicate.value
-                    let object = quad.object.value;
+                    let object = quad.object.value
                     // Convert literal to primitive
                     if (quad.object.termType === "Literal") {
                         // Convert duration to seconds first
