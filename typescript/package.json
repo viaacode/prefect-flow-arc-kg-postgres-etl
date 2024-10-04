@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@triply/triplydb": "^8.2.3",
     "@types/pg": "^8.11.10",
     "@types/pg-copy-streams": "^1.2.5",
     "csv": "^6.3.10",

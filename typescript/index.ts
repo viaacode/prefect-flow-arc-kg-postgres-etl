@@ -8,7 +8,15 @@ import { from } from 'pg-copy-streams'
 import { fromRdf } from 'rdf-literal'
 import { stringify } from 'csv-stringify'
 import { pipeline } from 'node:stream/promises'
-import { parse, toSeconds } from "iso8601-duration"
+import { parse as parseDuration, toSeconds } from "iso8601-duration"
+import App from '@triply/triplydb'
+import { Account } from '@triply/triplydb/Account.js'
+import { AddQueryOptions } from '@triply/triplydb/commonAccountFunctions.js'
+import Graph from '@triply/triplydb/Graph.js'
+import { PipelineProgress } from '@triply/triplydb/Pipeline.js'
+import { readdir, readFile } from 'fs/promises'
+import { join, extname, parse } from 'path'
+import Dataset from '@triply/triplydb/Dataset.js'
 
 // PostgreSQL connection settings
 const dbConfig = {
@@ -27,21 +35,76 @@ const BATCH_SIZE = 100
 const LIMIT = null
 
 type TableInfo = { name: string, schema: string }
+type ColumnInfo = { name: string, datatype: string }
 
 // Map RecordType to target tables and dynamic column configuration
 const recordTypeToTableMap: Map<string, string> = new Map(
     [
         [`${NAMESPACE}IntellectualEntityRecord`, 'graph.intellectual_entity'],
+        [`${NAMESPACE}FileRecord`, 'graph.file'],
         [`${NAMESPACE}CarrierRecord`, 'graph.carrier'],
         [`${NAMESPACE}RepresentationRecord`, 'graph.representation'],
-        [`${NAMESPACE}FileRecord`, 'graph.file']
+        [`${NAMESPACE}ThingRecord`, 'graph.thing'],
+        [`${NAMESPACE}RoleRecord`, 'graph.role'],
     ]
 )
 
-const columnCache: { [tableName: string]: { name: string, datatype: string }[] } = {}
+const columnCache: { [tableName: string]: ColumnInfo[] } = {}
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
+
+async function constructView(account: Account, source: Dataset, destination: { dataset: Dataset, graph?: Graph }, filePath: string) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const queryString = await readFile(filePath, 'utf8')
+            const queryName = parse(filePath).name
+
+            let query
+            const params: AddQueryOptions = {
+                dataset: source,
+                queryString,
+                serviceType: 'virtuoso',
+                output: 'response',
+                variables: [
+                    {
+                        name: 'since',
+                        termType: 'Literal',
+                        datatype: 'http://www.w3.org/2001/XMLSchema#dateTime'
+                    }
+                ]
+            }
+
+            try {
+                query = await account.getQuery(queryName)
+                await query.delete()
+                console.log(`Query ${queryName} deleted.\n`)
+            } catch (error) {
+                console.log(`Query ${queryName} does not exist.\n`)
+            }
+            query = await account.addQuery(queryName, params)
+
+
+            // job thing
+            const pipeline = await query.runPipeline({
+                destination,
+                onProgress: (progress: PipelineProgress) => {
+                    if (progress.finished) {
+                        resolve(true)
+                    }
+                }
+            })
+
+        } catch (readErr) {
+            console.error(readErr)
+            reject(readErr)
+        }
+    })
+}
+
+function isValidDate(date: any) {
+    return date && Object.prototype.toString.call(date) === "[object Date]" && !isNaN(date)
+}
 
 function getTempTableName(tableName: string) {
     const tableInfo = parseTableName(tableName)
@@ -73,7 +136,7 @@ async function createTempTable(tableName: string) {
     }
 }
 
-async function getTableColumnsWithCache(tableName: string): Promise<{ name: string, datatype: string }[]> {
+async function getTableColumnsWithCache(tableName: string): Promise<ColumnInfo[]> {
     if (columnCache[tableName]) {
         //console.log(`Returning ${columnCache[tableName].length} columns for ${tableName} from cache.`)
         return columnCache[tableName]
@@ -85,7 +148,7 @@ async function getTableColumnsWithCache(tableName: string): Promise<{ name: stri
 }
 
 // Helper function to retrieve column names for a specific table
-async function getTableColumns(tableName: string): Promise<{ name: string, datatype: string }[]> {
+async function getTableColumns(tableName: string): Promise<ColumnInfo[]> {
     const client = await pool.connect()
     const query = `
         SELECT column_name AS name, data_type AS datatype
@@ -126,26 +189,26 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
 }
 
 
- // Helper function to delete a batch of records based on the 'subject' column
+// Helper function to delete a batch of records based on the 'subject' column
 async function deleteBatch(tableName: string, ids: string[]) {
-    if (!ids.length) return;
+    if (!ids.length) return
 
-    const client = await pool.connect();
+    const client = await pool.connect()
     const query = `
         DELETE FROM "${tableName}"
         WHERE id = ANY($1::text[]);
-    `;
+    `
 
     try {
-        await client.query('BEGIN');
-        await client.query(query, [ids]);
-        await client.query('COMMIT');
-        console.log(`Deleted ${ids.length} records from table ${tableName}`);
+        await client.query('BEGIN')
+        await client.query(query, [ids])
+        await client.query('COMMIT')
+        console.log(`Deleted ${ids.length} records from table ${tableName}`)
     } catch (err) {
-        await client.query('ROLLBACK');
-        console.error(`Error during batch delete for table ${tableName}:`, err);
+        await client.query('ROLLBACK')
+        console.error(`Error during batch delete for table ${tableName}:`, err)
     } finally {
-        client.release();
+        client.release()
     }
 }
 
@@ -182,7 +245,13 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
 
         // Convert batch to CSV format
         for (const record of batch) {
-            const values = columns.map(col => record[col.name] || null)
+            const values = columns.map(col => {
+                // Make sure value exists and that dates are valid dates
+                if (!record[col.name] || (col.datatype === 'date' && !isValidDate(record[col.name])))
+                    return null
+
+                return record[col.name]
+            })
             sourceStream.write(values)
         }
         sourceStream.end()
@@ -194,11 +263,13 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         console.error(`Error during bulk insert for table ${tableName}:`, err)
         stringify(
             batch.map(record => columns.map(col => record[col.name] || null)),
-            {cast: {
-                date: (value) => {
-                    return value.toISOString()
-                },
-            }}, (result) =>{
+            {
+                cast: {
+                    date: (value) => {
+                        return value.toISOString()
+                    },
+                }
+            }, (result) => {
                 console.error(result)
                 process.exit()
             }
@@ -243,6 +314,8 @@ async function upsertTable(tableName: string) {
     const tempTableName = getTempTableName(tableName)
     // Get the actual columns from the database
     const columns = await getTableColumnsWithCache(tableName)
+    
+    const columnList = columns.map(c => `${c.name} = EXCLUDED.${c.name}`).join(',')
     // Get the primary keys from the database
     const primaryKeys = await getTablePrimaryKeys(tableName)
 
@@ -251,9 +324,9 @@ async function upsertTable(tableName: string) {
         INSERT INTO ${tableName}
         SELECT * FROM ${tempTableName}
         ON CONFLICT (${primaryKeys.join(',')}) DO UPDATE
-        SET ${columns.join(',')};
+        SET ${columnList};
         `
-
+    console.error(query)
     try {
         await client.query('BEGIN')
         await client.query(query)
@@ -270,28 +343,18 @@ async function upsertTable(tableName: string) {
 
 
 // Main function to parse and process the gzipped TriG file from a URL
-async function parseTrigGzAndInsertInBatches(url: string, token: string) {
+async function processGraph(graph: Graph) {
+    const quadStream = await graph.toStream('rdf-js')
     return new Promise<void>((resolve, reject) => {
-        https.get(url, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        }, (response) => {
-            if (response.statusCode !== 200) {
-                return reject(new Error(`Failed to fetch file: Status code ${response.statusCode}`))
-            }
 
             let recordCount = 0
-
-            const trigStream = response.pipe(zlib.createGunzip())
 
             const batches: { [tableName: string]: Array<Record<string, string>> } = {}
             let currentRecord: Record<string, string> | null = null
             let currentSubject: string | null = null
             let currentRecordType: string | null = null
 
-            rdfParser
-                .parse(trigStream, { contentType: 'application/trig' })
+            quadStream
                 .on('data', async (quad: Quad) => {
                     const subject = quad.subject.value
                     const predicate = quad.predicate.value
@@ -299,7 +362,7 @@ async function parseTrigGzAndInsertInBatches(url: string, token: string) {
                     // Convert literal to primitive
                     if (quad.object.termType === "Literal") {
                         // Convert duration to seconds first
-                        object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parse(object)) : fromRdf(quad.object)
+                        object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
                     }
 
                     // If the subject changes, process the current record
@@ -348,40 +411,65 @@ async function parseTrigGzAndInsertInBatches(url: string, token: string) {
                     console.error('Error during parsing or processing:', err)
                     reject(err)
                 })
-        }).on('error', (err) => {
-            console.error('Error during file download:', err)
-            reject(err)
-        })
     })
 }
 
 // Main execution function
 async function main() {
+    // Directory containing the .sparql files
+    const directoryPath = './queries'
+
+    const triply = App.get({ token: process.env.TOKEN })
+
+    const account = await triply.getAccount(process.env.ACCOUNT)
+    const dataset = await account.getDataset(process.env.DATASET || 'hetarchief')
+    const targetGraph = await dataset.getGraph(process.env.GRAPH || 'hetarchief')
+
     try {
+        const files = (await readdir(directoryPath))
+            // Only use sparql files
+            .filter(f => extname(f) === '.sparql')
+
+        const jobResults = await Promise.all(
+            files.map(
+                file => {
+                    const filePath = join(directoryPath, file)
+                    return constructView(account, dataset, {
+                        dataset, graph: targetGraph
+                    }, filePath)
+
+                }
+            ))
+
+        console.log(`Query jobs for ${files.join(',')} completed.`)
+
         // Create temp tables based on recordTypeToTableMap
         for (const tableInfo of recordTypeToTableMap.values()) {
             const name = await createTempTable(tableInfo)
             await getTableColumnsWithCache(name)
         }
 
-        // URL to the gzipped TriG file (replace with the actual URL)
-        const gzippedTrigUrl = 'https://nightly.triplydb.com/deemoo/query-job-results/download.trig.gz?graph=https%3A%2F%2Fnightly.triplydb.com%2Fdeemoo%2Fquery-job-results%2Fgraphs%2Fdefault'
-        const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bmtub3duIiwiaXNzIjoiaHR0cHM6Ly9hcGkubmlnaHRseS50cmlwbHlkYi5jb20iLCJqdGkiOiIxNjE1OTdjNy1mZDQ1LTQ4YWYtYjI1ZC05MGJiY2NlNjI1YjIiLCJ1aWQiOiI2NjJhNTdlODkwM2JmOWJkYTczOTA1YjYiLCJpYXQiOjE3Mjc3MDYyNzh9.Su91yv-KZC0JFURdE3UVXlzRFJSQn3fe9PqIytK25Us'
-
         // Parse and process the gzipped TriG file from the URL
         console.log('--- Step 1: load temporary tables --')
-        await parseTrigGzAndInsertInBatches(gzippedTrigUrl, token)
+        console.time('Load')
+        await processGraph(targetGraph)
 
         console.log('--- Step 2: upsert tables --')
+        console.time('Upsert')
         for (const tableName of recordTypeToTableMap.values()) {
             await upsertTable(tableName)
         }
         console.log('--- Step 3: delete records --')
+        console.time('Delete')
         // for (const tableName of recordTypeToTableMap.values()) {
         //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
         //     await deleteBatch(tableName, subjectsToDelete);
         // }
-        
+
+        console.timeEnd('Load')
+        console.timeEnd('Upsert')
+        console.timeEnd('Delete')
+
 
 
     } catch (err) {
