@@ -58,7 +58,7 @@ async function createTempTable(tableName: string) {
     const tempTableName = getTempTableName(tableName)
     const query = `
         DROP TABLE IF EXISTS ${tempTableName};
-        CREATE TABLE IF NOT EXISTS ${tempTableName} (LIKE ${tableName} INCLUDING ALL EXCLUDING INDEXES EXCLUDING CONSTRAINTS);
+        CREATE TABLE IF NOT EXISTS ${tempTableName} (LIKE ${tableName} INCLUDING ALL EXCLUDING CONSTRAINTS);
     `
     const client = await pool.connect()
     try {
@@ -105,6 +105,51 @@ async function getTableColumns(tableName: string): Promise<string[]> {
     }
 }
 
+// Helper function to retrieve primary keys for a specific table
+async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
+    const client = await pool.connect()
+    const query = `
+        SELECT COLUMN_NAME from information_schema.key_column_usage 
+        WHERE table_name = $1 AND table_schema = $2 AND constraint_name LIKE '%pkey'
+    `
+    console.log(query)
+    try {
+        const { name, schema } = parseTableName(tableName)
+        const result = await client.query(query, [name, schema])
+        return result.rows.map((row: { column_name: string }) => row.column_name)
+    } catch (err) {
+        console.error(`Error retrieving columns for table ${tableName}:`, err)
+        throw err
+    } finally {
+        client.release()
+    }
+}
+
+
+ // Helper function to delete a batch of records based on the 'subject' column
+async function deleteBatch(tableName: string, ids: string[]) {
+    if (!ids.length) return;
+
+    const client = await pool.connect();
+    const query = `
+        DELETE FROM "${tableName}"
+        WHERE id = ANY($1::text[]);
+    `;
+
+    try {
+        await client.query('BEGIN');
+        await client.query(query, [ids]);
+        await client.query('COMMIT');
+        console.log(`Deleted ${ids.length} records from table ${tableName}`);
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(`Error during batch delete for table ${tableName}:`, err);
+    } finally {
+        client.release();
+    }
+}
+
+
 async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
     if (!batch.length) return
 
@@ -129,7 +174,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         const sourceStream = stringify({
             delimiter: ",",
             cast: {
-                date: function (value) {
+                date: (value) => {
                     return value.toISOString()
                 },
             },
@@ -149,9 +194,15 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         console.error(`Error during bulk insert for table ${tableName}:`, err)
         stringify(
             batch.map(record => columns.map(col => record[col] || null)),
-            console.error
+            {cast: {
+                date: (value) => {
+                    return value.toISOString()
+                },
+            }}, (result) =>{
+                console.error(result)
+                //process.exit()
+            }
         )
-
     } finally {
         client.release()
     }
@@ -186,7 +237,34 @@ async function processRecord(
     }
 }
 
-async function upsertRecords() {
+async function upsertTable(tableName: string) {
+    const client = await pool.connect()
+    // Get the temp name
+    const tempTableName = getTempTableName(tableName)
+    // Get the actual columns from the database
+    const columns = await getTableColumnsWithCache(tableName)
+    // Get the primary keys from the database
+    const primaryKeys = await getTablePrimaryKeys(tableName)
+
+    // Build query
+    const query = `
+        INSERT INTO ${tableName}
+        SELECT * FROM ${tempTableName}
+        ON CONFLICT (${primaryKeys.join(',')}) DO UPDATE
+        SET ${columns.join(',')};
+        `
+
+    try {
+        await client.query('BEGIN')
+        await client.query(query)
+        await client.query('COMMIT')
+        console.log(`Batch for ${tableName} inserted!`)
+    } catch (err) {
+        await client.query('ROLLBACK')
+        console.error(`Error during upsert from '${tempTableName}' to '${tableName}':`, err)
+    } finally {
+        client.release()
+    }
 
 }
 
@@ -291,7 +369,21 @@ async function main() {
         const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bmtub3duIiwiaXNzIjoiaHR0cHM6Ly9hcGkubmlnaHRseS50cmlwbHlkYi5jb20iLCJqdGkiOiIxNjE1OTdjNy1mZDQ1LTQ4YWYtYjI1ZC05MGJiY2NlNjI1YjIiLCJ1aWQiOiI2NjJhNTdlODkwM2JmOWJkYTczOTA1YjYiLCJpYXQiOjE3Mjc3MDYyNzh9.Su91yv-KZC0JFURdE3UVXlzRFJSQn3fe9PqIytK25Us'
 
         // Parse and process the gzipped TriG file from the URL
+        console.log('--- Step 1: load temporary tables --')
         await parseTrigGzAndInsertInBatches(gzippedTrigUrl, token)
+
+        console.log('--- Step 2: upsert tables --')
+        for (const tableName of recordTypeToTableMap.values()) {
+            await upsertTable(tableName)
+        }
+        console.log('--- Step 3: delete records --')
+        // for (const tableName of recordTypeToTableMap.values()) {
+        //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
+        //     await deleteBatch(tableName, subjectsToDelete);
+        // }
+        
+
+
     } catch (err) {
         console.error('Error in main function:', err)
     } finally {
