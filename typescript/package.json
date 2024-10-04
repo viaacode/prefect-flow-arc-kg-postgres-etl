@@ -14,7 +14,6 @@
     "@types/pg": "^8.11.10",
     "@types/pg-copy-streams": "^1.2.5",
     "csv": "^6.3.10",
-    "follow-redirects": "^1.15.9",
     "iso8601-duration": "^2.1.2",
     "pg": "^8.13.0",
     "pg-copy-streams": "^6.0.6",

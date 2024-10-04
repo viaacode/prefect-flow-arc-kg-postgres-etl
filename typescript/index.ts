@@ -1,7 +1,3 @@
-import * as zlib from 'zlib'
-import fr from 'follow-redirects'
-const { https } = fr
-import { rdfParser } from "rdf-parse"
 import { Quad } from 'rdf-js'
 import pg from 'pg'
 import { from } from 'pg-copy-streams'
@@ -314,7 +310,7 @@ async function upsertTable(tableName: string) {
     const tempTableName = getTempTableName(tableName)
     // Get the actual columns from the database
     const columns = await getTableColumnsWithCache(tableName)
-    
+
     const columnList = columns.map(c => `${c.name} = EXCLUDED.${c.name}`).join(',')
     // Get the primary keys from the database
     const primaryKeys = await getTablePrimaryKeys(tableName)
@@ -347,70 +343,70 @@ async function processGraph(graph: Graph) {
     const quadStream = await graph.toStream('rdf-js')
     return new Promise<void>((resolve, reject) => {
 
-            let recordCount = 0
+        let recordCount = 0
 
-            const batches: { [tableName: string]: Array<Record<string, string>> } = {}
-            let currentRecord: Record<string, string> | null = null
-            let currentSubject: string | null = null
-            let currentRecordType: string | null = null
+        const batches: { [tableName: string]: Array<Record<string, string>> } = {}
+        let currentRecord: Record<string, string> | null = null
+        let currentSubject: string | null = null
+        let currentRecordType: string | null = null
 
-            quadStream
-                .on('data', async (quad: Quad) => {
-                    const subject = quad.subject.value
-                    const predicate = quad.predicate.value
-                    let object = quad.object.value
-                    // Convert literal to primitive
-                    if (quad.object.termType === "Literal") {
-                        // Convert duration to seconds first
-                        object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
-                    }
+        quadStream
+            .on('data', async (quad: Quad) => {
+                const subject = quad.subject.value
+                const predicate = quad.predicate.value
+                let object = quad.object.value
+                // Convert literal to primitive
+                if (quad.object.termType === "Literal") {
+                    // Convert duration to seconds first
+                    object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
+                }
 
-                    // If the subject changes, process the current record
-                    if (subject !== currentSubject) {
-                        if (currentSubject !== null && currentRecord && currentRecordType !== null) {
-                            processRecord(currentSubject, currentRecord, currentRecordType, batches)
-                        }
-                        recordCount++
-                        currentSubject = subject
-                        currentRecordType = null
-                        currentRecord = {}
-                        console.log(`Initiate record ${recordCount}: ${currentSubject}`)
-                        if (LIMIT && recordCount > LIMIT) {
-                            process.exit()
-                        }
+                // If the subject changes, process the current record
+                if (subject !== currentSubject) {
+                    if (currentSubject !== null && currentRecord && currentRecordType !== null) {
+                        processRecord(currentSubject, currentRecord, currentRecordType, batches)
                     }
+                    recordCount++
+                    currentSubject = subject
+                    currentRecordType = null
+                    currentRecord = {}
+                    console.log(`Initiate record ${recordCount}: ${currentSubject}`)
+                    if (LIMIT && recordCount > LIMIT) {
+                        process.exit()
+                    }
+                }
 
-                    // Check for the record type
-                    if (predicate === RDF_TYPE && recordTypeToTableMap.has(object)) {
-                        currentRecordType = object
-                    }
-                    // Handle predicates within the known namespace
-                    else if (predicate.startsWith(NAMESPACE)) {
-                        const columnName = predicate.replace(NAMESPACE, '')
-                        // TODO: handle multiple values
-                        currentRecord![columnName] = object
-                    }
-                })
-                .on('end', async () => {
-                    // Process the last record
-                    if (currentSubject && currentRecord && currentRecordType) {
-                        await processRecord(currentSubject, currentRecord, currentRecordType, batches)
-                    }
+                // Check for the record type
+                if (predicate === RDF_TYPE && recordTypeToTableMap.has(object)) {
+                    currentRecordType = object
+                }
+                // Handle predicates within the known namespace
+                else if (predicate.startsWith(NAMESPACE)) {
+                    const columnName = predicate.replace(NAMESPACE, '')
+                    // TODO: handle multiple values
+                    currentRecord![columnName] = object
+                }
+            })
+            .on('end', async () => {
+                // Process the last record
+                if (currentSubject && currentRecord && currentRecordType) {
+                    await processRecord(currentSubject, currentRecord, currentRecordType, batches)
+                }
 
-                    // Insert any remaining batches
-                    for (const tableName in batches) {
-                        if (batches[tableName].length) {
-                            await batchInsertUsingCopy(tableName, batches[tableName])
-                        }
+                // Insert any remaining batches
+                for (const tableName in batches) {
+                    if (batches[tableName].length) {
+                        await batchInsertUsingCopy(tableName, batches[tableName])
                     }
+                }
 
-                    console.log(`Processing completed: ${recordCount} records.`)
-                    resolve()
-                })
-                .on('error', (err: Error) => {
-                    console.error('Error during parsing or processing:', err)
-                    reject(err)
-                })
+                console.log(`Processing completed: ${recordCount} records.`)
+                resolve()
+            })
+            .on('error', (err: Error) => {
+                console.error('Error during parsing or processing:', err)
+                reject(err)
+            })
     })
 }
 
@@ -430,6 +426,8 @@ async function main() {
             // Only use sparql files
             .filter(f => extname(f) === '.sparql')
 
+        console.log('--- Step 0: Construct view --')
+        console.time('View')
         const jobResults = await Promise.all(
             files.map(
                 file => {
@@ -466,6 +464,7 @@ async function main() {
         //     await deleteBatch(tableName, subjectsToDelete);
         // }
 
+        console.timeEnd('View')
         console.timeEnd('Load')
         console.timeEnd('Upsert')
         console.timeEnd('Delete')
