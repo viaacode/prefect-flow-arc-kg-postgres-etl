@@ -38,7 +38,7 @@ const recordTypeToTableMap: Map<string, string> = new Map(
     ]
 )
 
-const columnCache: { [tableName: string]: string[] } = {}
+const columnCache: { [tableName: string]: { name: string, datatype: string }[] } = {}
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
@@ -73,7 +73,7 @@ async function createTempTable(tableName: string) {
     }
 }
 
-async function getTableColumnsWithCache(tableName: string): Promise<string[]> {
+async function getTableColumnsWithCache(tableName: string): Promise<{ name: string, datatype: string }[]> {
     if (columnCache[tableName]) {
         //console.log(`Returning ${columnCache[tableName].length} columns for ${tableName} from cache.`)
         return columnCache[tableName]
@@ -85,10 +85,10 @@ async function getTableColumnsWithCache(tableName: string): Promise<string[]> {
 }
 
 // Helper function to retrieve column names for a specific table
-async function getTableColumns(tableName: string): Promise<string[]> {
+async function getTableColumns(tableName: string): Promise<{ name: string, datatype: string }[]> {
     const client = await pool.connect()
     const query = `
-        SELECT column_name
+        SELECT column_name AS name, data_type AS datatype
         FROM information_schema.columns
         WHERE table_name = $1 AND table_schema = $2
     `
@@ -96,7 +96,7 @@ async function getTableColumns(tableName: string): Promise<string[]> {
     try {
         const { name, schema } = parseTableName(tableName)
         const result = await client.query(query, [name, schema])
-        return result.rows.map((row: { column_name: string }) => row.column_name)
+        return result.rows//.map((row: { column_name: string, data_type: string }) => {row.column_name})
     } catch (err) {
         console.error(`Error retrieving columns for table ${tableName}:`, err)
         throw err
@@ -161,7 +161,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
     const columns = await getTableColumnsWithCache(tableName)
 
     const client = await pool.connect()
-    const columnList = columns.join(',')
+    const columnList = columns.map(c => c.name).join(',')
     const copyQuery = `COPY ${schema}."${name}" (${columnList}) FROM STDIN WITH (FORMAT csv)`
 
     console.log(copyQuery)
@@ -182,7 +182,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
 
         // Convert batch to CSV format
         for (const record of batch) {
-            const values = columns.map(col => record[col] || null)
+            const values = columns.map(col => record[col.name] || null)
             sourceStream.write(values)
         }
         sourceStream.end()
@@ -193,14 +193,14 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         await client.query('ROLLBACK')
         console.error(`Error during bulk insert for table ${tableName}:`, err)
         stringify(
-            batch.map(record => columns.map(col => record[col] || null)),
+            batch.map(record => columns.map(col => record[col.name] || null)),
             {cast: {
                 date: (value) => {
                     return value.toISOString()
                 },
             }}, (result) =>{
                 console.error(result)
-                //process.exit()
+                process.exit()
             }
         )
     } finally {
