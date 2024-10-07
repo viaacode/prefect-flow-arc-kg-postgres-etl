@@ -9,93 +9,61 @@ import App from '@triply/triplydb'
 import { Account } from '@triply/triplydb/Account.js'
 import { AddQueryOptions } from '@triply/triplydb/commonAccountFunctions.js'
 import Graph from '@triply/triplydb/Graph.js'
-import { PipelineProgress } from '@triply/triplydb/Pipeline.js'
 import { readdir, readFile } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
+import { BATCH_SIZE, dbConfig, RECORD_LIMIT, QUERY_PATH, recordTypeToTableMap, NAMESPACE, RDF_TYPE, XSD_DURATION } from './configuration.js'
 
-// PostgreSQL connection settings
-const dbConfig = {
-    user: 'hetarchief',
-    host: 'localhost',
-    database: 'hetarchief',
-    password: 'password',
-    port: 5555,
-}
-
-// RDF namespace
-const NAMESPACE = 'https://data.hetarchief.be/ns/test/'
-const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
-const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
-const BATCH_SIZE = 100
-const LIMIT = null
 
 type TableInfo = { name: string, schema: string }
 type ColumnInfo = { name: string, datatype: string }
-
-// Map RecordType to target tables and dynamic column configuration
-const recordTypeToTableMap: Map<string, string> = new Map(
-    [
-        [`${NAMESPACE}IntellectualEntityRecord`, 'graph.intellectual_entity'],
-        [`${NAMESPACE}FileRecord`, 'graph.file'],
-        [`${NAMESPACE}CarrierRecord`, 'graph.carrier'],
-        [`${NAMESPACE}RepresentationRecord`, 'graph.representation'],
-        [`${NAMESPACE}ThingRecord`, 'graph.thing'],
-        [`${NAMESPACE}RoleRecord`, 'graph.role'],
-    ]
-)
+type Destination = { dataset: Dataset, graph: string }
 
 const columnCache: { [tableName: string]: ColumnInfo[] } = {}
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
 
-async function constructView(account: Account, source: Dataset, destination: { dataset: Dataset, graph?: Graph }, filePath: string) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const queryString = await readFile(filePath, 'utf8')
-            const queryName = parse(filePath).name
+async function addJobQueries(account: Account, source: Dataset) {
+    const files = (await readdir(QUERY_PATH))
+        // Only use sparql files
+        .filter(f => extname(f) === '.sparql')
 
-            let query
-            const params: AddQueryOptions = {
-                dataset: source,
-                queryString,
-                serviceType: 'virtuoso',
-                output: 'response',
-                variables: [
-                    {
-                        name: 'since',
-                        termType: 'Literal',
-                        datatype: 'http://www.w3.org/2001/XMLSchema#dateTime'
-                    }
-                ]
-            }
+    const queries = []
+    for (const file of files) {
+        const filePath = join(QUERY_PATH, file)
+        const queryString = await readFile(filePath, 'utf8')
+        const queryName = parse(filePath).name
 
-            try {
-                query = await account.getQuery(queryName)
-                await query.delete()
-                console.log(`Query ${queryName} deleted.\n`)
-            } catch (error) {
-                console.log(`Query ${queryName} does not exist.\n`)
-            }
-            query = await account.addQuery(queryName, params)
+        let query
+        const params: AddQueryOptions = {
+            dataset: source,
+            queryString,
+            serviceType: 'speedy',
+            output: 'response',
 
-
-            // job thing
-            const pipeline = await query.runPipeline({
-                destination,
-                onProgress: (progress: PipelineProgress) => {
-                    if (progress.finished) {
-                        resolve(true)
-                    }
+            variables: [
+                {
+                    name: 'since',
+                    termType: 'Literal',
+                    datatype: 'http://www.w3.org/2001/XMLSchema#dateTime'
                 }
-            })
-
-        } catch (readErr) {
-            console.error(readErr)
-            reject(readErr)
+            ]
         }
-    })
+
+        try {
+            query = await account.getQuery(queryName)
+            await query.delete()
+            console.log(`Query ${queryName} deleted.\n`)
+        } catch (error) {
+            console.log(`Query ${queryName} does not exist.\n`)
+        }
+        query = await account.addQuery(queryName, params)
+        console.log(`Query ${queryName} added.\n`)
+
+        queries.push(query)
+    }
+    return queries
 }
 
 function isValidDate(date: any) {
@@ -304,7 +272,7 @@ async function processRecord(
     }
 }
 
-async function upsertTable(tableName: string) {
+async function upsertTable(tableName: string, truncate: boolean = true) {
     const client = await pool.connect()
     // Get the temp name
     const tempTableName = getTempTableName(tableName)
@@ -322,9 +290,14 @@ async function upsertTable(tableName: string) {
         ON CONFLICT (${primaryKeys.join(',')}) DO UPDATE
         SET ${columnList};
         `
+    const truncateQuery = `TRUNCATE ${tableName} CASCADE`
     console.error(query)
     try {
         await client.query('BEGIN')
+        // Truncate table first if desired
+        if (truncate) {
+            await client.query(truncateQuery)
+        }
         await client.query(query)
         await client.query('COMMIT')
         console.log(`Batch for ${tableName} inserted!`)
@@ -371,7 +344,7 @@ async function processGraph(graph: Graph) {
                     currentRecordType = null
                     currentRecord = {}
                     console.log(`Initiate record ${recordCount}: ${currentSubject}`)
-                    if (LIMIT && recordCount > LIMIT) {
+                    if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
                         process.exit()
                     }
                 }
@@ -412,34 +385,33 @@ async function processGraph(graph: Graph) {
 
 // Main execution function
 async function main() {
-    // Directory containing the .sparql files
-    const directoryPath = './queries'
+
+    const since = null
 
     const triply = App.get({ token: process.env.TOKEN })
 
-    const account = await triply.getAccount(process.env.ACCOUNT)
-    const dataset = await account.getDataset(process.env.DATASET || 'hetarchief')
-    const targetGraph = await dataset.getGraph(process.env.GRAPH || 'hetarchief')
+    const account = await triply.getAccount(process.env.ACCOUNT || 'meemoo')
+    // TODO: create dataset if not exists
+    const dataset = await account.getDataset(process.env.DATASET || 'knowledge-graph')
+    const destination: Destination = {
+        dataset: await account.getDataset(process.env.DESTINATION_DATASET || process.env.DATASET || 'knowledge-graph'),
+        graph: process.env.DESTINATION_GRAPH || 'hetarchief'
+    }
 
     try {
-        const files = (await readdir(directoryPath))
-            // Only use sparql files
-            .filter(f => extname(f) === '.sparql')
+        console.log('--- Step 1: Construct view --')
 
-        console.log('--- Step 0: Construct view --')
-        console.time('View')
-        const jobResults = await Promise.all(
-            files.map(
-                file => {
-                    const filePath = join(directoryPath, file)
-                    return constructView(account, dataset, {
-                        dataset, graph: targetGraph
-                    }, filePath)
+        const queries = await addJobQueries(account, dataset)
 
-                }
-            ))
+        console.log(`Starting pipelines for ${queries.map(q => q.slug)}.`)
+        await account.runPipeline({
+            destination,
+            queries,
+        })
+        console.log(`Pipelines completed.`)
 
-        console.log(`Query jobs for ${files.join(',')} completed.`)
+        // Parse and process the gzipped TriG file from the URL
+        console.log('--- Step 2: load temporary tables --')
 
         // Create temp tables based on recordTypeToTableMap
         for (const tableInfo of recordTypeToTableMap.values()) {
@@ -447,17 +419,16 @@ async function main() {
             await getTableColumnsWithCache(name)
         }
 
-        // Parse and process the gzipped TriG file from the URL
-        console.log('--- Step 1: load temporary tables --')
         console.time('Load')
-        await processGraph(targetGraph)
+        const graph = await destination.dataset.getGraph(destination.graph)
+        await processGraph(graph)
 
-        console.log('--- Step 2: upsert tables --')
+        console.log('--- Step 3: upsert tables --')
         console.time('Upsert')
         for (const tableName of recordTypeToTableMap.values()) {
-            await upsertTable(tableName)
+            await upsertTable(tableName, since === null)
         }
-        console.log('--- Step 3: delete records --')
+        console.log('--- Step 4: delete records --')
         console.time('Delete')
         // for (const tableName of recordTypeToTableMap.values()) {
         //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
@@ -468,8 +439,6 @@ async function main() {
         console.timeEnd('Load')
         console.timeEnd('Upsert')
         console.timeEnd('Delete')
-
-
 
     } catch (err) {
         console.error('Error in main function:', err)

@@ -1,0 +1,383 @@
+# position: 1
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+prefix prov: <http://www.w3.org/ns/prov#>
+# EBUCore - the Dublin Core for media
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+prefix edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
+PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
+PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/Fragment>
+
+
+PREFIX : <https://data.hetarchief.be/ns/test/>
+
+
+CONSTRUCT {
+
+?mhf a :MediahavenFragment;
+  :id ?mf_identifier;
+  :deleted ?mf_deleted.
+
+?ie a :IntellectualEntityRecord;
+:id ?ie;
+:dcterms_available ?dcterms_available;
+:dcterms_rights ?dcterms_rights;
+:ebucore_has_cast_member ?ebucore_has_cast_member;
+:ebucore_has_object_type ?ebucore_has_object_type;
+:ebucore_synopsis ?ebucore_synopsis;
+:ha_des_number_of_pages ?ha_des_number_of_pages;
+:relation_is_part_of ?relation_is_part_of;
+:schema_abstract ?schema_abstract;
+:schema_copyright_notice ?schema_copyright_notice;
+:schema_copyright_year ?schema_copyright_year;
+:schema_credit_text ?schema_credit_text;
+:schema_date_created ?schema_date_created;
+:schema_date_published ?schema_date_published;
+:schema_description ?schema_description;
+:schema_identifier ?schema_identifier;
+:schema_issue_number ?schema_issue_number;
+:schema_maintainer ?schema_maintainer;
+:schema_name ?schema_name;
+:schema_position ?schema_position;
+:bibframe_edition ?bibframe_edition.
+
+?ie_lic a :LicenseRecord;
+:intellectual_entity_id ?ie;
+:schema_license ?schema_license.
+
+?ie_an a :AlternateNameRecord;
+:intellectual_entity_id ?ie;
+:schema_license ?schema_alternate_name.
+
+?ie_il a :InLanguageRecord;
+:intellectual_entity_id ?ie;
+:schema_license ?schema_in_language.
+
+?role a :RoleRecord;
+:id ?role;
+:intellectual_entity_id  ?ie; 
+:schema_role ?schema_role_name;
+:thing_id ?thing.
+
+?thing a :ThingRecord;
+:id ?thing;
+:schema_name ?thing_schema_name.
+
+# ?mention :id ?mention;
+# :intellectual_entity_id  ?ie; 
+# :confidence ?mention_confidence;
+# :height ?mention_height;
+# :width ?mention_width;
+# :x ?mention_x;
+# :y ?mention_y;
+# :thing_id ?person.
+
+?person a :PersonRecord;
+:id ?person;
+:schema_name ?person_schema_name;
+:schema_birth_date ?person_schema_birth_date;
+:schema_birth_place ?person_schema_birth_place;
+:schema_death_date ?person_schema_death_date;
+:schema_death_place ?person_schema_death_place.
+
+?rep a :RepresentationRecord;
+:id ?rep;
+:edm_is_next_in_sequence  ?rep_edm_is_next_in_sequence ;
+:represents  ?ie ;
+:includes ?file;
+:relation_has_root  ?rep_relation_has_root ;
+:relation_has_source  ?rep_relation_has_source ;
+:schema_caption  ?rep_schema_caption ;
+:schema_in_language  ?rep_schema_in_language ;
+:schema_name  ?rep_schema_name ;
+:schema_transcript ?rep_schema_transcript.
+
+?fr a :FragmentRecord;
+:id ?fr;
+:is_media_fragment_of ?fr_is_media_fragment_of;
+:represents  ?ie ;
+:schema_end_time ?fr_schema_end_time;
+:schema_name  ?fr_schema_name ;
+:schema_start_time ?fr_schema_start_time.
+
+?pc a :CarrierRecord;
+:id ?pc;
+:bibframe_production_method ?car_bibframe_production_method;
+:ebucore_has_captioning ?car_ebucore_has_captioning;
+:intellectual_entity_id ?car_intellectual_entity_id;
+:premis_medium ?car_premis_medium;
+:schema_height ?car_schema_height;
+:schema_identifier ?car_schema_identifier;
+:schema_material ?car_schema_material;
+:schema_material_extent ?car_schema_material_extent;
+:schema_name ?car_schema_name;
+:schema_width ?car_schema_width;
+:digitization_date ?car_digitization_date;
+:type ?car_type.
+
+?file a :FileRecord;
+:id ?file;
+:ebucore_has_mime_type ?file_ebucore_has_mime_type;
+:edm_is_next_in_sequence ?file_edm_is_next_in_sequence;
+:premis_original_name ?file_premis_original_name;
+:premis_stored_at ?file_premis_stored_at;
+:schema_duration ?file_schema_duration;
+:schema_name ?file_schema_name;
+:schema_thumbnail_url ?file_schema_thumbnail_url.
+
+
+
+} WHERE {
+
+    # 0. Mediahaven fragments
+    # ?mf a mh:Fragment;
+    #     schema:identifier ?mf_identifier;
+    #     schema:dateDeleted ?date_deleted.
+
+    # BIND(BOUND(?mf) AS ?mf_deleted )
+
+    # 1. Intellectual Entity data
+    ?ie a premis:IntellectualEntity;
+           schema:identifier ?schema_identifier ;
+           schema:name ?schema_name ;
+           schema:maintainer ?schema_maintainer;
+           schema:license ?schema_license;
+           dct:format ?format ;
+           prov:wasDerivedFrom/schema:dateModified ?modified .
+
+    # Only include the right licenses
+    FILTER (?schema_license IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ) && ?format != "image" && langMatches(lang(?schema_name), "nl"))
+
+    # for incremental 
+    #FILTER (!BOUND(?since) || ?modified >= ?since )
+
+
+    BIND(IRI(CONCAT(str(?ie),'/license')) AS ?ie_lic)
+
+    OPTIONAL {
+        ?ie schema:alternateName ?schema_alternate_name.
+        FILTER langMatches(lang(?schema_alternate_name), "nl")
+        
+        BIND(IRI(CONCAT(str(?ie),'/schema_alternate_name')) AS ?ie_an)
+    }
+
+    OPTIONAL {
+        ?ie schema:inLanguage ?schema_in_language.
+        BIND(IRI(CONCAT(str(?ie),'/schema_in_language')) AS ?ie_il)
+    }
+  
+    OPTIONAL {
+      ?ie schema:dateCreated ?schema_date_created .
+    }
+
+    OPTIONAL{ 
+      ?ie schema:description ?schema_description
+      FILTER langMatches(lang(?schema_description), "nl")
+    }
+  
+    OPTIONAL{ 
+      ?ie schema:abstract ?schema_abstract 
+      FILTER langMatches(lang(?schema_abstract), "nl")
+    }
+  
+    OPTIONAL { ?ie haDes:pageNumber ?schema_position }
+    OPTIONAL { ?ie haDes:numberOfPages ?ha_des_number_of_pages }
+    OPTIONAL { ?ie schema:issueNumber ?schema_issue_number }
+    OPTIONAL { ?ie rel:isp ?relation_is_part_of }
+    OPTIONAL { ?ie dct:available ?dcterms_available }
+    OPTIONAL { ?ie schema:datePublished ?schema_date_published }
+    OPTIONAL { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
+    OPTIONAL { ?ie ebucore:hasCastMember ?ebucore_has_cast_member }
+    OPTIONAL { ?ie schema:copyrightYear ?schema_copyright_year }
+    OPTIONAL { ?ie schema:copyrightNotice ?schema_copyright_notice }
+    OPTIONAL { ?ie dct:rights ?dcterms_rights }
+    OPTIONAL { ?ie schema:creditText ?schema_credit_text }    
+    OPTIONAL { ?ie ebucore:synopsis ?ebucore_synopsis }
+    # krant
+    OPTIONAL{ 
+      ?ie bf:edition/skos:prefLabel ?bibframe_edition .
+      FILTER langMatches(lang(?bibframe_edition), "nl")
+    }
+
+    # - roles & things
+
+    OPTIONAL {
+      ?ie schema:creator|schema:contributor|schema:publisher ?role.
+      
+      ?role a schema:Role;
+            schema:roleName ?schema_role_name;
+            schema:creator|schema:contributor|schema:publisher ?thing.
+      
+      ?thing a schema:Thing; 
+            schema:name ?thing_schema_name.
+  
+    }
+
+    # - 
+
+
+    # - mentions
+    # OPTIONAL {
+    #     ?ie schema:mentions ?person.
+
+    #     ?person a schema:Person; 
+    #        schema:name ?person_schema_name.
+        
+    #     FILTER langMatches(lang(?person_schema_name), "nl")
+    
+    #     OPTIONAL {
+    #       ?person schema:deathDate ?person_schema_death_date
+    #     }
+    
+    #     OPTIONAL {
+    #       ?person schema:birthDate ?person_schema_birth_date
+    #     }
+    
+    #     OPTIONAL {
+    #       ?person schema:birthPlace/schema:name ?person_schema_birth_place
+    #     }
+    
+    #     OPTIONAL {
+    #       ?person schema:deathPlace/schema:name ?person_schema_death_place
+    #     }
+
+    #     ?mention ebucore:isAnnotatedMediaResource ?mention_resource;
+    #                 ebucore:width ?mention_width;
+    #                 ebucore:height ?mention_height;
+    #                 ebucore:regionDelimX ?mention_x;
+    #                 ebucore:regionDelimY ?mention_y.
+                    
+        
+    #     ?mention_resource ebucore:annotationConfidence ?mention_confidence;
+    #             ebucore:hasAnnotationRelatedAgent ?person.
+    # }
+
+    # 2. Carrier
+    # - carrier rep
+    OPTIONAL {
+      ?ie rel:isr ?crep.
+      ?crep a haObj:CarrierRepresentation; 
+          premis:storedAt ?pc.
+      
+      OPTIONAL {
+        ?crep bf:productionMethod/skos:prefLabel ?car_bibframe_production_method.
+        FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+      }
+      
+      # - physical carrier
+      ?pc a haObj:PhysicalCarrier;
+      schema:name ?car_schema_name;
+      premis:medium/skos:prefLabel ?car_premis_medium.
+      FILTER (langMatches(lang(?car_schema_name), "nl") && langMatches(lang(?car_premis_medium), "nl"))
+
+      OPTIONAL {
+        ?pc schema:identifier ?car_schema_identifier
+      }
+
+      OPTIONAL {
+        ?pc ^eror:sou ?event.
+        ?event a haEvt:digitization; 
+          prov:startedAtTime ?car_digitization_date; 
+      }
+    
+      OPTIONAL {
+        ?pc schema:height ?height.
+        ?height schema:value ?height_value;
+                schema:unitText ?height_unit.
+        BIND( CONCAT(?height_value, ' ', ?height_unit) as ?car_schema_height)
+      }
+      
+    
+      OPTIONAL {
+        ?pc schema:width ?width.
+        ?width schema:value ?width_value;
+                schema:unitText ?width_unit.
+        BIND( CONCAT(?width_value, ' ', ?width_unit) as ?car_schema_width)
+      }
+      
+      OPTIONAL {
+        ?pc schema:materialExtent ?car_schema_material_extent
+      }
+      OPTIONAL {
+        ?pc schema:material ?car_schema_material
+      }
+
+      BIND(EXISTS {
+        ?pc ebucore:hasCaptioning/rdf:type ebucore:OpenCaptions 
+      } AS ?car_ebucore_has_captioning)
+
+      OPTIONAL {
+        ?pc a ?type_res.
+        VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
+        ?type_res rdfs:label ?car_type.
+        FILTER (langMatches(lang(?car_type), "nl"))
+      }
+    }
+
+
+    # 3. Representation
+    # - fragment rep 
+    OPTIONAL {
+      ?fr a haObj:FragmentRepresentation;
+        schema:name ?fr_schema_name;
+        schema:startTime ?fr_schema_start_time;
+        schema:endTime ?fr_schema_end_time;
+        rel:rep ?ie;
+        ebucore:isMediaFragmentOf ?fr_is_media_fragment_of.
+    }
+    # - digital reps
+    OPTIONAL {
+      ?rep a haObj:DigitalRepresentation;
+            schema:name ?rep_schema_name;
+            haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?ie.
+
+      FILTER langMatches(lang(?rep_schema_name), "nl")
+
+      OPTIONAL { ?rep schema:inLanguage ?rep_schema_in_language }
+      OPTIONAL { ?rep rel:hsr ?rep_relation_has_root }
+      OPTIONAL { ?rep rel:hss ?rep_relation_has_source }
+      OPTIONAL { ?rep edm:isNextInSequence ?rep_edm_is_next_in_sequence }
+      OPTIONAL { ?rep schema:caption ?rep_schema_caption }
+      OPTIONAL { ?rep schema:transcript ?rep_schema_transcript }
+
+      
+
+      # 3. File
+      ?file a premis:File;
+          schema:name ?file_schema_name ;
+          premis:originalName ?file_premis_original_name;
+          premis:storedAt/rdf:value ?file_premis_stored_at ;
+          rel:isi ?rep;
+          ebucore:hasMimeType ?file_ebucore_has_mime_type .
+
+      VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "image/jpeg" "application/xml" "audio/mpeg" "audio/m4a" "image/jp2" }
+      FILTER (langMatches(lang(?file_schema_name), "nl"))
+
+      OPTIONAL { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
+      OPTIONAL { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
+      OPTIONAL { ?file schema:duration ?file_schema_duration }
+    }
+    
+}
