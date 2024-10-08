@@ -12,7 +12,13 @@ import Graph from '@triply/triplydb/Graph.js'
 import { readdir, readFile } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
-import { BATCH_SIZE, dbConfig, RECORD_LIMIT, QUERY_PATH, recordTypeToTableMap, NAMESPACE, RDF_TYPE, XSD_DURATION } from './configuration.js'
+import {
+    BATCH_SIZE, dbConfig, RECORD_LIMIT, QUERY_PATH, recordTypeToTableMap, NAMESPACE,
+    RDF_TYPE, XSD_DURATION, ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
+    SINCE,
+    GRAPH_BASE,
+    SQUASH_GRAPHS
+} from './configuration.js'
 
 
 type TableInfo = { name: string, schema: string }
@@ -23,6 +29,17 @@ const columnCache: { [tableName: string]: ColumnInfo[] } = {}
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
+
+async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
+    try {
+        const query = await account.getQuery(queryName)
+        await query.delete()
+        console.log(`Query ${queryName} deleted.\n`)
+    } catch (error) {
+        console.log(`Query ${queryName} does not exist.\n`)
+    }
+    return account.addQuery(queryName, params)
+}
 
 async function addJobQueries(account: Account, source: Dataset) {
     const files = (await readdir(QUERY_PATH))
@@ -35,13 +52,11 @@ async function addJobQueries(account: Account, source: Dataset) {
         const queryString = await readFile(filePath, 'utf8')
         const queryName = parse(filePath).name
 
-        let query
         const params: AddQueryOptions = {
             dataset: source,
             queryString,
             serviceType: 'speedy',
             output: 'response',
-
             variables: [
                 {
                     name: 'since',
@@ -51,16 +66,7 @@ async function addJobQueries(account: Account, source: Dataset) {
             ]
         }
 
-        try {
-            query = await account.getQuery(queryName)
-            await query.delete()
-            console.log(`Query ${queryName} deleted.\n`)
-        } catch (error) {
-            console.log(`Query ${queryName} does not exist.\n`)
-        }
-        query = await account.addQuery(queryName, params)
-        console.log(`Query ${queryName} added.\n`)
-
+        const query = await addQuery(account, queryName, params)
         queries.push(query)
     }
     return queries
@@ -385,33 +391,60 @@ async function processGraph(graph: Graph) {
 
 // Main execution function
 async function main() {
+    const triply = App.get({ token: TOKEN })
 
-    const since = null
-
-    const triply = App.get({ token: process.env.TOKEN })
-
-    const account = await triply.getAccount(process.env.ACCOUNT || 'meemoo')
+    const account = await triply.getAccount(ACCOUNT)
     // TODO: create dataset if not exists
-    const dataset = await account.getDataset(process.env.DATASET || 'knowledge-graph')
+    let dataset = await account.getDataset(DATASET)
     const destination: Destination = {
-        dataset: await account.getDataset(process.env.DESTINATION_DATASET || process.env.DATASET || 'knowledge-graph'),
-        graph: process.env.DESTINATION_GRAPH || 'hetarchief'
+        dataset: await account.getDataset(DESTINATION_DATASET),
+        graph: GRAPH_BASE + DESTINATION_GRAPH
     }
 
     try {
-        console.log('--- Step 1: Construct view --')
+        if (SQUASH_GRAPHS) {
+            console.log('--- Step 0: Squash graphs ---')
+            console.time('Squash graphs')
+            const graphName = `${GRAPH_BASE}knowledge-graph`
+            try {
+                await destination.dataset.deleteGraph(graphName)
+            } catch (error) {
+                console.log(`Graph ${graphName} does not exist.`)
+            }
+            const params: AddQueryOptions = {
+                dataset,
+                queryString: 'CONSTRUCT WHERE { ?s ?p ?o }',
+                serviceType: 'speedy',
+                output: 'response',
+            }
+            const query = await addQuery(account, 'squash-graphs', params)
+            console.log(`Starting pipeline for ${query.slug}.`)
+            await query.runPipeline({destination: {
+                dataset: destination.dataset,
+                graph: graphName
+            }})
+            console.log(`Pipeline completed.`)
+            dataset = destination.dataset
+            console.timeEnd('Squash graphs')
+        }
+
+        console.log('--- Step 1: Construct view ---')
+        console.time('Construct view')
 
         const queries = await addJobQueries(account, dataset)
 
         console.log(`Starting pipelines for ${queries.map(q => q.slug)}.`)
+        
         await account.runPipeline({
             destination,
             queries,
         })
         console.log(`Pipelines completed.`)
+        console.timeEnd('Construct view')
 
         // Parse and process the gzipped TriG file from the URL
         console.log('--- Step 2: load temporary tables --')
+        console.time('Load temporary tables')
 
         // Create temp tables based on recordTypeToTableMap
         for (const tableInfo of recordTypeToTableMap.values()) {
@@ -419,27 +452,30 @@ async function main() {
             await getTableColumnsWithCache(name)
         }
 
-        console.time('Load')
+        
         const graph = await destination.dataset.getGraph(destination.graph)
         await processGraph(graph)
+        console.timeEnd('Load temporary tables')
 
         console.log('--- Step 3: upsert tables --')
-        console.time('Upsert')
+        console.time('Upsert tables')
         for (const tableName of recordTypeToTableMap.values()) {
-            await upsertTable(tableName, since === null)
+            await upsertTable(tableName, SINCE === null)
         }
+        console.timeEnd('Upsert tables')
         console.log('--- Step 4: delete records --')
-        console.time('Delete')
+        console.time('Delete records')
         // for (const tableName of recordTypeToTableMap.values()) {
         //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
         //     await deleteBatch(tableName, subjectsToDelete);
         // }
-
-        console.timeEnd('View')
-        console.timeEnd('Load')
-        console.timeEnd('Upsert')
-        console.timeEnd('Delete')
-
+        console.timeEnd('Delete records')
+        console.log('--- Step 5: Graph cleanup --')
+        console.time('Graph cleanup')
+        for await (const graph of dataset.getGraphs()) {
+            graph.delete()
+        }
+        console.timeEnd('Graph cleanup')
     } catch (err) {
         console.error('Error in main function:', err)
     } finally {

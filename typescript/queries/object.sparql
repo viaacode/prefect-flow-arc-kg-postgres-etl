@@ -68,7 +68,7 @@ CONSTRUCT {
 ?role a :RoleRecord;
 :id ?role;
 :intellectual_entity_id  ?ie; 
-:schema_role ?schema_role_name;
+:schema_role_name ?schema_role_name;
 :thing_id ?thing.
 
 ?thing a :ThingRecord;
