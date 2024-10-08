@@ -419,10 +419,12 @@ async function main() {
             }
             const query = await addQuery(account, 'squash-graphs', params)
             console.log(`Starting pipeline for ${query.slug}.`)
-            await query.runPipeline({destination: {
-                dataset: destination.dataset,
-                graph: graphName
-            }})
+            await query.runPipeline({
+                destination: {
+                    dataset: destination.dataset,
+                    graph: graphName
+                }
+            })
             console.log(`Pipeline completed.`)
             dataset = destination.dataset
             console.timeEnd('Squash graphs')
@@ -434,7 +436,7 @@ async function main() {
         const queries = await addJobQueries(account, dataset)
 
         console.log(`Starting pipelines for ${queries.map(q => q.slug)}.`)
-        
+
         await account.runPipeline({
             destination,
             queries,
@@ -452,7 +454,7 @@ async function main() {
             await getTableColumnsWithCache(name)
         }
 
-        
+
         const graph = await destination.dataset.getGraph(destination.graph)
         await processGraph(graph)
         console.timeEnd('Load temporary tables')
@@ -463,6 +465,7 @@ async function main() {
             await upsertTable(tableName, SINCE === null)
         }
         console.timeEnd('Upsert tables')
+
         console.log('--- Step 4: delete records --')
         console.time('Delete records')
         // for (const tableName of recordTypeToTableMap.values()) {
@@ -470,6 +473,7 @@ async function main() {
         //     await deleteBatch(tableName, subjectsToDelete);
         // }
         console.timeEnd('Delete records')
+
         console.log('--- Step 5: Graph cleanup --')
         console.time('Graph cleanup')
         for await (const graph of dataset.getGraphs()) {
