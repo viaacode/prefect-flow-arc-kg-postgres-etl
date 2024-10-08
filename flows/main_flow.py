@@ -63,4 +63,8 @@ def main_flow(
 
 
 if __name__ == "__main__":
-    main_flow(triplydb_block_name="triplydb-meemoo", postgres_block_name="local-hasura", base_path="./typescript/")
+    main_flow(
+        triplydb_block_name="triplydb-meemoo", 
+        postgres_block_name="local-hasura", 
+        base_path="./typescript/",
+        squash_graphs=False)

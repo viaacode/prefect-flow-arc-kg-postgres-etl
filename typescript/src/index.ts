@@ -19,7 +19,7 @@ import {
     GRAPH_BASE,
     SQUASH_GRAPHS
 } from './configuration.js'
-import { logInfo, logError, logDebug } from './util.js'
+import { logInfo, logError, logDebug, getErrorMessage, isValidDate } from './util.js'
 
 
 type TableInfo = { name: string, schema: string }
@@ -31,12 +31,22 @@ const columnCache: { [tableName: string]: ColumnInfo[] } = {}
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
 
+function getTempTableName(tableName: string) {
+    const tableInfo = parseTableName(tableName)
+    return `${tableInfo.schema}.temp_${tableInfo.name}`
+}
+
+function parseTableName(tableName: string): TableInfo {
+    const parts = tableName.split('.')
+    return { name: parts[1], schema: parts[0] }
+}
+
 async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
     try {
         const query = await account.getQuery(queryName)
         await query.delete()
         logInfo(`Query ${queryName} deleted.\n`)
-    } catch (error) {
+    } catch (err) {
         logInfo(`Query ${queryName} does not exist.\n`)
     }
     return account.addQuery(queryName, params)
@@ -73,20 +83,6 @@ async function addJobQueries(account: Account, source: Dataset) {
     return queries
 }
 
-function isValidDate(date: any) {
-    return date && Object.prototype.toString.call(date) === "[object Date]" && !isNaN(date)
-}
-
-function getTempTableName(tableName: string) {
-    const tableInfo = parseTableName(tableName)
-    return `${tableInfo.schema}.temp_${tableInfo.name}`
-}
-
-function parseTableName(tableName: string): TableInfo {
-    const parts = tableName.split('.')
-    return { name: parts[1], schema: parts[0] }
-}
-
 // Helper function to create a table dynamically based on the columns
 async function createTempTable(tableName: string) {
     const tempTableName = getTempTableName(tableName)
@@ -99,7 +95,8 @@ async function createTempTable(tableName: string) {
         await client.query(query)
         return tempTableName
     } catch (err) {
-        logError(`Error creating temp table ${tempTableName}:`, err)
+        const msg = getErrorMessage(err)
+        logError(`Error creating temp table ${tempTableName}:`, msg)
         throw err
     }
     finally {
@@ -132,7 +129,8 @@ async function getTableColumns(tableName: string): Promise<ColumnInfo[]> {
         const result = await client.query(query, [name, schema])
         return result.rows//.map((row: { column_name: string, data_type: string }) => {row.column_name})
     } catch (err) {
-        logError(`Error retrieving columns for table ${tableName}:`, err)
+        const msg = getErrorMessage(err)
+        logError(`Error retrieving columns for table ${tableName}:`, msg)
         throw err
     } finally {
         client.release()
@@ -152,7 +150,8 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
         const result = await client.query(query, [name, schema])
         return result.rows.map((row: { column_name: string }) => row.column_name)
     } catch (err) {
-        logError(`Error retrieving columns for table ${tableName}:`, err)
+        const msg = getErrorMessage(err)
+        logError(`Error retrieving columns for table ${tableName}:`, msg)
         throw err
     } finally {
         client.release()
@@ -232,7 +231,8 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
     } catch (err) {
         await client.query('ROLLBACK')
         //TODO: fix error caused by logging
-        logError(`Error during bulk insert for table ${tableName}:`)//, err)
+        const msg = getErrorMessage(err)
+        logError(`Error during bulk insert for table ${tableName}:`, msg)
         stringify(
             batch.map(record => columns.map(col => record[col.name] || null)),
             {
@@ -311,7 +311,9 @@ async function upsertTable(tableName: string, truncate: boolean = true) {
         logInfo(`Batch for ${tableName} inserted!`)
     } catch (err) {
         await client.query('ROLLBACK')
-        logError(`Error during upsert from '${tempTableName}' to '${tableName}':`, err)
+        const msg = getErrorMessage(err)
+        logError(`Error during upsert from '${tempTableName}' to '${tableName}':`, msg)
+        throw err
     } finally {
         client.release()
     }
@@ -410,7 +412,7 @@ async function main() {
         const graphName = `${GRAPH_BASE}knowledge-graph`
         try {
             await destination.dataset.deleteGraph(graphName)
-        } catch (error) {
+        } catch (err) {
             logInfo(`Graph ${graphName} does not exist.`)
         }
         const params: AddQueryOptions = {
@@ -485,6 +487,7 @@ async function main() {
 }
 
 main().catch(err => {
-    logError(err)
+    const msg = getErrorMessage(err)
+    logError(msg)
     process.exit(1)
 }).finally(() => pool.end())
