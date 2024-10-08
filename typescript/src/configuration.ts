@@ -1,7 +1,3 @@
-
-
-
-
 // Directory containing the .sparql files
 export const QUERY_PATH = '../queries'
 
@@ -20,6 +16,7 @@ export const ACCOUNT = process.env.TRIPLYDB_OWNER ?? 'meemoo'
 export const DATASET = process.env.TRIPLYDB_DATASET ?? 'knowledge-graph'
 export const DESTINATION_DATASET = process.env.TRIPLYDB_DESTINATION_DATASET || DATASET
 export const DESTINATION_GRAPH = process.env.TRIPLYDB_DESTINATION_GRAPH || 'hetarchief'
+
 export const TOKEN = process.env.TRIPLYDB_TOKEN
 
 // PostgreSQL connection settings

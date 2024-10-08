@@ -19,6 +19,7 @@ import {
     GRAPH_BASE,
     SQUASH_GRAPHS
 } from './configuration.js'
+import { logInfo, logError, logDebug } from './util.js'
 
 
 type TableInfo = { name: string, schema: string }
@@ -34,9 +35,9 @@ async function addQuery(account: Account, queryName: string, params: AddQueryOpt
     try {
         const query = await account.getQuery(queryName)
         await query.delete()
-        console.log(`Query ${queryName} deleted.\n`)
+        logInfo(`Query ${queryName} deleted.\n`)
     } catch (error) {
-        console.log(`Query ${queryName} does not exist.\n`)
+        logInfo(`Query ${queryName} does not exist.\n`)
     }
     return account.addQuery(queryName, params)
 }
@@ -98,7 +99,7 @@ async function createTempTable(tableName: string) {
         await client.query(query)
         return tempTableName
     } catch (err) {
-        console.error(`Error creating temp table ${tempTableName}:`, err)
+        logError(`Error creating temp table ${tempTableName}:`, err)
         throw err
     }
     finally {
@@ -125,13 +126,13 @@ async function getTableColumns(tableName: string): Promise<ColumnInfo[]> {
         FROM information_schema.columns
         WHERE table_name = $1 AND table_schema = $2
     `
-    console.log(query)
+    logDebug(query)
     try {
         const { name, schema } = parseTableName(tableName)
         const result = await client.query(query, [name, schema])
         return result.rows//.map((row: { column_name: string, data_type: string }) => {row.column_name})
     } catch (err) {
-        console.error(`Error retrieving columns for table ${tableName}:`, err)
+        logError(`Error retrieving columns for table ${tableName}:`, err)
         throw err
     } finally {
         client.release()
@@ -145,13 +146,13 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
         SELECT COLUMN_NAME from information_schema.key_column_usage 
         WHERE table_name = $1 AND table_schema = $2 AND constraint_name LIKE '%pkey'
     `
-    console.log(query)
+    logDebug(query)
     try {
         const { name, schema } = parseTableName(tableName)
         const result = await client.query(query, [name, schema])
         return result.rows.map((row: { column_name: string }) => row.column_name)
     } catch (err) {
-        console.error(`Error retrieving columns for table ${tableName}:`, err)
+        logError(`Error retrieving columns for table ${tableName}:`, err)
         throw err
     } finally {
         client.release()
@@ -160,27 +161,27 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
 
 
 // Helper function to delete a batch of records based on the 'subject' column
-async function deleteBatch(tableName: string, ids: string[]) {
-    if (!ids.length) return
+// async function deleteBatch(tableName: string, ids: string[]) {
+//     if (!ids.length) return
 
-    const client = await pool.connect()
-    const query = `
-        DELETE FROM "${tableName}"
-        WHERE id = ANY($1::text[]);
-    `
+//     const client = await pool.connect()
+//     const query = `
+//         DELETE FROM "${tableName}"
+//         WHERE id = ANY($1::text[]);
+//     `
 
-    try {
-        await client.query('BEGIN')
-        await client.query(query, [ids])
-        await client.query('COMMIT')
-        console.log(`Deleted ${ids.length} records from table ${tableName}`)
-    } catch (err) {
-        await client.query('ROLLBACK')
-        console.error(`Error during batch delete for table ${tableName}:`, err)
-    } finally {
-        client.release()
-    }
-}
+//     try {
+//         await client.query('BEGIN')
+//         await client.query(query, [ids])
+//         await client.query('COMMIT')
+//         console.log(`Deleted ${ids.length} records from table ${tableName}`)
+//     } catch (err) {
+//         await client.query('ROLLBACK')
+//         logError(`Error during batch delete for table ${tableName}:`, err)
+//     } finally {
+//         client.release()
+//     }
+// }
 
 
 async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
@@ -188,7 +189,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
 
     const { schema, name } = parseTableName(tableName)
 
-    console.log(`Start batch insert using COPY for ${tableName}`)
+    logInfo(`Start batch insert using COPY for ${tableName}`)
 
     // Get the actual columns from the database
     const columns = await getTableColumnsWithCache(tableName)
@@ -197,7 +198,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
     const columnList = columns.map(c => c.name).join(',')
     const copyQuery = `COPY ${schema}."${name}" (${columnList}) FROM STDIN WITH (FORMAT csv)`
 
-    console.log(copyQuery)
+    logDebug(copyQuery)
 
     try {
         await client.query('BEGIN')
@@ -227,10 +228,11 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         sourceStream.end()
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
-        console.log(`Batch for ${tableName} inserted!`)
+        logInfo(`Batch for ${tableName} inserted!`)
     } catch (err) {
         await client.query('ROLLBACK')
-        console.error(`Error during bulk insert for table ${tableName}:`, err)
+        //TODO: fix error caused by logging
+        logError(`Error during bulk insert for table ${tableName}:`)//, err)
         stringify(
             batch.map(record => columns.map(col => record[col.name] || null)),
             {
@@ -240,8 +242,8 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
                     },
                 }
             }, (result) => {
-                console.error(result)
-                process.exit()
+                logError(result)
+                throw err
             }
         )
     } finally {
@@ -297,7 +299,7 @@ async function upsertTable(tableName: string, truncate: boolean = true) {
         SET ${columnList};
         `
     const truncateQuery = `TRUNCATE ${tableName} CASCADE`
-    console.error(query)
+    logError(query)
     try {
         await client.query('BEGIN')
         // Truncate table first if desired
@@ -306,10 +308,10 @@ async function upsertTable(tableName: string, truncate: boolean = true) {
         }
         await client.query(query)
         await client.query('COMMIT')
-        console.log(`Batch for ${tableName} inserted!`)
+        logInfo(`Batch for ${tableName} inserted!`)
     } catch (err) {
         await client.query('ROLLBACK')
-        console.error(`Error during upsert from '${tempTableName}' to '${tableName}':`, err)
+        logError(`Error during upsert from '${tempTableName}' to '${tableName}':`, err)
     } finally {
         client.release()
     }
@@ -349,7 +351,7 @@ async function processGraph(graph: Graph) {
                     currentSubject = subject
                     currentRecordType = null
                     currentRecord = {}
-                    console.log(`Initiate record ${recordCount}: ${currentSubject}`)
+                    logInfo(`Initiate record ${recordCount}: ${currentSubject}`)
                     if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
                         process.exit()
                     }
@@ -379,11 +381,11 @@ async function processGraph(graph: Graph) {
                     }
                 }
 
-                console.log(`Processing completed: ${recordCount} records.`)
+                logInfo(`Processing completed: ${recordCount} records.`)
                 resolve()
             })
             .on('error', (err: Error) => {
-                console.error('Error during parsing or processing:', err)
+                logError('Error during parsing or processing:', err)
                 reject(err)
             })
     })
@@ -391,6 +393,7 @@ async function processGraph(graph: Graph) {
 
 // Main execution function
 async function main() {
+    logInfo(`Starting sync from ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
     const triply = App.get({ token: TOKEN })
 
     const account = await triply.getAccount(ACCOUNT)
@@ -401,90 +404,87 @@ async function main() {
         graph: GRAPH_BASE + DESTINATION_GRAPH
     }
 
-    try {
-        if (SQUASH_GRAPHS) {
-            console.log('--- Step 0: Squash graphs ---')
-            console.time('Squash graphs')
-            const graphName = `${GRAPH_BASE}knowledge-graph`
-            try {
-                await destination.dataset.deleteGraph(graphName)
-            } catch (error) {
-                console.log(`Graph ${graphName} does not exist.`)
-            }
-            const params: AddQueryOptions = {
-                dataset,
-                queryString: 'CONSTRUCT WHERE { ?s ?p ?o }',
-                serviceType: 'speedy',
-                output: 'response',
-            }
-            const query = await addQuery(account, 'squash-graphs', params)
-            console.log(`Starting pipeline for ${query.slug}.`)
-            await query.runPipeline({
-                destination: {
-                    dataset: destination.dataset,
-                    graph: graphName
-                }
-            })
-            console.log(`Pipeline completed.`)
-            dataset = destination.dataset
-            console.timeEnd('Squash graphs')
+    if (SQUASH_GRAPHS) {
+        logInfo('--- Step 0: Squash graphs ---')
+        console.time('Squash graphs')
+        const graphName = `${GRAPH_BASE}knowledge-graph`
+        try {
+            await destination.dataset.deleteGraph(graphName)
+        } catch (error) {
+            logInfo(`Graph ${graphName} does not exist.`)
         }
-
-        console.log('--- Step 1: Construct view ---')
-        console.time('Construct view')
-
-        const queries = await addJobQueries(account, dataset)
-
-        console.log(`Starting pipelines for ${queries.map(q => q.slug)}.`)
-
-        await account.runPipeline({
-            destination,
-            queries,
+        const params: AddQueryOptions = {
+            dataset,
+            queryString: 'CONSTRUCT WHERE { ?s ?p ?o }',
+            serviceType: 'speedy',
+            output: 'response',
+        }
+        const query = await addQuery(account, 'squash-graphs', params)
+        logInfo(`Starting pipeline for ${query.slug}.`)
+        await query.runPipeline({
+            destination: {
+                dataset: destination.dataset,
+                graph: graphName
+            }
         })
-        console.log(`Pipelines completed.`)
-        console.timeEnd('Construct view')
-
-        // Parse and process the gzipped TriG file from the URL
-        console.log('--- Step 2: load temporary tables --')
-        console.time('Load temporary tables')
-
-        // Create temp tables based on recordTypeToTableMap
-        for (const tableInfo of recordTypeToTableMap.values()) {
-            const name = await createTempTable(tableInfo)
-            await getTableColumnsWithCache(name)
-        }
-
-
-        const graph = await destination.dataset.getGraph(destination.graph)
-        await processGraph(graph)
-        console.timeEnd('Load temporary tables')
-
-        console.log('--- Step 3: upsert tables --')
-        console.time('Upsert tables')
-        for (const tableName of recordTypeToTableMap.values()) {
-            await upsertTable(tableName, SINCE === null)
-        }
-        console.timeEnd('Upsert tables')
-
-        console.log('--- Step 4: delete records --')
-        console.time('Delete records')
-        // for (const tableName of recordTypeToTableMap.values()) {
-        //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
-        //     await deleteBatch(tableName, subjectsToDelete);
-        // }
-        console.timeEnd('Delete records')
-
-        console.log('--- Step 5: Graph cleanup --')
-        console.time('Graph cleanup')
-        for await (const graph of dataset.getGraphs()) {
-            graph.delete()
-        }
-        console.timeEnd('Graph cleanup')
-    } catch (err) {
-        console.error('Error in main function:', err)
-    } finally {
-        pool.end()
+        logInfo(`Pipeline completed.`)
+        dataset = destination.dataset
+        console.timeEnd('Squash graphs')
     }
+
+    logInfo('--- Step 1: Construct view ---')
+    console.time('Construct view')
+
+    const queries = await addJobQueries(account, dataset)
+
+    logInfo(`Starting pipelines for ${queries.map(q => q.slug)}.`)
+
+    await account.runPipeline({
+        destination,
+        queries,
+    })
+    logInfo(`Pipelines completed.`)
+    console.timeEnd('Construct view')
+
+    // Parse and process the gzipped TriG file from the URL
+    logInfo('--- Step 2: load temporary tables --')
+    console.time('Load temporary tables')
+
+    // Create temp tables based on recordTypeToTableMap
+    for (const tableInfo of recordTypeToTableMap.values()) {
+        const name = await createTempTable(tableInfo)
+        await getTableColumnsWithCache(name)
+    }
+
+
+    const graph = await destination.dataset.getGraph(destination.graph)
+    await processGraph(graph)
+    console.timeEnd('Load temporary tables')
+
+    logInfo('--- Step 3: upsert tables --')
+    console.time('Upsert tables')
+    for (const tableName of recordTypeToTableMap.values()) {
+        await upsertTable(tableName, SINCE === null)
+    }
+    console.timeEnd('Upsert tables')
+
+    logInfo('--- Step 4: delete records --')
+    console.time('Delete records')
+    // for (const tableName of recordTypeToTableMap.values()) {
+    //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
+    //     await deleteBatch(tableName, subjectsToDelete);
+    // }
+    console.timeEnd('Delete records')
+
+    logInfo('--- Step 5: Graph cleanup --')
+    console.time('Graph cleanup')
+    for await (const graph of dataset.getGraphs()) {
+        graph.delete()
+    }
+    console.timeEnd('Graph cleanup')
 }
 
-main().catch(console.error)
+main().catch(err => {
+    logError(err)
+    process.exit(1)
+}).finally(() => pool.end())
