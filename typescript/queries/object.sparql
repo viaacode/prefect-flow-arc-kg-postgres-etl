@@ -49,7 +49,7 @@ CONSTRUCT {
 :schema_position ?schema_position;
 :bibframe_edition ?bibframe_edition.
 
-?ie_fragment :target "graph.mh_fragment_identifier";
+?ie_fragment :tableName "graph.mh_fragment_identifier";
   :intellectual_entity_id ?ie;
   :mh_fragment_identifier ?mh_fragment_identifier.
 
@@ -380,10 +380,15 @@ CONSTRUCT {
       OPTIONAL { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
       OPTIONAL { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
       OPTIONAL { ?file schema:duration ?file_schema_duration }
+
+      # 4. includes
+      BIND(IRI(
+           CONCAT(str(?file), "/", md5(str(?rep)))
+           ) AS ?inc)
     }
 
-    # 4. includes
-    BIND(IRI(CONCAT(str(?ie),MD5(CONCAT(?rep,?file)))) AS ?inc)
+    
+    
     
     
 }
