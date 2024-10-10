@@ -6,7 +6,7 @@ RUN pip3 install -r requirements.txt --extra-index-url http://do-prd-mvn-01.do.v
 ADD flows /opt/prefect/flows
 ADD typescript /opt/prefect/typescript
 WORKDIR /opt/prefect/typescript
-RUN npm run build
+RUN npm ci && npm run build
 WORKDIR /opt/prefect
 
 ENV NODE_ENV="production"
