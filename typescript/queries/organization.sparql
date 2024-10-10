@@ -1,0 +1,52 @@
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX haPref: <https://data.hetarchief.be/id/organization-preferences/>
+
+PREFIX : <https://data.hetarchief.be/ns/test/>
+
+CONSTRUCT {
+?org :tableName "graph.organization";
+:id ?org;
+:dcterms_description ?dcterms_description;
+:foaf_homepage ?foaf_homepage;
+:ha_org_has_logo ?ha_org_has_logo;
+:ha_org_request_form ?ha_org_request_form;
+:ha_org_sector ?ha_org_sector;
+:org_classification ?org_classification;
+:org_identifier ?org_identifier;
+:skos_pref_label ?skos_pref_label.
+
+?org_pref :tableName "graph.organization_has_preference";
+:organization_id ?org;
+:ha_pref ?ha_pref.
+
+}WHERE {
+
+   ?org a org:Organization;
+            org:identifier ?org_identifier;
+            skos:prefLabel ?skos_pref_label;
+            
+      
+  FILTER strStarts(?org_identifier, "OR-")
+  FILTER langMatches(lang(?skos_pref_label), "nl") 
+
+  OPTIONAL { ?org dct:description ?dcterms_description }
+  OPTIONAL { ?org foaf:homepage ?foaf_homepage }
+  OPTIONAL { ?org haOrg:hasLogo ?ha_org_has_logo }
+  OPTIONAL { ?org haOrg:requestForm ?ha_org_request_form } 
+  OPTIONAL { ?org haOrg:sector ?ha_org_sector } 
+  OPTIONAL { 
+    ?org org:classification/skos:prefLabel ?org_classification .
+    FILTER langMatches(lang(?org_classification), "nl") 
+  }
+  OPTIONAL {
+    ?org haOrg:hasPreference ?ha_pref_res .
+
+   BIND (REPLACE(STR(?ha_pref_res), "^.*/([^/]*)$", "$1") as ?ha_pref)
+   BIND(IRI(CONCAT(?org,md5(?ha_pref_res))) AS ?org_pref)
+  }
+  
+}

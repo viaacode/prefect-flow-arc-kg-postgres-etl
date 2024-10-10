@@ -22,7 +22,7 @@ def main_flow(
     squash_graphs: str = False,
     postgres_block_name: str = "local",  # "hetarchief-tst",
     record_limit: int = None,
-    batch_size: int = 1000,
+    batch_size: int = 100,
     full_sync: bool = False,
 ):
     """
@@ -67,4 +67,5 @@ if __name__ == "__main__":
         triplydb_block_name="triplydb-meemoo", 
         postgres_block_name="local-hasura", 
         base_path="./typescript/",
+        triplydb_dataset="hetarchief",
         squash_graphs=False)

@@ -4,7 +4,7 @@ export const QUERY_PATH = '../queries'
 // RDF constants
 export const NAMESPACE = 'https://data.hetarchief.be/ns/test/'
 export const GRAPH_BASE = 'https://data.hetarchief.be/graph/'
-export const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+export const TABLE_PRED = `${NAMESPACE}tableName`
 export const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
 
 // ENV variables
@@ -30,16 +30,36 @@ export const dbConfig = {
 }
 
 // Map RecordType to target tables and dynamic column configuration
-export const recordTypeToTableMap: Map<string, string> = new Map(
+export const tables: string[] = 
     [
-        [`${NAMESPACE}IntellectualEntityRecord`, 'graph.intellectual_entity'],
-        [`${NAMESPACE}FileRecord`, 'graph.file'],
-        [`${NAMESPACE}CarrierRecord`, 'graph.carrier'],
-        [`${NAMESPACE}RepresentationRecord`, 'graph.representation'],
-        [`${NAMESPACE}ThingRecord`, 'graph.thing'],
-        [`${NAMESPACE}RoleRecord`, 'graph.schema_role'],
+        'graph.organization',
+        'graph.organization_has_preference',
+        'graph.intellectual_entity',
+        'graph.schema_license',
+        'graph.file',
+        'graph.carrier', 
+        'graph.representation',
+        'graph.thing',
+        'graph.schema_role',
+        'graph.collection',
+        'graph.dcterms_format',
+        'graph.ha_des_coloring_type',
+        'graph.includes',
+        'graph.mh_fragment_identifier',
+        'graph.newspaper_schema_alternate_name',
+        'graph.newspaper_schema_in_language',
+        'graph.premis_identifier',
+        'graph.representation',
+        'graph.schema_alternate_name',
+        'graph.schema_contact_point',
+        'graph.schema_copyright_holder',
+        'graph.schema_genre',
+        'graph.schema_in_language',
+        'graph.schema_is_part_of',
+        'graph.schema_keywords',
+        'graph.schema_mentions',
     ]
-)
+
 
 
 

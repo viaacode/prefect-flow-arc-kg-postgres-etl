@@ -3,6 +3,7 @@ import pg from 'pg'
 import { from } from 'pg-copy-streams'
 import { fromRdf } from 'rdf-literal'
 import { stringify } from 'csv-stringify'
+import { stringify as stringifySync } from 'csv-stringify/sync'
 import { pipeline } from 'node:stream/promises'
 import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import App from '@triply/triplydb'
@@ -13,11 +14,12 @@ import { readdir, readFile } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
 import {
-    BATCH_SIZE, dbConfig, RECORD_LIMIT, QUERY_PATH, recordTypeToTableMap, NAMESPACE,
-    RDF_TYPE, XSD_DURATION, ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
+    BATCH_SIZE, dbConfig, RECORD_LIMIT, QUERY_PATH, tables, NAMESPACE,
+    XSD_DURATION, ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
     SINCE,
     GRAPH_BASE,
-    SQUASH_GRAPHS
+    SQUASH_GRAPHS,
+    TABLE_PRED
 } from './configuration.js'
 import { logInfo, logError, logDebug, getErrorMessage, isValidDate } from './util.js'
 
@@ -87,7 +89,6 @@ async function addJobQueries(account: Account, source: Dataset) {
 async function createTempTable(tableName: string) {
     const tempTableName = getTempTableName(tableName)
     const query = `
-        DROP TABLE IF EXISTS ${tempTableName};
         CREATE TABLE IF NOT EXISTS ${tempTableName} (LIKE ${tableName} INCLUDING ALL EXCLUDING CONSTRAINTS);
     `
     const client = await pool.connect()
@@ -97,6 +98,25 @@ async function createTempTable(tableName: string) {
     } catch (err) {
         const msg = getErrorMessage(err)
         logError(`Error creating temp table ${tempTableName}:`, msg)
+        throw err
+    }
+    finally {
+        client.release()
+    }
+}
+
+async function dropTempTable(tableName: string) {
+    const tempTableName = getTempTableName(tableName)
+    const query = `
+        DROP TABLE IF EXISTS ${tempTableName};
+    `
+    const client = await pool.connect()
+    try {
+        await client.query(query)
+        return tempTableName
+    } catch (err) {
+        const msg = getErrorMessage(err)
+        logError(`Error dropping temp table ${tempTableName}:`, msg)
         throw err
     }
     finally {
@@ -233,7 +253,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         //TODO: fix error caused by logging
         const msg = getErrorMessage(err)
         logError(`Error during bulk insert for table ${tableName}:`, msg)
-        stringify(
+        const result = stringifySync(
             batch.map(record => columns.map(col => record[col.name] || null)),
             {
                 cast: {
@@ -241,11 +261,10 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
                         return value.toISOString()
                     },
                 }
-            }, (result) => {
-                logError(result)
-                throw err
             }
         )
+        logError(result)
+        throw err
     } finally {
         client.release()
     }
@@ -254,23 +273,22 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
 
 // Process each record and add it to the appropriate batch
 async function processRecord(
-    currentSubject: string,
-    currentRecord: Record<string, string>,
-    currentRecordType: string,
+    subject: string,
+    record: Record<string, string>,
+    tableName: string,
     batches: { [tableName: string]: Array<Record<string, string>> }
 ) {
     //console.log(`Process record for ${currentSubject}: ${JSON.stringify(currentRecord)}`)
-    const table = recordTypeToTableMap.get(currentRecordType)
 
-    if (!currentRecord || !currentRecordType || !currentSubject || !table) return
+    if (!record || !tableName || !subject) return
 
-    const tempTableName = getTempTableName(table)
+    const tempTableName = getTempTableName(tableName)
 
     if (!batches[tempTableName]) {
         batches[tempTableName] = []
     }
 
-    batches[tempTableName].push(currentRecord)
+    batches[tempTableName].push(record)
 
     if (batches[tempTableName].length >= BATCH_SIZE) {
         console.log(`Maximum batch size reached for ${tempTableName}; processing.`)
@@ -331,7 +349,7 @@ async function processGraph(graph: Graph) {
         const batches: { [tableName: string]: Array<Record<string, string>> } = {}
         let currentRecord: Record<string, string> | null = null
         let currentSubject: string | null = null
-        let currentRecordType: string | null = null
+        let currentTableName: string | null = null
 
         quadStream
             .on('data', async (quad: Quad) => {
@@ -346,12 +364,12 @@ async function processGraph(graph: Graph) {
 
                 // If the subject changes, process the current record
                 if (subject !== currentSubject) {
-                    if (currentSubject !== null && currentRecord && currentRecordType !== null) {
-                        processRecord(currentSubject, currentRecord, currentRecordType, batches)
+                    if (currentSubject !== null && currentRecord && currentTableName !== null) {
+                        processRecord(currentSubject, currentRecord, currentTableName, batches)
                     }
                     recordCount++
                     currentSubject = subject
-                    currentRecordType = null
+                    currentTableName = null
                     currentRecord = {}
                     logInfo(`Initiate record ${recordCount}: ${currentSubject}`)
                     if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
@@ -360,8 +378,8 @@ async function processGraph(graph: Graph) {
                 }
 
                 // Check for the record type
-                if (predicate === RDF_TYPE && recordTypeToTableMap.has(object)) {
-                    currentRecordType = object
+                if (predicate === TABLE_PRED && tables.includes(object)) {
+                    currentTableName = object
                 }
                 // Handle predicates within the known namespace
                 else if (predicate.startsWith(NAMESPACE)) {
@@ -372,8 +390,8 @@ async function processGraph(graph: Graph) {
             })
             .on('end', async () => {
                 // Process the last record
-                if (currentSubject && currentRecord && currentRecordType) {
-                    await processRecord(currentSubject, currentRecord, currentRecordType, batches)
+                if (currentSubject && currentRecord && currentTableName) {
+                    await processRecord(currentSubject, currentRecord, currentTableName, batches)
                 }
 
                 // Insert any remaining batches
@@ -406,15 +424,16 @@ async function main() {
         graph: GRAPH_BASE + DESTINATION_GRAPH
     }
 
+    logInfo(`--- Syncing ${DATASET} to graph ${destination.graph} of ${DESTINATION_DATASET} ---`)
+
     if (SQUASH_GRAPHS) {
         logInfo('--- Step 0: Squash graphs ---')
         console.time('Squash graphs')
-        const graphName = `${GRAPH_BASE}knowledge-graph`
-        try {
-            await destination.dataset.deleteGraph(graphName)
-        } catch (err) {
-            logInfo(`Graph ${graphName} does not exist.`)
-        }
+        const graphName = GRAPH_BASE + DATASET
+
+        await destination.dataset.clear("graphs")
+        logInfo(`Cleared graphs of dataset ${DATASET}.`)
+
         const params: AddQueryOptions = {
             dataset,
             queryString: 'CONSTRUCT WHERE { ?s ?p ?o }',
@@ -453,9 +472,10 @@ async function main() {
     console.time('Load temporary tables')
 
     // Create temp tables based on recordTypeToTableMap
-    for (const tableInfo of recordTypeToTableMap.values()) {
-        const name = await createTempTable(tableInfo)
-        await getTableColumnsWithCache(name)
+    for (const tableName of tables) {
+        await dropTempTable(tableName)
+        const tempTableName = await createTempTable(tableName)
+        await getTableColumnsWithCache(tempTableName)
     }
 
 
@@ -465,8 +485,10 @@ async function main() {
 
     logInfo('--- Step 3: upsert tables --')
     console.time('Upsert tables')
-    for (const tableName of recordTypeToTableMap.values()) {
+    for (const tableName of tables.values()) {
         await upsertTable(tableName, SINCE === null)
+        // drop table when done
+        await dropTempTable(tableName)
     }
     console.timeEnd('Upsert tables')
 
