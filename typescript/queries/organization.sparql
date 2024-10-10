@@ -23,6 +23,13 @@ CONSTRUCT {
 :organization_id ?org;
 :ha_pref ?ha_pref.
 
+?cp :tableName "graph.schema_contact_point";
+:id ?id;
+:organization_id ?organization_id;
+:schema_contact_type ?schema_contact_type;
+:schema_email ?schema_email;
+:schema_telephone ?schema_telephone.
+
 }WHERE {
 
    ?org a org:Organization;
@@ -47,6 +54,20 @@ CONSTRUCT {
 
    BIND (REPLACE(STR(?ha_pref_res), "^.*/([^/]*)$", "$1") as ?ha_pref)
    BIND(IRI(CONCAT(?org,md5(?ha_pref_res))) AS ?org_pref)
+  }
+
+  OPTIONAL {
+    ?org schema:contactPoint ?cp.
+      
+      ?cp schema:contactType ?schema_contact_type.
+      
+      OPTIONAL {
+        ?cp schema:email ?schema_email ;
+      }
+
+      OPTIONAL {
+        ?cp schema:telephone ?schema_telephone .
+      } 
   }
   
 }

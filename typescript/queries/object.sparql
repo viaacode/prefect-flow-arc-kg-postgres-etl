@@ -49,6 +49,10 @@ CONSTRUCT {
 :schema_position ?schema_position;
 :bibframe_edition ?bibframe_edition.
 
+?ie_format :tableName "graph.mh_fragment_identifier";
+  :intellectual_entity_id ?ie;
+ :dcterms_format ?dcterms_format.
+
 ?ie_fragment :tableName "graph.mh_fragment_identifier";
   :intellectual_entity_id ?ie;
   :mh_fragment_identifier ?mh_fragment_identifier.
@@ -80,6 +84,10 @@ CONSTRUCT {
 ?ie_g :tableName "graph.schema_temporal";
 :intellectual_entity_id ?ie;
 :schema_temporal ?schema_temporal.
+
+?ie_ch :tableName "graph.schema_copyright_holder";
+:intellectual_entity_id ?ie;
+:schema_copyright_holder ?schema_copyright_holder.
 
 ?role :tableName "graph.schema_role";
 :id ?role;
@@ -125,6 +133,11 @@ CONSTRUCT {
   :schema_width ?car_schema_width;
   :digitization_date ?car_digitization_date;
   :type ?car_type.
+
+?pc_ct :tableName "graph.ha_des_coloring_type";
+  :carrier_id ?pc;
+  :ha_des_coloring_type ?ha_des_coloring_type.
+
 
 ?inc :tableName "graph.includes";
   :representation_id ?rep;
@@ -181,6 +194,7 @@ CONSTRUCT {
     #FILTER (!BOUND(?since) || ?modified >= ?since )
 
     BIND(IRI(CONCAT(str(?ie),md5(?license))) AS ?ie_lic)
+    BIND(IRI(CONCAT(str(?ie),md5(?format))) AS ?ie_format)
 
     OPTIONAL {
         ?ie schema:alternateName ?schema_alternate_name.
@@ -252,6 +266,17 @@ CONSTRUCT {
     OPTIONAL { ?ie dct:rights ?dcterms_rights }
     OPTIONAL { ?ie schema:creditText ?schema_credit_text }    
     OPTIONAL { ?ie ebucore:synopsis ?ebucore_synopsis }
+
+    OPTIONAL {
+      ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
+      FILTER (
+          langmatches(lang(?schema_copyright_holder), "nl") 
+          || (not exists {
+                  ?intellectual_entity_id schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_name_other. 
+                  filter(langmatches(lang(?schema_name_other), "nl")) 
+      }))
+      BIND(IRI(CONCAT(str(?ie),md5(?schema_copyright_holder))) AS ?ie_ch)
+    }
     # krant
     OPTIONAL{ 
       ?ie bf:edition/skos:prefLabel ?bibframe_edition .
@@ -337,6 +362,10 @@ CONSTRUCT {
         VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
         ?type_res rdfs:label ?car_type.
         FILTER (langMatches(lang(?car_type), "nl"))
+        OPTIONAL {
+          ?pc haDes:coloringType/skos:prefLabel  ?ha_des_coloring_type
+           BIND(IRI(CONCAT(str(?pc),md5(?ha_des_coloring_type))) AS ?pc_ct)
+        }
       }
     }
 

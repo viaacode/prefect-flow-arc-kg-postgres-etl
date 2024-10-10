@@ -5,13 +5,12 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX : <https://data.hetarchief.be/ns/test/>
 
 CONSTRUCT {
-  ?id :target "graph.collection";
+  ?id :tableName "graph.collection";
   :id ?id;
   :bibframe_preceeded_by ?bibframe_preceeded_by;
   :bibframe_succeeded_by ?bibframe_succeeded_by; 
   :bibframe_supplement_to ?bibframe_supplement_to;
   :collection_type ?collection_type;
-  :schema_alternate_name ?schema_alternate_name;
   :schema_end_date ?schema_end_date;
   :schema_identifier ?schema_identifier ;
   :schema_is_part_of ?schema_is_part_of;
@@ -19,7 +18,20 @@ CONSTRUCT {
   :schema_name ?schema_name;
   :schema_publisher ?schema_publisher;
   :schema_season_number ?schema_season_number;
-  :schema_start_date ?schema_start_date
+  :schema_start_date ?schema_start_date.
+
+  ?il :tableName "graph.newspaper_schema_in_language";
+  :collection_id ?id;
+  :schema_in_language ?schema_in_language.
+
+  ?an :tableName "graph.newspaper_schema_alternate_name";
+  :collection_id ?id;
+  :schema_alternate_name ?schema_alternate_name.
+
+  ?ie_isp :tableName "graph.schema_is_part_of";
+  :intellectual_entity_id ?ie;
+  :type ?collection_type;
+  :collection_id ?id.
 }
 WHERE {
   {
@@ -27,6 +39,16 @@ WHERE {
         schema:identifier ?schema_identifier;
         schema:name ?schema_name_res;
         schema:hasPart ?serie.
+    
+    OPTIONAL {
+      ?id schema:inLanguage ?schema_in_language.
+      BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
+    }
+
+    OPTIONAL {
+      ?id schema:alternateName ?schema_alternate_name.
+      BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
+    }
 
     OPTIONAL {
       ?serie schema:locationCreated/schema:name ?schema_location_created_res.
@@ -72,4 +94,9 @@ WHERE {
     BIND ("archive" AS ?collection_type)
   }
   #?x schema:isPartOf ?id.
+
+  OPTIONAL {
+    ?ie schema:isPartOf ?id.
+    BIND(IRI(CONCAT(str(?id),md5(?ie))) AS ?ie_isp)
+  }
 }
