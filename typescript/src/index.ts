@@ -19,7 +19,8 @@ import {
     SINCE,
     GRAPH_BASE,
     SQUASH_GRAPHS,
-    TABLE_PRED
+    TABLE_PRED,
+    DELETE_TABLE_NAME
 } from './configuration.js'
 import { logInfo, logError, logDebug, getErrorMessage, isValidDate } from './util.js'
 
@@ -183,29 +184,39 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
 }
 
 
-// Helper function to delete a batch of records based on the 'subject' column
-// async function deleteBatch(tableName: string, ids: string[]) {
-//     if (!ids.length) return
+// Helper function to delete a batch of records
+// TODO: rework this to reduce the amount of implicit knowledge, eg. make SPARQL produce clear cut delete operations
+async function deleteBatch(tableName: string, property: string, batch: Array<Record<string, string>>) {
+    if (!batch.length) return
 
-//     const client = await pool.connect()
-//     const query = `
-//         DELETE FROM "${tableName}"
-//         WHERE id = ANY($1::text[]);
-//     `
+    const { schema, name } = parseTableName(tableName)
 
-//     try {
-//         await client.query('BEGIN')
-//         await client.query(query, [ids])
-//         await client.query('COMMIT')
-//         console.log(`Deleted ${ids.length} records from table ${tableName}`)
-//     } catch (err) {
-//         await client.query('ROLLBACK')
-//         logError(`Error during batch delete for table ${tableName}:`, err)
-//     } finally {
-//         client.release()
-//     }
-// }
+    const client = await pool.connect()
+    const query = `
+        DELETE ${schema}."${name}"
+        FROM ${schema}."${name}" x
+        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
+        WHERE y.${property} = ANY($1::text[]); 
+    `
+    const ids = batch.map(record => record[property])
+    try {
+        await client.query('BEGIN')
+        await client.query(query, [ids])
+        await client.query('COMMIT')
+        console.log(`Deleted ${ids.length} records from table ${tableName}`)
+    } catch (err) {
+        await client.query('ROLLBACK')
+        logError(`Error during batch delete for table ${tableName}:`, err)
+    } finally {
+        client.release()
+    }
+}
 
+async function processBatch(tableName: string, batch: Array<Record<string, string>>) {
+    if (tableName === DELETE_TABLE_NAME)
+        return deleteBatch('graph.intellectual_entity', 'mh_fragment_identifier', batch)
+    return batchInsertUsingCopy(tableName, batch)
+}
 
 async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
     if (!batch.length) return
@@ -301,7 +312,7 @@ async function processRecord(
     if (batches[tableName].length >= BATCH_SIZE) {
         console.log(`Maximum batch size reached for ${tableName}; processing.`)
         const batch = batches[tableName]
-        await batchInsertUsingCopy(tableName, batch)
+        await processBatch(tableName, batch)
         batches[tableName] = []
     }
 }
@@ -411,7 +422,7 @@ async function processGraph(graph: Graph) {
                 // Insert any remaining batches
                 for (const tableName in batches) {
                     if (batches[tableName].length) {
-                        await batchInsertUsingCopy(tableName, batches[tableName])
+                        await processBatch(tableName, batches[tableName])
                     }
                 }
 
@@ -482,13 +493,13 @@ async function main() {
     console.timeEnd('Construct view')
 
     // Parse and process the gzipped TriG file from the URL
-    logInfo('--- Step 2: load temporary tables --')
-    console.time('Load temporary tables')
+    logInfo('--- Step 2: load temporary tables and delete records --')
+    console.time('Load and delete records')
 
     // Create temp tables based on recordTypeToTableMap
     const graph = await destination.dataset.getGraph(destination.graph)
     await processGraph(graph)
-    console.timeEnd('Load temporary tables')
+    console.timeEnd('Load and delete records')
 
     logInfo('--- Step 3: upsert tables --')
     console.time('Upsert tables')
@@ -501,19 +512,9 @@ async function main() {
     }
     console.timeEnd('Upsert tables')
 
-    logInfo('--- Step 4: delete records --')
-    console.time('Delete records')
-    // for (const tableName of recordTypeToTableMap.values()) {
-    //     const subjectsToDelete = ['subject1', 'subject2', 'subject3'];
-    //     await deleteBatch(tableName, subjectsToDelete);
-    // }
-    console.timeEnd('Delete records')
-
-    logInfo('--- Step 5: Graph cleanup --')
+    logInfo('--- Step 4: Graph cleanup --')
     console.time('Graph cleanup')
-    for await (const graph of dataset.getGraphs()) {
-        graph.delete()
-    }
+    await graph.delete()
     console.timeEnd('Graph cleanup')
 }
 

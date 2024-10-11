@@ -157,13 +157,6 @@ CONSTRUCT {
 
 } WHERE {
 
-    # 0. Mediahaven fragments
-    # ?mf a mh:Fragment;
-    #     schema:identifier ?mf_identifier;
-    #     schema:dateDeleted ?date_deleted.
-
-    # BIND(BOUND(?mf) AS ?mf_deleted )
-
     # 1. Intellectual Entity data
     ?ie a premis:IntellectualEntity;
            schema:identifier ?schema_identifier ;
@@ -416,8 +409,5 @@ CONSTRUCT {
            ) AS ?inc)
     }
 
-    
-    
-    
     
 }

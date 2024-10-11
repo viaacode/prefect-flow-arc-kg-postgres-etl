@@ -1,0 +1,72 @@
+# position: 1
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+prefix prov: <http://www.w3.org/ns/prov#>
+# EBUCore - the Dublin Core for media
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+prefix edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
+PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
+PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
+
+
+PREFIX : <https://data.hetarchief.be/ns/test/>
+
+
+CONSTRUCT {
+    ?fragment :tableName "delete_record";
+        :mh_fragment_identifier ?mh_fragment_identifier
+
+} WHERE {
+    # 1. Fragment was not deleted, but the IntellectualEntity derived from the fragment does not have the right licenses
+    {
+        ?ie a premis:IntellectualEntity ;
+            schema:license ?schema_license;
+            dct:format ?format ;
+            prov:wasDerivedFrom ?fragment.
+        
+            
+        ?fragment a mh:Fragment;
+                schema:dateModified ?modified;
+                schema:identifier ?mh_fragment_identifier.
+
+        # only take into account fragments that were modified since
+        FILTER (!BOUND(?since) || ?modified >= ?since )
+
+        # Only include who does not have the right licenses
+        FILTER (?schema_license NOT IN ( 
+            haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+            haLicId:VIAA-PUBLIEK-METADATA-ALL,
+            haLicId:VIAA-PUBLIEK-CONTENT,
+            haLicId:BEZOEKERTOOL-METADATA-ALL,
+            haLicId:BEZOEKERTOOL-CONTENT ,
+            haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+            haLicId:VIAA-INTRA_CP-CONTENT ,
+            haLicId:Publiek-Domein,
+            haLicId:COPYRIGHT-UNDETERMINED
+        ) && ?format != "image" )
+
+    } 
+    # 2. The fragment was deleted
+    UNION{
+        ?fragment a mh:Fragment;
+        schema:identifier ?mh_fragment_identifier;
+        schema:dateModified ?modified;
+        schema:dateDeleted ?date_deleted.
+        # only take into account fragments that were modified since
+        FILTER (!BOUND(?since) || ?modified >= ?since )
+    }
+
+     
+}

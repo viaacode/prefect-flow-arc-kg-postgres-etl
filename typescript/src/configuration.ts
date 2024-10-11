@@ -29,6 +29,9 @@ export const dbConfig = {
     //url: process.env.POSTGRES_URL,
 }
 
+// 
+export const DELETE_TABLE_NAME = 'delete_record'
+
 // Map RecordType to target tables and dynamic column configuration
 export const tables: string[] = 
     [
