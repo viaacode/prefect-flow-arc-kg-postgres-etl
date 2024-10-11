@@ -96,7 +96,23 @@ WHERE {
   #?x schema:isPartOf ?id.
 
   OPTIONAL {
-    ?ie schema:isPartOf ?id.
+    ?ie schema:license ?schema_license;
+        dct:format ?format ;
+        schema:isPartOf ?id.
+
+    # Only include the right licenses
+    FILTER (?schema_license IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ) && ?format != "image")
+
     BIND(IRI(CONCAT(str(?id),md5(?ie))) AS ?ie_isp)
   }
 }
