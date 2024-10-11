@@ -92,9 +92,7 @@ pipeline {
                     withCredentials([string(credentialsId: 'triplydb_gitlab_token', variable: 'triplydb_gitlab_token')]) {
                         docker.withRegistry(REGISTRY_SCHEMA, REGISTRY_CREDENTIAL) {
                             dockerImage = docker.build("$REGISTRY/prefect/$APP_NAME:$GIT_SHORT_COMMIT", "--no-cache --build-arg TRIPLYDB_GITLAB_TOKEN=$triplydb_gitlab_token .")
-                            if (toDeploy) {
-                                dockerImage.push()
-                            }
+                            dockerImage.push()
                         }
                     }
                 }
