@@ -117,7 +117,7 @@ async function dropTable(tableName: string) {
         return tableName
     } catch (err) {
         const msg = getErrorMessage(err)
-        logError(`Error dropping temp table ${tableName}:`, msg)
+        logError(`Error dropping table ${tableName}:`, msg)
         throw err
     }
     finally {
