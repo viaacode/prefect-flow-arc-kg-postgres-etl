@@ -33,6 +33,9 @@ const columnCache: { [tableName: string]: ColumnInfo[] } = {}
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
 
+let unprocessedBatches = 0
+let batchCount = 0
+
 function getTempTableName(tableName: string) {
     const tableInfo = parseTableName(tableName)
     return `${tableInfo.schema}.temp_${tableInfo.name}`
@@ -207,6 +210,8 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
 async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
     if (!batch.length) return
 
+    unprocessedBatches++
+
     // Create table if not exists
     const tempTableName = await createTempTable(tableName)
 
@@ -251,6 +256,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
         logInfo(`Batch for ${tableName} inserted!`)
+        batchCount++
     } catch (err) {
         await client.query('ROLLBACK')
         //TODO: fix error caused by logging
@@ -270,6 +276,7 @@ async function batchInsertUsingCopy(tableName: string, batch: Array<Record<strin
         throw err
     } finally {
         client.release()
+        unprocessedBatches--
     }
 }
 
@@ -401,7 +408,7 @@ async function processGraph(graph: Graph) {
                     }
                 }
 
-                logInfo(`Processing completed: ${recordCount} records.`)
+                logInfo(`Processing completed: ${recordCount} records (${batchCount}/${Math.ceil(recordCount/BATCH_SIZE)} batches).`)
                 resolve()
             })
             .on('error', (err: Error) => {
@@ -507,4 +514,7 @@ main().catch(err => {
     const msg = getErrorMessage(err)
     logError(msg)
     process.exit(1)
-}).finally(() => pool.end())
+}).finally(() => {
+    logDebug(`Unprocessed batched: ${unprocessedBatches}`)
+    
+    pool.end()})
