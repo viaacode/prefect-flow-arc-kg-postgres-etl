@@ -288,7 +288,7 @@ async function processRecord(
     tableName: string,
     batches: { [tableName: string]: Array<Record<string, string>> }
 ) {
-    //console.log(`Process record for ${currentSubject}: ${JSON.stringify(currentRecord)}`)
+    logDebug(`Process record for ${subject}: ${JSON.stringify(record)}`)
 
     if (!record || !tableName || !subject) return
 
@@ -375,6 +375,7 @@ async function processGraph(graph: Graph) {
                         try {
                             quadStream.pause()
                             await processRecord(currentSubject, currentRecord, currentTableName, batches)
+                            logDebug(`Record ${recordCount} (${currentSubject}) processed`)
                         } finally {
                             quadStream.resume()
                         }
@@ -388,7 +389,6 @@ async function processGraph(graph: Graph) {
                     currentSubject = subject
                     currentTableName = null
                     currentRecord = {}
-                    logInfo(`Initiate record ${recordCount}: ${currentSubject}`)
                 }
 
                 // Check for the record type
