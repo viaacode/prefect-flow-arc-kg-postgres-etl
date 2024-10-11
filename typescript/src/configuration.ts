@@ -10,7 +10,7 @@ export const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
 // ENV variables
 export const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '100', 10)
 export const RECORD_LIMIT = process.env.RECORD_LIMIT ? parseInt(process.env.RECORD_LIMIT, 10) : null
-export const SINCE = process.env.SINCE ? new Date(process.env.SINCE) : null
+export const SINCE = process.env.SINCE ? new Date(process.env.SINCE).toISOString() : undefined
 export const SQUASH_GRAPHS = process.env.SQUASH_GRAPHS === 'True'
 export const ACCOUNT = process.env.TRIPLYDB_OWNER ?? 'meemoo'
 export const DATASET = process.env.TRIPLYDB_DATASET ?? 'knowledge-graph'

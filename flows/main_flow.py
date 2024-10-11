@@ -2,14 +2,14 @@ from prefect import flow, get_run_logger
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
-#from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
+from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect.task_runners import ConcurrentTaskRunner
 
 
 @flow(
     name="prefect-flow-arc-kg-postgres-etl",
     task_runner=ConcurrentTaskRunner(),
-    #on_completion=[save_last_run_config],
+    on_completion=[save_last_run_config],
 )
 def main_flow(
     triplydb_block_name: str = "triplydb",
@@ -31,15 +31,13 @@ def main_flow(
         - triplydb (TriplyDBCredentials): Credentials to connect to MediaHaven
         - hetarchief-tst (PostgresCredentials): Credentials to connect to the postgres database
     """
-    # Load logger
-    logger = get_run_logger()
 
     # Load credentials
     triply_creds = TriplyDBCredentials.load(triplydb_block_name)
     postgres_creds = DatabaseCredentials.load(postgres_block_name)
 
     # Figure out start time
-    #last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None
+    last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None
 
     # Run javascript
     sync_service_script: str = "index.js"
@@ -58,7 +56,7 @@ def main_flow(
         postgres=postgres_creds,
         record_limit=record_limit,
         batch_size=batch_size,
-        #since=last_modified_date,
+        since=last_modified_date,
     )
 
 

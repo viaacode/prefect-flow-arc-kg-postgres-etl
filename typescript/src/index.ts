@@ -77,8 +77,9 @@ async function addJobQueries(account: Account, source: Dataset) {
             variables: [
                 {
                     name: 'since',
+                    required: false,
                     termType: 'Literal',
-                    datatype: 'http://www.w3.org/2001/XMLSchema#dateTime'
+                    datatype: 'http://www.w3.org/2001/XMLSchema#dateTime',
                 }
             ]
         }
@@ -487,7 +488,12 @@ async function main() {
 
     await account.runPipeline({
         destination,
-        queries,
+        queries: queries.map(q => ({
+            query: q,
+            variables: {
+                since: SINCE
+            }
+        })),
     })
     logInfo(`Pipelines completed.`)
     console.timeEnd('Construct view')

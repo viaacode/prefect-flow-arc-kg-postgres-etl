@@ -184,7 +184,7 @@ CONSTRUCT {
     ) && ?format != "image" && langMatches(lang(?schema_name), "nl"))
 
     # for incremental 
-    #FILTER (!BOUND(?since) || ?modified >= ?since )
+    FILTER (!BOUND(?since) || ?modified >= ?since )
 
     BIND(IRI(CONCAT(str(?ie),md5(?license))) AS ?ie_lic)
     BIND(IRI(CONCAT(str(?ie),md5(?format))) AS ?ie_format)

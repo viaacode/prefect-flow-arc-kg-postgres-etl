@@ -95,10 +95,9 @@ WHERE {
     OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
     BIND ("archive" AS ?collection_type)
   }
-  #?x schema:isPartOf ?id.
-
-  OPTIONAL {
-    ?ie schema:license ?schema_license;
+  
+  # Only get collections where the IEs are disseminated
+ ?ie schema:license ?schema_license;
         dct:format ?format ;
         schema:isPartOf ?id.
 
@@ -115,6 +114,8 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     ) && ?format != "image")
 
+    # for incremental 
+    FILTER (!BOUND(?since) || ?modified >= ?since )
+
     BIND(IRI(CONCAT(str(?id),md5(?ie))) AS ?ie_isp)
-  }
 }
