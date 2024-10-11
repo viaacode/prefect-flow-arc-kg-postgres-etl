@@ -301,7 +301,7 @@ async function processRecord(
     if (batches[tableName].length >= BATCH_SIZE) {
         console.log(`Maximum batch size reached for ${tableName}; processing.`)
         const batch = batches[tableName]
-        batchInsertUsingCopy(tableName, batch)
+        await batchInsertUsingCopy(tableName, batch)
         batches[tableName] = []
     }
 }
@@ -372,16 +372,23 @@ async function processGraph(graph: Graph) {
                 // If the subject changes, process the current record
                 if (subject !== currentSubject) {
                     if (currentSubject !== null && currentRecord && currentTableName !== null) {
-                        processRecord(currentSubject, currentRecord, currentTableName, batches)
+                        try {
+                            quadStream.pause()
+                            await processRecord(currentSubject, currentRecord, currentTableName, batches)
+                        } finally {
+                            quadStream.resume()
+                        }
                     }
                     recordCount++
+
+                    if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
+                        return quadStream.destroy()
+                    }
+
                     currentSubject = subject
                     currentTableName = null
                     currentRecord = {}
                     logInfo(`Initiate record ${recordCount}: ${currentSubject}`)
-                    if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
-                        process.exit()
-                    }
                 }
 
                 // Check for the record type
@@ -408,7 +415,7 @@ async function processGraph(graph: Graph) {
                     }
                 }
 
-                logInfo(`Processing completed: ${recordCount} records (${batchCount}/${Math.ceil(recordCount/BATCH_SIZE)} batches).`)
+                logInfo(`Processing completed: ${recordCount} records (${batchCount}/${Math.ceil(recordCount / BATCH_SIZE)} batches).`)
                 resolve()
             })
             .on('error', (err: Error) => {
@@ -516,5 +523,6 @@ main().catch(err => {
     process.exit(1)
 }).finally(() => {
     logDebug(`Unprocessed batched: ${unprocessedBatches}`)
-    
-    pool.end()})
+
+    pool.end()
+})
