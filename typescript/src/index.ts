@@ -88,6 +88,7 @@ async function addJobQueries(account: Account, source: Dataset) {
 // Helper function to create a table dynamically based on the columns
 async function createTempTable(tableName: string) {
     const tempTableName = getTempTableName(tableName)
+    logInfo(`Creating temp table ${tempTableName} from ${tableName} if not exists.`)
     const query = `
         CREATE TABLE IF NOT EXISTS ${tempTableName} (LIKE ${tableName} INCLUDING ALL EXCLUDING CONSTRAINTS);
     `
@@ -97,7 +98,7 @@ async function createTempTable(tableName: string) {
         return tempTableName
     } catch (err) {
         const msg = getErrorMessage(err)
-        logError(`Error creating temp table ${tempTableName}:`, msg)
+        logError(`Error creating table ${tempTableName}:`, msg)
         throw err
     }
     finally {
@@ -105,18 +106,18 @@ async function createTempTable(tableName: string) {
     }
 }
 
-async function dropTempTable(tableName: string) {
-    const tempTableName = getTempTableName(tableName)
+async function dropTable(tableName: string) {
+    logInfo(`Dropping table ${tableName} if exists.`)
     const query = `
-        DROP TABLE IF EXISTS ${tempTableName};
+        DROP TABLE IF EXISTS ${tableName};
     `
     const client = await pool.connect()
     try {
         await client.query(query)
-        return tempTableName
+        return tableName
     } catch (err) {
         const msg = getErrorMessage(err)
-        logError(`Error dropping temp table ${tempTableName}:`, msg)
+        logError(`Error dropping temp table ${tableName}:`, msg)
         throw err
     }
     finally {
@@ -206,15 +207,17 @@ async function getTablePrimaryKeys(tableName: string): Promise<string[]> {
 async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
     if (!batch.length) return
 
-    const { schema, name } = parseTableName(tableName)
+    // Create table if not exists
+    const tempTableName = await createTempTable(tableName)
 
-    logInfo(`Start batch insert using COPY for ${tableName}`)
+    logInfo(`Start batch insert using COPY for ${tableName} using ${tempTableName}`)
 
     // Get the actual columns from the database
     const columns = await getTableColumnsWithCache(tableName)
 
     const client = await pool.connect()
     const columnList = columns.map(c => c.name).join(',')
+    const { schema, name } = parseTableName(tempTableName)
     const copyQuery = `COPY ${schema}."${name}" (${columnList}) FROM STDIN WITH (FORMAT csv)`
 
     logDebug(copyQuery)
@@ -282,26 +285,23 @@ async function processRecord(
 
     if (!record || !tableName || !subject) return
 
-    const tempTableName = getTempTableName(tableName)
-
-    if (!batches[tempTableName]) {
-        batches[tempTableName] = []
+    if (!batches[tableName]) {
+        batches[tableName] = []
     }
 
-    batches[tempTableName].push(record)
+    batches[tableName].push(record)
 
-    if (batches[tempTableName].length >= BATCH_SIZE) {
-        console.log(`Maximum batch size reached for ${tempTableName}; processing.`)
-        const batch = batches[tempTableName]
-        batchInsertUsingCopy(tempTableName, batch)
-        batches[tempTableName] = []
+    if (batches[tableName].length >= BATCH_SIZE) {
+        console.log(`Maximum batch size reached for ${tableName}; processing.`)
+        const batch = batches[tableName]
+        batchInsertUsingCopy(tableName, batch)
+        batches[tableName] = []
     }
 }
 
-async function upsertTable(tableName: string, truncate: boolean = true) {
+async function upsertTable(tempTableName: string, tableName: string, truncate: boolean = true) {
     const client = await pool.connect()
-    // Get the temp name
-    const tempTableName = getTempTableName(tableName)
+
     // Get the actual columns from the database
     const columns = await getTableColumnsWithCache(tableName)
 
@@ -472,13 +472,6 @@ async function main() {
     console.time('Load temporary tables')
 
     // Create temp tables based on recordTypeToTableMap
-    for (const tableName of tables) {
-        await dropTempTable(tableName)
-        const tempTableName = await createTempTable(tableName)
-        await getTableColumnsWithCache(tempTableName)
-    }
-
-
     const graph = await destination.dataset.getGraph(destination.graph)
     await processGraph(graph)
     console.timeEnd('Load temporary tables')
@@ -486,9 +479,11 @@ async function main() {
     logInfo('--- Step 3: upsert tables --')
     console.time('Upsert tables')
     for (const tableName of tables.values()) {
-        await upsertTable(tableName, SINCE === null)
-        // drop table when done
-        await dropTempTable(tableName)
+        const tempTableName = getTempTableName(tableName)
+        // upsert records from temp table into table
+        await upsertTable(tempTableName, tableName, SINCE === null)
+        // drop temp table when done
+        await dropTable(tempTableName)
     }
     console.timeEnd('Upsert tables')
 
