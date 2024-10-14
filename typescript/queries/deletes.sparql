@@ -25,9 +25,7 @@ PREFIX : <https://data.hetarchief.be/ns/test/>
 
 
 CONSTRUCT {
-    ?fragment :tableName "delete_record";
-        :mh_fragment_identifier ?mh_fragment_identifier
-
+    ?fragment :is_deleted true
 } WHERE {
     # 1. Fragment was not deleted, but the IntellectualEntity derived from the fragment does not have the right licenses
     {

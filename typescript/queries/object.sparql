@@ -49,8 +49,8 @@ CONSTRUCT {
 :schema_position ?schema_position;
 :bibframe_edition ?bibframe_edition.
 
-?ie_format :tableName "graph.mh_fragment_identifier";
-  :intellectual_entity_id ?ie;
+?ie_format :tableName "graph.dcterms_format";
+ :intellectual_entity_id ?ie;
  :dcterms_format ?dcterms_format.
 
 ?ie_fragment :tableName "graph.mh_fragment_identifier";
@@ -163,7 +163,7 @@ CONSTRUCT {
            schema:name ?schema_name ;
            schema:maintainer ?schema_maintainer;
            schema:license ?schema_license;
-           dct:format ?format ;
+           dct:format ?dcterms_format ;
            prov:wasDerivedFrom ?ie_fragment.
            
     ?ie_fragment a mh:Fragment;
@@ -181,13 +181,13 @@ CONSTRUCT {
         haLicId:VIAA-INTRA_CP-CONTENT ,
         haLicId:Publiek-Domein,
         haLicId:COPYRIGHT-UNDETERMINED
-    ) && ?format != "image" && langMatches(lang(?schema_name), "nl"))
+    ) && ?dcterms_format != "image" && langMatches(lang(?schema_name), "nl"))
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     BIND(IRI(CONCAT(str(?ie),md5(?license))) AS ?ie_lic)
-    BIND(IRI(CONCAT(str(?ie),md5(?format))) AS ?ie_format)
+    BIND(IRI(CONCAT(str(?ie),md5(?dcterms_format))) AS ?ie_format)
 
     OPTIONAL {
         ?ie schema:alternateName ?schema_alternate_name.

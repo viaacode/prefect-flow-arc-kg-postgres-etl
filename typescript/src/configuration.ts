@@ -11,7 +11,8 @@ export const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
 export const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '100', 10)
 export const RECORD_LIMIT = process.env.RECORD_LIMIT ? parseInt(process.env.RECORD_LIMIT, 10) : null
 export const SINCE = process.env.SINCE ? new Date(process.env.SINCE).toISOString() : undefined
-export const SQUASH_GRAPHS = process.env.SQUASH_GRAPHS === 'True'
+export const SKIP_SQUASH = process.env.SKIP_SQUASH === 'True'
+export const SKIP_VIEW = process.env.SKIP_VIEW === 'True'
 export const ACCOUNT = process.env.TRIPLYDB_OWNER ?? 'meemoo'
 export const DATASET = process.env.TRIPLYDB_DATASET ?? 'knowledge-graph'
 export const DESTINATION_DATASET = process.env.TRIPLYDB_DESTINATION_DATASET || DATASET
@@ -31,37 +32,6 @@ export const dbConfig = {
 
 // 
 export const DELETE_TABLE_NAME = 'delete_record'
-
-// Map RecordType to target tables and dynamic column configuration
-export const tables: string[] = 
-    [
-        'graph.organization',
-        'graph.organization_has_preference',
-        'graph.intellectual_entity',
-        'graph.schema_license',
-        'graph.file',
-        'graph.carrier', 
-        'graph.representation',
-        'graph.thing',
-        'graph.schema_role',
-        'graph.collection',
-        'graph.dcterms_format',
-        'graph.ha_des_coloring_type',
-        'graph.includes',
-        'graph.mh_fragment_identifier',
-        'graph.newspaper_schema_alternate_name',
-        'graph.newspaper_schema_in_language',
-        'graph.premis_identifier',
-        'graph.representation',
-        'graph.schema_alternate_name',
-        'graph.schema_contact_point',
-        'graph.schema_copyright_holder',
-        'graph.schema_genre',
-        'graph.schema_in_language',
-        'graph.schema_is_part_of',
-        'graph.schema_keywords',
-        'graph.schema_mentions',
-    ]
 
 
 

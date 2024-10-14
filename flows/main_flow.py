@@ -19,7 +19,8 @@ def main_flow(
     triplydb_destination_graph: str = "hetarchief",
     base_path: str = "/opt/prefect/typescript/",
     script_path: str = "lib/",
-    squash_graphs: str = False,
+    skip_squash: bool = False,
+    skip_view: bool = False,
     postgres_block_name: str = "local",  # "hetarchief-tst",
     record_limit: int = None,
     batch_size: int = 100,
@@ -52,7 +53,8 @@ def main_flow(
         triplydb_dataset=triplydb_dataset,
         triplydb_destination_dataset=triplydb_destination_dataset,
         triplydb_destination_graph=triplydb_destination_graph,
-        squash_graphs=squash_graphs,
+        skip_squash=skip_squash,
+        skip_view=skip_view,
         postgres=postgres_creds,
         record_limit=record_limit,
         batch_size=batch_size,
@@ -66,4 +68,7 @@ if __name__ == "__main__":
         postgres_block_name="local-hasura", 
         base_path="./typescript/",
         triplydb_dataset="hetarchief",
-        squash_graphs=False)
+        skip_squash=True,
+        skip_view=True,
+        full_sync=True
+    )

@@ -39,7 +39,7 @@ WHERE {
   {
     ?id a schema:Newspaper;
         schema:identifier ?schema_identifier;
-        schema:name ?schema_name_res;
+        schema:name ?schema_name;
         schema:hasPart ?serie.
     
     OPTIONAL {
@@ -77,21 +77,21 @@ WHERE {
     BIND ("newspaper" AS ?collection_type)
   }
   UNION {
-    ?id a schema:Episode; schema:name ?schema_name_res.
+    ?id a schema:Episode; schema:name ?schema_name.
     BIND ("episode" AS ?collection_type)
   }
   UNION {
-    ?id a schema:CreativeWorkSeries; schema:name ?schema_name_res.
+    ?id a schema:CreativeWorkSeries; schema:name ?schema_name.
     OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
     BIND ("series" AS ?collection_type)
   }
   UNION {
-    ?id a schema:CreativeWorkSeason; schema:name ?schema_name_res;
+    ?id a schema:CreativeWorkSeason; schema:name ?schema_name;
     OPTIONAL { ?id schema:seasonNumber ?schema_season_number }
     BIND ("season" AS ?collection_type)
   }
   UNION {
-    ?id a schema:ArchiveComponent; schema:name ?schema_name_res.
+    ?id a schema:ArchiveComponent; schema:name ?schema_name.
     OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
     BIND ("archive" AS ?collection_type)
   }
