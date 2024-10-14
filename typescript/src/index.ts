@@ -20,7 +20,6 @@ import {
     GRAPH_BASE,
     SKIP_SQUASH,
     TABLE_PRED,
-    DELETE_TABLE_NAME,
     SKIP_VIEW
 } from './configuration.js'
 import { logInfo, logError, logDebug, getErrorMessage, isValidDate } from './util.js'
@@ -244,31 +243,26 @@ async function createTableNode(tableName: string): Promise<TableNode> {
 
 
 // Helper function to delete a batch of records
-// TODO: rework this to reduce the amount of implicit knowledge, eg. make SPARQL produce clear cut delete operations
-// async function processDeletes(tableInfo: TableInfo, property: string, batch: Array<Record<string, string>>) {
-//     if (!batch.length) return
-
-//     const client = await pool.connect()
-//     const query = `
-//         DELETE ${tableInfo}
-//         FROM ${tableInfo} x
-//         INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
-//         WHERE y.is_deleted;
-//         -- WHERE y.${property} = ANY($1::text[]); 
-//     `
-//     const ids = batch.map(record => record[property])
-//     try {
-//         await client.query('BEGIN')
-//         await client.query(query, [ids])
-//         await client.query('COMMIT')
-//         logInfo(`Deleted ${ids.length} records from table ${tableInfo}`)
-//     } catch (err) {
-//         await client.query('ROLLBACK')
-//         logError(`Error during batch delete for table ${tableInfo}:`, err)
-//     } finally {
-//         client.release()
-//     }
-// }
+async function processDeletes(tableInfo: TableInfo) {
+    const client = await pool.connect()
+    const query = `
+        DELETE ${tableInfo}
+        FROM ${tableInfo} x
+        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
+        WHERE y.is_deleted;
+    `
+    try {
+        await client.query('BEGIN')
+        const result = await client.query(query)
+        await client.query('COMMIT')
+        logInfo(`Deleted ${result} records from table ${tableInfo}`)
+    } catch (err) {
+        await client.query('ROLLBACK')
+        logError(`Error during batch delete for table ${tableInfo}:`, err)
+    } finally {
+        client.release()
+    }
+}
 
 async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
     if (!batch.length) return
@@ -587,8 +581,13 @@ async function main() {
     }
     console.timeEnd('Upsert tables')
 
-    logInfo('--- Step 4: Perform deletes --')
-    //await processDeletes(new TableInfo('graph','intellectual_entity'),"mh_fragment_identifier")
+    if (SINCE) { 
+        logInfo('--- Step 4: Perform deletes --')
+        const tableInfo = new TableInfo('graph','intellectual_entity')
+        await processDeletes(tableInfo)
+    } else {
+        logInfo('--- Skipping deletes because full sync ---')
+    }
 
     logInfo('--- Step 5: Graph cleanup --')
     console.time('Graph cleanup')

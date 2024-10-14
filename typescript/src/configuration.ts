@@ -30,9 +30,6 @@ export const dbConfig = {
     //url: process.env.POSTGRES_URL,
 }
 
-// 
-export const DELETE_TABLE_NAME = 'delete_record'
-
 
 
 
