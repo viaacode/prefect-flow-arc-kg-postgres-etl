@@ -21,7 +21,7 @@ def main_flow(
     script_path: str = "lib/",
     skip_squash: bool = False,
     skip_view: bool = False,
-    postgres_block_name: str = "local",  # "hetarchief-tst",
+    db_block_name: str = "local",  # "hetarchief-tst",
     record_limit: int = None,
     batch_size: int = 100,
     full_sync: bool = False,
@@ -35,7 +35,7 @@ def main_flow(
 
     # Load credentials
     triply_creds = TriplyDBCredentials.load(triplydb_block_name)
-    postgres_creds = DatabaseCredentials.load(postgres_block_name)
+    postgres_creds = DatabaseCredentials.load(db_block_name)
 
     # Figure out start time
     last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None

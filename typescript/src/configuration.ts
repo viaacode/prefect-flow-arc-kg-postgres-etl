@@ -22,7 +22,7 @@ export const TOKEN = process.env.TRIPLYDB_TOKEN
 
 // PostgreSQL connection settings
 export const dbConfig = {
-    port: parseInt(process.env.POSTGRES_PORT ?? '5555', 10),
+    port: parseInt(process.env.POSTGRES_PORT ?? '5432', 10),
     database: process.env.POSTGRES_DATABASE ?? 'hetarchief',
     host: process.env.POSTGRES_HOST ?? 'localhost',
     user: process.env.POSTGRES_USERNAME ?? 'hetarchief',

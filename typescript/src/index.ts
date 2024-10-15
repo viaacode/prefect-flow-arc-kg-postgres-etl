@@ -508,6 +508,7 @@ async function main() {
             const query = await addQuery(account, 'squash-graphs', params)
             logInfo(`Starting pipeline for ${query.slug}.`)
             await query.runPipeline({
+                onProgress: progress => logInfo(`Pipeline ${query.slug}: ${Math.round(progress.progress * 100)}% complete.`),
                 destination: {
                     dataset: destination.dataset,
                     graph: graphName
@@ -529,7 +530,7 @@ async function main() {
 
         await account.runPipeline({
             destination,
-            onProgress: progress => logInfo(`Pipeline ${Math.round(progress.progress * 100)}% complete.`),
+            onProgress: progress => logInfo(`Pipeline ${queries.map(q => q.slug)}: ${Math.round(progress.progress * 100)}% complete.`),
             queries: queries.map(q => ({
                 query: q,
                 // TODO report bug on 'less than one properry`
