@@ -25,7 +25,7 @@ CONSTRUCT {
 :ha_pref ?ha_pref.
 
 ?cp :tableName "graph.schema_contact_point";
-:id ?id;
+:id ?cp;
 :organization_id ?org;
 :schema_contact_type ?schema_contact_type;
 :schema_email ?schema_email;
