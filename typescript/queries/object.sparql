@@ -40,6 +40,10 @@ CONSTRUCT {
 :schema_copyright_year ?schema_copyright_year;
 :schema_credit_text ?schema_credit_text;
 :schema_date_created ?schema_date_created;
+:ha_des_min_date_created ?ha_des_min_date_created; 
+:ha_des_max_date_created ?ha_des_max_date_created; 
+:ha_des_min_date_published ?ha_des_min_date_published; 
+:ha_des_max_date_published ?ha_des_max_date_published; 
 :schema_date_published ?schema_date_published;
 :schema_description ?schema_description;
 :schema_identifier ?schema_identifier;
@@ -221,6 +225,16 @@ CONSTRUCT {
   
     OPTIONAL {
       ?ie schema:dateCreated ?schema_date_created .
+      
+      OPTIONAL { ?ie haDes:minDateCreated ?ha_des_min_date_created }
+      OPTIONAL { ?ie haDes:maxDateCreated ?ha_des_max_date_created }
+    }
+
+    OPTIONAL { 
+      ?ie schema:datePublished ?schema_date_published .
+
+      OPTIONAL { ?ie haDes:minDatePublished ?ha_des_min_date_published }
+      OPTIONAL { ?ie haDes:maxDatePublished ?ha_des_max_date_published }
     }
 
     OPTIONAL{ 
@@ -251,7 +265,6 @@ CONSTRUCT {
     OPTIONAL { ?ie schema:issueNumber ?schema_issue_number }
     OPTIONAL { ?ie rel:isp ?relation_is_part_of }
     OPTIONAL { ?ie dct:available ?dcterms_available }
-    OPTIONAL { ?ie schema:datePublished ?schema_date_published }
     OPTIONAL { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
     OPTIONAL { ?ie ebucore:hasCastMember ?ebucore_has_cast_member }
     OPTIONAL { ?ie schema:copyrightYear ?schema_copyright_year }
