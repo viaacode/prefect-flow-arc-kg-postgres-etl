@@ -243,22 +243,23 @@ async function createTableNode(tableName: string): Promise<TableNode> {
 
 
 // Helper function to delete a batch of records
-async function processDeletes(tableInfo: TableInfo) {
+async function processDeletes() {
     const client = await pool.connect()
     const query = `
-        DELETE ${tableInfo}
-        FROM ${tableInfo} x
+        DELETE graph."intellectual_entity"
+        FROM graph."intellectual_entity" x
         INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
         WHERE y.is_deleted;
+        DELETE graph."mh_fragment_identifier" WHERE is_deleted;
     `
     try {
         await client.query('BEGIN')
         const result = await client.query(query)
         await client.query('COMMIT')
-        logInfo(`Deleted ${result} records from table ${tableInfo}`)
+        logInfo(`Deleted ${result} records from table graph."intellectual_entity" and graph."mh_fragment_identifier"`)
     } catch (err) {
         await client.query('ROLLBACK')
-        logError(`Error during batch delete for table ${tableInfo}:`, err)
+        logError(`Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier":`, err)
     } finally {
         client.release()
     }
@@ -584,8 +585,7 @@ async function main() {
 
     if (SINCE) { 
         logInfo('--- Step 4: Perform deletes --')
-        const tableInfo = new TableInfo('graph','intellectual_entity')
-        await processDeletes(tableInfo)
+        await processDeletes()
     } else {
         logInfo('--- Skipping deletes because full sync ---')
     }

@@ -25,46 +25,42 @@ PREFIX : <https://data.hetarchief.be/ns/test/>
 
 
 CONSTRUCT {
-    ?fragment :is_deleted true
+    ?fragment :is_deleted ?is_deleted
 } WHERE {
     # 1. Fragment was not deleted, but the IntellectualEntity derived from the fragment does not have the right licenses
     {
-        ?ie a premis:IntellectualEntity ;
-            schema:license ?schema_license;
-            dct:format ?format ;
-            prov:wasDerivedFrom ?fragment.
-        
-            
+        ?ie a premis:IntellectualEntity;
+        dct:format ?format ;
+        prov:wasDerivedFrom ?fragment.
+
         ?fragment a mh:Fragment;
-                schema:dateModified ?modified;
-                schema:identifier ?mh_fragment_identifier.
+                schema:dateModified ?modified.
 
         # only take into account fragments that were modified since
-        FILTER (!BOUND(?since) || ?modified >= ?since )
+        FILTER ((!BOUND(?since) || ?modified >= ?since ) && ?format != "image")
 
-        # Only include who does not have the right licenses
-        FILTER (?schema_license NOT IN ( 
-            haLicId:VIAA-PUBLIEK-METADATA-LTD, 
-            haLicId:VIAA-PUBLIEK-METADATA-ALL,
-            haLicId:VIAA-PUBLIEK-CONTENT,
-            haLicId:BEZOEKERTOOL-METADATA-ALL,
-            haLicId:BEZOEKERTOOL-CONTENT ,
-            haLicId:VIAA-INTRA_CP-METADATA-ALL ,
-            haLicId:VIAA-INTRA_CP-CONTENT ,
-            haLicId:Publiek-Domein,
-            haLicId:COPYRIGHT-UNDETERMINED
-        ) && ?format != "image" )
+        BIND (!(EXISTS {
+        ?ie schema:license ?schema_license
+        values ?schema_license {
+            haLicId:VIAA-PUBLIEK-METADATA-LTD
+            haLicId:VIAA-PUBLIEK-METADATA-ALL
+            haLicId:VIAA-PUBLIEK-CONTENT
+            haLicId:BEZOEKERTOOL-METADATA-ALL
+            haLicId:BEZOEKERTOOL-CONTENT
+            haLicId:VIAA-INTRA_CP-METADATA-ALL
+            haLicId:VIAA-INTRA_CP-CONTENT
+        }
+        }) AS ?is_deleted)
 
     } 
     # 2. The fragment was deleted
     UNION{
         ?fragment a mh:Fragment;
-        schema:identifier ?mh_fragment_identifier;
-        schema:dateModified ?modified;
-        schema:dateDeleted ?date_deleted.
+        schema:dateModified ?modified.
+
         # only take into account fragments that were modified since
         FILTER (!BOUND(?since) || ?modified >= ?since )
+        BIND(EXISTS { ?fragment schema:dateDeleted ?date_deleted } AS ?is_deleted)
     }
 
-     
 }
