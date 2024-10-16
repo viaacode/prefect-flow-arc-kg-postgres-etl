@@ -81,11 +81,11 @@ CONSTRUCT {
 :intellectual_entity_id ?ie;
 :schema_genre ?schema_genre.
 
-?ie_g :tableName "graph.schema_spatial";
+?ie_spat :tableName "graph.schema_spatial";
 :intellectual_entity_id ?ie;
 :schema_spatial ?schema_spatial.
 
-?ie_g :tableName "graph.schema_temporal";
+?ie_temp :tableName "graph.schema_temporal";
 :intellectual_entity_id ?ie;
 :schema_temporal ?schema_temporal.
 
