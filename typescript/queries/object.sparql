@@ -191,7 +191,7 @@ CONSTRUCT {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    BIND(IRI(CONCAT(str(?ie),md5(?license))) AS ?ie_lic)
+    BIND(IRI(CONCAT(str(?ie),md5(?schema_license))) AS ?ie_lic)
     BIND(IRI(CONCAT(str(?ie),md5(?dcterms_format))) AS ?ie_format)
 
     OPTIONAL {
