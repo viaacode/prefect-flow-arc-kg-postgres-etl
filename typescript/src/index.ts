@@ -1,10 +1,5 @@
 import { Quad } from 'rdf-js'
-import pg from 'pg'
-import { from } from 'pg-copy-streams'
 import { fromRdf } from 'rdf-literal'
-import { stringify } from 'csv-stringify'
-import { stringify as stringifySync } from 'csv-stringify/sync'
-import { pipeline } from 'node:stream/promises'
 import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import App from '@triply/triplydb'
 import { Account } from '@triply/triplydb/Account.js'
@@ -14,7 +9,7 @@ import { readdir, readFile } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
 import {
-    BATCH_SIZE, dbConfig, RECORD_LIMIT, QUERY_PATH, NAMESPACE,
+    BATCH_SIZE, RECORD_LIMIT, QUERY_PATH, NAMESPACE,
     XSD_DURATION, ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
     SINCE,
     GRAPH_BASE,
@@ -22,48 +17,12 @@ import {
     TABLE_PRED,
     SKIP_VIEW
 } from './configuration.js'
-import { logInfo, logError, logDebug, getErrorMessage, isValidDate } from './util.js'
+import { logInfo, logError, logDebug, getErrorMessage } from './util.js'
 import { DepGraph } from 'dependency-graph'
-
-class TableInfo {
-    private _name: string
-    private _schema: string
-
-    constructor(schema: string, name?: string) {
-        if (!name) {
-            const parts = schema.split('.')
-            name = parts[1]
-            schema = parts[0]
-        }
-
-        this._schema = schema
-        this._name = name
-    }
-
-    public get schema() {
-        return this._schema
-    }
-
-    public get name() {
-        return this._name
-    }
-
-    public toString = (): string => {
-        return `${this._schema}."${this._name}"`
-    }
-}
-
-type ColumnInfo = { name: string, datatype: string }
-type TableNode = { tempTable: TableInfo, columns: ColumnInfo[], dependencies: TableInfo[], primaryKeys: string[] }
-type Destination = { dataset: Dataset, graph: string }
+import { TableNode, TableInfo, Destination } from './types.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
 
 const tableIndex = new DepGraph<TableNode>()
-
-// PostgreSQL connection pool
-const pool = new pg.Pool(dbConfig)
-
-let unprocessedBatches = 0
-let batchCount = 0
 
 async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
     try {
@@ -108,127 +67,10 @@ async function addJobQueries(account: Account, source: Dataset) {
     return queries
 }
 
-// Helper function to create a table dynamically based on the columns
-async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> {
-    // Construct temp table name
-    const { schema, name } = tableInfo
-    const tempTableInfo = new TableInfo(schema, `temp_${name}`)
-
-    logInfo(`Creating temp table ${tempTableInfo} from ${tableInfo} if not exists.`)
-    const query = `
-        DROP TABLE IF EXISTS ${tempTableInfo};
-        CREATE TABLE ${tempTableInfo} (LIKE ${tableInfo} INCLUDING ALL EXCLUDING CONSTRAINTS);
-    `
-    const client = await pool.connect()
-    try {
-        await client.query(query)
-        return tempTableInfo
-    } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error creating table ${tempTableInfo}:`, msg)
-        throw err
-    }
-    finally {
-        client.release()
-    }
-}
-
-async function dropTable(tableInfo: TableInfo) {
-    logInfo(`Dropping table ${tableInfo} if exists.`)
-    const query = `
-        DROP TABLE IF EXISTS ${tableInfo};
-    `
-    const client = await pool.connect()
-    try {
-        await client.query(query)
-        return tableInfo
-    } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error dropping table ${tableInfo}:`, msg)
-        throw err
-    }
-    finally {
-        client.release()
-    }
-}
-
-// Helper function to retrieve column names for a specific table
-async function getTableColumns(tableInfo: TableInfo): Promise<ColumnInfo[]> {
-    const client = await pool.connect()
-    const query = `
-        SELECT column_name AS name, data_type AS datatype
-        FROM information_schema.columns
-        WHERE table_name = $1 AND table_schema = $2
-    `
-    logDebug(query)
-    try {
-        const { name, schema } = tableInfo
-        const result = await client.query(query, [name, schema])
-        return result.rows
-    } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error retrieving columns for table ${tableInfo}:`, msg)
-        throw err
-    } finally {
-        client.release()
-    }
-}
-
-// Helper function to retrieve primary keys for a specific table
-async function getDependentTables(tableInfo: TableInfo): Promise<TableInfo[]> {
-    const client = await pool.connect()
-    const query = `
-        SELECT DISTINCT
-            ccu.table_schema AS schema,
-            ccu.table_name AS name
-        FROM information_schema.table_constraints AS tc 
-        JOIN information_schema.key_column_usage AS kcu
-            ON tc.constraint_name = kcu.constraint_name
-            AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-            ON ccu.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_schema=$2
-            AND tc.table_name=$1;
-    `
-    logDebug(query)
-    try {
-        const { name, schema } = tableInfo
-        const result = await client.query(query, [name, schema])
-        return result.rows
-    } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error retrieving dependent tables for table ${tableInfo}:`, msg)
-        throw err
-    } finally {
-        client.release()
-    }
-}
-
-// Helper function to retrieve primary keys for a specific table
-async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[]> {
-    const client = await pool.connect()
-    const query = `
-        SELECT COLUMN_NAME from information_schema.key_column_usage 
-        WHERE table_name = $1 AND table_schema = $2 AND constraint_name LIKE '%pkey'
-    `
-    logDebug(query)
-    try {
-        const { name, schema } = tableInfo
-        const result = await client.query(query, [name, schema])
-        return result.rows.map((row: { column_name: string }) => row.column_name)
-    } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error retrieving columns for table ${tableInfo}:`, msg)
-        throw err
-    } finally {
-        client.release()
-    }
-}
-
 async function createTableNode(tableName: string): Promise<TableNode> {
     const tableInfo = new TableInfo(tableName)
     const tableNode = {
+        tableInfo,
         tempTable: await createTempTable(tableInfo),
         // Get the actual columns from the database
         columns: await getTableColumns(tableInfo),
@@ -242,99 +84,11 @@ async function createTableNode(tableName: string): Promise<TableNode> {
 }
 
 
-// Helper function to delete a batch of records
-async function processDeletes() {
-    const client = await pool.connect()
-    const query = `
-        DELETE graph."intellectual_entity"
-        FROM graph."intellectual_entity" x
-        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
-        WHERE y.is_deleted;
-        DELETE graph."mh_fragment_identifier" WHERE is_deleted;
-    `
-    try {
-        await client.query('BEGIN')
-        const result = await client.query(query)
-        await client.query('COMMIT')
-        logInfo(`Deleted ${result} records from table graph."intellectual_entity" and graph."mh_fragment_identifier"`)
-    } catch (err) {
-        await client.query('ROLLBACK')
-        logError(`Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier":`, err)
-    } finally {
-        client.release()
-    }
-}
-
-async function batchInsertUsingCopy(tableName: string, batch: Array<Record<string, string>>) {
-    if (!batch.length) return
-
-    unprocessedBatches++
-
+async function processBatch(tableName: string, batch: Array<Record<string, string>>) {
     // Create temp table if not exists
-    const { columns, tempTable } = tableIndex.hasNode(tableName) ? tableIndex.getNodeData(tableName) : await createTableNode(tableName)
-
-    logInfo(`Start batch insert using COPY for ${tableName} using ${tempTable}`)
-
-    // Get the actual columns from the database
-    const client = await pool.connect()
-    const columnList = columns.map(c => c.name).join(',')
-    const copyQuery = `COPY ${tempTable} (${columnList}) FROM STDIN WITH (FORMAT csv)`
-
-    logDebug(copyQuery)
-
-    try {
-        await client.query('BEGIN')
-        const ingestStream = client.query(from(copyQuery))
-
-        // Initialize the stringifier
-        const sourceStream = stringify({
-            delimiter: ",",
-            cast: {
-                date: (value) => {
-                    return value.toISOString()
-                },
-            },
-        })
-
-        // Convert batch to CSV format
-        for (const record of batch) {
-            const values = columns.map(col => {
-                // Make sure value exists and that dates are valid dates
-                if (!record[col.name] || (col.datatype === 'date' && !isValidDate(record[col.name])))
-                    return null
-
-                return record[col.name]
-            })
-            sourceStream.write(values)
-        }
-        sourceStream.end()
-        await pipeline(sourceStream, ingestStream)
-        await client.query('COMMIT')
-        batchCount++
-        logInfo(`Batch #${batchCount} for ${tableName} inserted!`)
-    } catch (err) {
-        await client.query('ROLLBACK')
-        //TODO: fix error caused by logging
-        const msg = getErrorMessage(err)
-        logError(`Error during bulk insert for table ${tableName}:`, msg)
-        const result = stringifySync(
-            batch.map(record => columns.map(col => record[col.name] || null)),
-            {
-                cast: {
-                    date: (value) => {
-                        return value.toISOString()
-                    },
-                }
-            }
-        )
-        logError(`Erroreous batch:`, result)
-        throw err
-    } finally {
-        client.release()
-        unprocessedBatches--
-    }
+    const tableNode = tableIndex.hasNode(tableName) ? tableIndex.getNodeData(tableName) : await createTableNode(tableName)
+    await batchInsertUsingCopy(tableNode, batch)
 }
-
 
 // Process each record and add it to the appropriate batch
 async function processRecord(
@@ -356,47 +110,10 @@ async function processRecord(
     if (batches[tableName].length >= BATCH_SIZE) {
         logDebug(`Maximum batch size reached for ${tableName}; processing.`)
         const batch = batches[tableName]
-        await batchInsertUsingCopy(tableName, batch)
+        await processBatch(tableName, batch)
         batches[tableName] = []
     }
 }
-
-async function upsertTable(tableInfo: TableInfo, tableNode: TableNode, truncate: boolean = true) {
-    const client = await pool.connect()
-
-    // Get the actual columns from the database
-    const { columns, primaryKeys, tempTable } = tableNode
-    const columnList = columns.map(c => `${c.name} = EXCLUDED.${c.name}`).join(',')
-
-    // Build query
-    const query = `
-        INSERT INTO ${tableInfo}
-        SELECT * FROM ${tempTable}
-        ON CONFLICT (${primaryKeys.join(',')}) DO UPDATE
-        SET ${columnList};
-        `
-    const truncateQuery = `TRUNCATE ${tableInfo} CASCADE`
-    logError(query)
-    try {
-        await client.query('BEGIN')
-        // Truncate table first if desired
-        if (truncate) {
-            await client.query(truncateQuery)
-        }
-        await client.query(query)
-        await client.query('COMMIT')
-        logInfo(`Records for table ${tableInfo} upserted!`)
-    } catch (err) {
-        await client.query('ROLLBACK')
-        const msg = getErrorMessage(err)
-        logError(`Error during upsert from '${tempTable}' to '${tableInfo}':`, msg)
-        throw err
-    } finally {
-        client.release()
-    }
-
-}
-
 
 // Main function to parse and process the gzipped TriG file from a URL
 async function processGraph(graph: Graph) {
@@ -463,7 +180,7 @@ async function processGraph(graph: Graph) {
                 // Insert any remaining batches
                 for (const tableName in batches) {
                     if (batches[tableName].length) {
-                        await batchInsertUsingCopy(tableName, batches[tableName])
+                        await processBatch(tableName, batches[tableName])
                     }
                 }
 
@@ -573,17 +290,14 @@ async function main() {
     // Upsert tables in the right order
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
-
-        const tableInfo = new TableInfo(tableName)
-
         // upsert records from temp table into table; truncate tables if full sync
-        await upsertTable(tableInfo, tableNode, !SINCE)
+        await upsertTable(tableNode, !SINCE)
         // drop temp table when done
         await dropTable(tableNode.tempTable)
     }
     console.timeEnd('Upsert tables')
 
-    if (SINCE) { 
+    if (SINCE) {
         logInfo('--- Step 4: Perform deletes --')
         await processDeletes()
     } else {
@@ -602,7 +316,7 @@ main().catch(err => {
     const msg = getErrorMessage(err)
     logError(msg)
     process.exit(1)
-}).finally(() => {
+}).finally(async () => {
     logDebug(`Unprocessed batches: ${unprocessedBatches}`)
-    pool.end()
+    await closeConnectionPool()
 })
