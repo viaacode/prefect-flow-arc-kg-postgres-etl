@@ -166,7 +166,8 @@ CONSTRUCT {
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name ;
            schema:maintainer ?schema_maintainer;
-           schema:license ?schema_license;
+           #(schema:license|rel:isp/schema:license) ?schema_license;
+           schema:license ?schema_license ;
            dct:format ?dcterms_format ;
            prov:wasDerivedFrom ?ie_fragment.
            
@@ -275,12 +276,12 @@ CONSTRUCT {
 
     OPTIONAL {
       ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
-      FILTER (
-          langmatches(lang(?schema_copyright_holder), "nl") 
-          || (not exists {
-                  ?intellectual_entity_id schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_name_other. 
-                  filter(langmatches(lang(?schema_name_other), "nl")) 
-      }))
+      # FILTER (
+      #     langmatches(lang(?schema_copyright_holder), "nl") 
+      #     || (not exists {
+      #             ?intellectual_entity_id schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_name_other. 
+      #             filter(langmatches(lang(?schema_name_other), "nl")) 
+      # }))
       BIND(IRI(CONCAT(str(?ie),md5(?schema_copyright_holder))) AS ?ie_ch)
     }
     # krant
