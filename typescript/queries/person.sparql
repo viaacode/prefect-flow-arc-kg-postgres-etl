@@ -1,0 +1,84 @@
+# position: 2
+PREFIX schema: <https://schema.org/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
+prefix premis: <http://www.loc.gov/premis/rdf/v3/>
+
+PREFIX : <https://data.hetarchief.be/ns/test/>
+
+
+CONSTRUCT {
+
+?mention :tableName "graph.schema_mentions";
+:id ?mention;
+:intellectual_entity_id  ?ie; 
+:confidence ?mention_confidence;
+:height ?mention_height;
+:width ?mention_width;
+:x ?mention_x;
+:y ?mention_y;
+:thing_id ?person.
+
+?person :tableName "graph.thing";
+:id ?person;
+:schema_name ?person_schema_name;
+:schema_birth_date ?person_schema_birth_date;
+:schema_birth_place ?person_schema_birth_place;
+:schema_death_date ?person_schema_death_date;
+:schema_death_place ?person_schema_death_place.
+
+
+}WHERE {
+    # 1. Intellectual Entity data
+    ?ie a premis:IntellectualEntity;
+           schema:license ?schema_license;
+           dct:format ?format ;
+           schema:mentions ?person;
+           prov:wasDerivedFrom/schema:dateModified ?modified .
+
+    # Only include the right licenses
+    FILTER (?schema_license IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ) && ?format != "image")
+
+
+    ?person a schema:Person; 
+        schema:name ?person_schema_name.
+    
+    FILTER langMatches(lang(?person_schema_name), "nl")
+
+    OPTIONAL {
+        ?person schema:deathDate ?person_schema_death_date
+    }
+
+    OPTIONAL {
+        ?person schema:birthDate ?person_schema_birth_date
+    }
+
+    OPTIONAL {
+        ?person schema:birthPlace/schema:name ?person_schema_birth_place
+    }
+
+    OPTIONAL {
+        ?person schema:deathPlace/schema:name ?person_schema_death_place
+    }
+
+    ?mention ebucore:isAnnotatedMediaResource ?mention_resource;
+                ebucore:width ?mention_width;
+                ebucore:height ?mention_height;
+                ebucore:regionDelimX ?mention_x;
+                ebucore:regionDelimY ?mention_y.
+                
+    ?mention_resource ebucore:annotationConfidence ?mention_confidence;
+            ebucore:hasAnnotationAgent ?person.
+}

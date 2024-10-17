@@ -134,3 +134,5 @@ dmypy.json
 .npmrc
 node_modules
 tables/
+*.js
+lib/
