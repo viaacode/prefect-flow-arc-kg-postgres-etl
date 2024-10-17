@@ -123,7 +123,7 @@ async function processGraph(graph: Graph) {
         let recordCount = 0
 
         const batches: { [tableName: string]: Record<string, string>[] } = {}
-        let currentRecord: Record<string, string> | null = null
+        let currentRecord: Record<string, string> = {}
         let currentSubject: string | null = null
         let currentTableName: string | null = null
 
@@ -132,15 +132,17 @@ async function processGraph(graph: Graph) {
                 const subject = quad.subject.value
                 const predicate = quad.predicate.value
                 let object = quad.object.value
+                let language
                 // Convert literal to primitive
                 if (quad.object.termType === "Literal") {
+                    language = quad.object.language
                     // Convert duration to seconds first
                     object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
                 }
 
                 // If the subject changes, process the current record
                 if (subject !== currentSubject) {
-                    if (currentSubject !== null && currentRecord && currentTableName !== null) {
+                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null) {
                         try {
                             quadStream.pause()
                             await processRecord(currentSubject, currentRecord, currentTableName, batches)
@@ -167,8 +169,12 @@ async function processGraph(graph: Graph) {
                 // Handle predicates within the known namespace
                 else if (predicate.startsWith(NAMESPACE)) {
                     const columnName = predicate.replace(NAMESPACE, '')
-                    // TODO: handle multiple values
-                    currentRecord![columnName] = object
+
+                    // Pick first value
+                    // Workaround: if label is nl, override existing value
+                    if (!currentRecord[columnName] || language === 'nl'){
+                        currentRecord[columnName] = object 
+                    }
                 }
             })
             .on('end', async () => {
