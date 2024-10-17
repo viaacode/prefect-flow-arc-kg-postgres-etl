@@ -67,7 +67,7 @@ CONSTRUCT {
 
 ?ie_an :tableName "graph.schema_alternate_name";
 :intellectual_entity_id ?ie;
-:schemaschema_alternate_name_license ?schema_alternate_name.
+:schema_alternate_name ?schema_alternate_name.
 
 ?ie_il :tableName "graph.schema_in_language";
 :intellectual_entity_id ?ie;
