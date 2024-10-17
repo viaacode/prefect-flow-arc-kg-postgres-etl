@@ -246,6 +246,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
             batch.map(record => columns.map(col => record[col.name] || null)),
             {
                 cast: {
+                    boolean: (value) => value ? 'true' : 'false',
                     date: (value) => {
                         return value.toISOString()
                     },
