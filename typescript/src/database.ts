@@ -253,7 +253,8 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
                 }
             }
         )
-        logError(`Erroreous batch:`, result)
+        logError(`Erroreous batch (CSV):`, result)
+        logError(`Erroreous batch (JSON):`,`${JSON.stringify(batch)}`)
         throw err
     } finally {
         client.release()
