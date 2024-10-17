@@ -168,7 +168,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
         SET ${columnList};
         `
     const truncateQuery = `TRUNCATE ${tableInfo} CASCADE`
-    logError(query)
+    logDebug(query)
     try {
         await client.query('BEGIN')
         // Truncate table first if desired

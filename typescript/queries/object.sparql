@@ -166,8 +166,8 @@ CONSTRUCT {
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name ;
            schema:maintainer ?schema_maintainer;
-           #(schema:license|rel:isp/schema:license) ?schema_license;
-           schema:license ?schema_license ;
+           #(schema:license|rel:isp/schema:license) ?schema_license_res;
+           schema:license ?schema_license_res ;
            dct:format ?dcterms_format ;
            prov:wasDerivedFrom ?ie_fragment.
            
@@ -176,7 +176,7 @@ CONSTRUCT {
               schema:identifier ?mh_fragment_identifier.
 
     # Only include the right licenses
-    FILTER (?schema_license IN ( 
+    FILTER (?schema_license_res IN ( 
         haLicId:VIAA-PUBLIEK-METADATA-LTD, 
         haLicId:VIAA-PUBLIEK-METADATA-ALL,
         haLicId:VIAA-PUBLIEK-CONTENT,
@@ -191,6 +191,7 @@ CONSTRUCT {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
+    BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
     BIND(IRI(CONCAT(str(?ie),md5(?schema_license))) AS ?ie_lic)
     BIND(IRI(CONCAT(str(?ie),md5(?dcterms_format))) AS ?ie_format)
 

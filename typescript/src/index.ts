@@ -15,7 +15,8 @@ import {
     GRAPH_BASE,
     SKIP_SQUASH,
     TABLE_PRED,
-    SKIP_VIEW
+    SKIP_VIEW,
+    SKIP_CLEANUP
 } from './configuration.js'
 import { logInfo, logError, logDebug, getErrorMessage } from './util.js'
 import { DepGraph } from 'dependency-graph'
@@ -172,8 +173,8 @@ async function processGraph(graph: Graph) {
 
                     // Pick first value
                     // Workaround: if label is nl, override existing value
-                    if (!currentRecord[columnName] || language === 'nl'){
-                        currentRecord[columnName] = object 
+                    if (!currentRecord[columnName] || language === 'nl') {
+                        currentRecord[columnName] = object
                     }
                 }
             })
@@ -310,10 +311,14 @@ async function main() {
         logInfo('--- Skipping deletes because full sync ---')
     }
 
-    logInfo('--- Step 5: Graph cleanup --')
-    console.time('Graph cleanup')
-    await graph.delete()
-    console.timeEnd('Graph cleanup')
+    if (!SKIP_CLEANUP) {
+        logInfo('--- Step 5: Graph cleanup --')
+        console.time('Graph cleanup')
+        await graph.delete()
+        console.timeEnd('Graph cleanup')
+    } else {
+        logInfo('--- Skipping graph cleanup ---')
+    }
 
     logInfo('--- Sync done. --')
 }

@@ -1,4 +1,4 @@
-from prefect import flow, get_run_logger
+from prefect import flow
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
@@ -21,6 +21,7 @@ def main_flow(
     script_path: str = "lib/",
     skip_squash: bool = False,
     skip_view: bool = False,
+    skip_cleanup: bool = False,
     db_block_name: str = "local",  # "hetarchief-tst",
     record_limit: int = None,
     batch_size: int = 100,
@@ -55,6 +56,7 @@ def main_flow(
         triplydb_destination_graph=triplydb_destination_graph,
         skip_squash=skip_squash,
         skip_view=skip_view,
+        skip_cleanup=skip_cleanup,
         postgres=postgres_creds,
         record_limit=record_limit,
         batch_size=batch_size,

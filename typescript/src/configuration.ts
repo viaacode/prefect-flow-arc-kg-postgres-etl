@@ -13,6 +13,7 @@ export const RECORD_LIMIT = process.env.RECORD_LIMIT ? parseInt(process.env.RECO
 export const SINCE = process.env.SINCE ? new Date(process.env.SINCE).toISOString() : undefined
 export const SKIP_SQUASH = process.env.SKIP_SQUASH === 'True'
 export const SKIP_VIEW = process.env.SKIP_VIEW === 'True'
+export const SKIP_CLEANUP = process.env.SKIP_CLEANUP === 'True'
 export const ACCOUNT = process.env.TRIPLYDB_OWNER ?? 'meemoo'
 export const DATASET = process.env.TRIPLYDB_DATASET ?? 'knowledge-graph'
 export const DESTINATION_DATASET = process.env.TRIPLYDB_DESTINATION_DATASET || DATASET
@@ -27,7 +28,6 @@ export const dbConfig = {
     host: process.env.POSTGRES_HOST ?? 'localhost',
     user: process.env.POSTGRES_USERNAME ?? 'hetarchief',
     password: process.env.POSTGRES_PASSWORD ?? 'password',
-    //url: process.env.POSTGRES_URL,
 }
 
 
