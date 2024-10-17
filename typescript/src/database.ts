@@ -225,7 +225,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         for (const record of batch) {
             const values = columns.map(col => {
                 // Make sure value exists and that dates are valid dates
-                if (!record[col.name] || (col.datatype === 'date' && !isValidDate(record[col.name])))
+                if (record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])))
                     return null
 
                 return record[col.name]
@@ -243,7 +243,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         const msg = getErrorMessage(err)
         logError(`Error during bulk insert for table ${tableInfo}:`, msg)
         const result = stringifySync(
-            batch.map(record => columns.map(col => record[col.name] || null)),
+            batch.map(record => columns.map(col => record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])) ? null : record[col.name])),
             {
                 cast: {
                     boolean: (value) => value ? 'true' : 'false',
