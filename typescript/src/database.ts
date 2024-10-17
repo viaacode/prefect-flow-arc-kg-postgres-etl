@@ -211,6 +211,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         const sourceStream = stringify({
             delimiter: ",",
             cast: {
+                boolean: (value) => value ? 'true' : 'false',
                 date: (value) => {
                     // Postgres does not support year 0; convert to year 1
                     if (value.getUTCFullYear() < 1)
