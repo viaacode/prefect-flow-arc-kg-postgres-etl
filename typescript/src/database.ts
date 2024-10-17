@@ -212,6 +212,9 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
             delimiter: ",",
             cast: {
                 date: (value) => {
+                    // Postgres does not support year 0; convert to year 1
+                    if (value.getUTCFullYear() < 1)
+                        value.setUTCFullYear(1)
                     return value.toISOString()
                 },
             },
