@@ -54,7 +54,7 @@ CONSTRUCT {
     ?org haOrg:hasPreference ?ha_pref_res .
 
    BIND (REPLACE(STR(?ha_pref_res), "^.*/([^/]*)$", "$1") as ?ha_pref)
-   BIND(IRI(CONCAT(?org,md5(?ha_pref_res))) AS ?org_pref)
+   BIND (IRI(CONCAT(str(?org),md5(str(?ha_pref)))) AS ?org_pref)
   }
 
   OPTIONAL {

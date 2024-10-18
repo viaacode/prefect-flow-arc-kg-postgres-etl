@@ -112,7 +112,7 @@ CONSTRUCT {
 ?rep :tableName "graph.representation";
   :id ?rep;
   :edm_is_next_in_sequence  ?rep_edm_is_next_in_sequence ;
-  :represents  ?ie ;
+  :premis_represents  ?ie ;
   :relation_has_root  ?rep_relation_has_root ;
   :relation_has_source  ?rep_relation_has_source ;
   :schema_caption  ?rep_schema_caption ;
