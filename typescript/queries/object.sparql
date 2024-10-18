@@ -372,6 +372,7 @@ CONSTRUCT {
         FILTER (langMatches(lang(?car_type), "nl"))
         OPTIONAL {
           ?pc haDes:coloringType/skos:prefLabel  ?ha_des_coloring_type
+          FILTER (langMatches(lang(?ha_des_coloring_type), "nl"))
            BIND(IRI(CONCAT(str(?pc),md5(str(?ha_des_coloring_type)))) AS ?pc_ct)
         }
       }
