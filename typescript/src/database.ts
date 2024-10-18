@@ -173,6 +173,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
         await client.query('BEGIN')
         // Truncate table first if desired
         if (truncate) {
+            logInfo(`Truncating table ${tableInfo} before upsert.`)
             await client.query(truncateQuery)
         }
         await client.query(query)

@@ -51,6 +51,9 @@ CONSTRUCT {
         haLicId:COPYRIGHT-UNDETERMINED
     ) && ?format != "image")
 
+    # for incremental 
+    FILTER (!BOUND(?since) || ?modified >= ?since )
+
 
     ?person a schema:Person; 
         schema:name ?person_schema_name.
