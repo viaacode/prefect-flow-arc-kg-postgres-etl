@@ -22,6 +22,7 @@ import { logInfo, logError, logDebug, getErrorMessage } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
+import { performance } from 'perf_hooks';
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -215,10 +216,11 @@ async function main() {
     }
 
     logInfo(`--- Syncing ${DATASET} to graph ${destination.graph} of ${DESTINATION_DATASET} ---`)
+    let start: number
     if (!SKIP_VIEW) {
         if (!SKIP_SQUASH) {
             logInfo('--- Step 0: Squash graphs ---')
-            console.time('Squash graphs')
+            start = performance.now();
             const graphName = GRAPH_BASE + DATASET
 
             await destination.dataset.clear("graphs")
@@ -239,15 +241,14 @@ async function main() {
                     graph: graphName
                 }
             })
-            logInfo(`Pipeline completed.`)
             dataset = destination.dataset
-            console.timeEnd('Squash graphs')
+            logInfo(`Squash graphs completed (${performance.now() - start}ms).`)
         } else {
             logInfo('--- Skipping squash graphs ---')
         }
 
         logInfo('--- Step 1: Construct view ---')
-        console.time('Construct view')
+        start = performance.now();
 
         const queries = await addJobQueries(account, dataset)
 
@@ -266,24 +267,23 @@ async function main() {
                 } : {}
             })),
         })
-        logInfo(`Pipelines completed.`)
-        console.timeEnd('Construct view')
+        logInfo(`View construction completed (${performance.now() - start}ms).`)
     } else {
         logInfo('--- Skipping view construction ---')
     }
 
     // Parse and process the gzipped TriG file from the URL
     logInfo('--- Step 2: load temporary tables and delete records --')
-    console.time('Load and delete records')
+    start = performance.now();
 
     // Get destination graph and process
     const graph = await destination.dataset.getGraph(destination.graph)
 
     await processGraph(graph)
-    console.timeEnd('Load and delete records')
+    logInfo(`Loading completed (${performance.now() - start}ms).`)
 
     logInfo('--- Step 3: upsert tables --')
-    console.time('Upsert tables')
+    start = performance.now();
 
     // Resolve dependencies to table graph
     tableIndex.entryNodes().forEach(tableName => {
@@ -302,20 +302,23 @@ async function main() {
         // drop temp table when done
         await dropTable(tableNode.tempTable)
     }
-    console.timeEnd('Upsert tables')
+    logInfo(`Upserting completed (${performance.now() - start}ms).`)
+
 
     if (SINCE) {
         logInfo('--- Step 4: Perform deletes --')
+        start = performance.now();
         await processDeletes()
+        logInfo(`Deletes completed (${performance.now() - start}ms).`)
     } else {
         logInfo('--- Skipping deletes because full sync ---')
     }
 
     if (!SKIP_CLEANUP) {
         logInfo('--- Step 5: Graph cleanup --')
-        console.time('Graph cleanup')
+        start = performance.now();
         await graph.delete()
-        console.timeEnd('Graph cleanup')
+        logInfo(`Cleanup completed (${performance.now() - start}ms).`)
     } else {
         logInfo('--- Skipping graph cleanup ---')
     }
