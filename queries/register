@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-dotenvx run -f .env.$ENV -- node register.js
