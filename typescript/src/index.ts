@@ -18,7 +18,7 @@ import {
     SKIP_VIEW,
     SKIP_CLEANUP
 } from './configuration.js'
-import { logInfo, logError, logDebug, getErrorMessage } from './util.js'
+import { logInfo, logError, logDebug, getErrorMessage, msToTime } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
@@ -242,7 +242,7 @@ async function main() {
                 }
             })
             dataset = destination.dataset
-            logInfo(`Squash graphs completed (${performance.now() - start}ms).`)
+            logInfo(`Squash graphs completed (${msToTime(performance.now() - start)}).`)
         } else {
             logInfo('--- Skipping squash graphs ---')
         }
@@ -267,7 +267,7 @@ async function main() {
                 } : {}
             })),
         })
-        logInfo(`View construction completed (${performance.now() - start}ms).`)
+        logInfo(`View construction completed (${msToTime(performance.now() - start)}).`)
     } else {
         logInfo('--- Skipping view construction ---')
     }
@@ -280,7 +280,7 @@ async function main() {
     const graph = await destination.dataset.getGraph(destination.graph)
 
     await processGraph(graph)
-    logInfo(`Loading completed (${performance.now() - start}ms).`)
+    logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
     logInfo('--- Step 3: upsert tables --')
     start = performance.now();
@@ -302,14 +302,14 @@ async function main() {
         // drop temp table when done
         await dropTable(tableNode.tempTable)
     }
-    logInfo(`Upserting completed (${performance.now() - start}ms).`)
+    logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
 
     if (SINCE) {
         logInfo('--- Step 4: Perform deletes --')
         start = performance.now();
         await processDeletes()
-        logInfo(`Deletes completed (${performance.now() - start}ms).`)
+        logInfo(`Deletes completed (${msToTime(performance.now() - start)}).`)
     } else {
         logInfo('--- Skipping deletes because full sync ---')
     }
@@ -318,7 +318,7 @@ async function main() {
         logInfo('--- Step 5: Graph cleanup --')
         start = performance.now();
         await graph.delete()
-        logInfo(`Cleanup completed (${performance.now() - start}ms).`)
+        logInfo(`Cleanup completed (${msToTime(performance.now() - start)}).`)
     } else {
         logInfo('--- Skipping graph cleanup ---')
     }
