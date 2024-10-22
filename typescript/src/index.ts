@@ -259,7 +259,7 @@ async function main() {
             onProgress: progress => logInfo(`Pipeline ${queries.map(q => q.slug)}: ${Math.round(progress.progress * 100)}% complete.`),
             queries: queries.map(q => ({
                 query: q,
-                // TODO report bug on 'less than one properry`
+                // TODO report bug on 'less than one property`
                 ...SINCE ? {
                     variables: {
                         since: SINCE
