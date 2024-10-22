@@ -224,7 +224,7 @@ async function main() {
             const graphName = GRAPH_BASE + DATASET
 
             await destination.dataset.clear("graphs")
-            logInfo(`Cleared graphs of dataset ${DATASET}.`)
+            logInfo(`Cleared graphs of dataset ${DESTINATION_DATASET}.`)
 
             const params: AddQueryOptions = {
                 dataset,
