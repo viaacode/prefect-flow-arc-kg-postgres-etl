@@ -99,7 +99,8 @@ WHERE {
   # Only get collections where the IEs are disseminated
  ?ie schema:license ?schema_license;
         dct:format ?format ;
-        schema:isPartOf ?id.
+        schema:isPartOf ?id;
+        prov:wasDerivedFrom/schema:dateModified ?modified.
 
     # Only include the right licenses
     FILTER (?schema_license IN ( 
