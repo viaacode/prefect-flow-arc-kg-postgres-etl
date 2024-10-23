@@ -21,7 +21,7 @@ PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
 
 
-PREFIX : <https://data.hetarchief.be/ns/test/>
+PREFIX : <urn:kg-to-postgres:>
 
 
 CONSTRUCT {

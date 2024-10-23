@@ -4,7 +4,7 @@ PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 
-PREFIX : <https://data.hetarchief.be/ns/test/>
+PREFIX : <urn:kg-to-postgres:>
 
 CONSTRUCT {
   ?id :tableName "graph.collection";

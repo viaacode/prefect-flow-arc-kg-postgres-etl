@@ -2,7 +2,7 @@
 export const QUERY_PATH = '../queries'
 
 // RDF constants
-export const NAMESPACE = 'https://data.hetarchief.be/ns/test/'
+export const NAMESPACE = 'urn:kg-to-postgres:'
 export const GRAPH_BASE = 'https://data.hetarchief.be/graph/'
 export const TABLE_PRED = `${NAMESPACE}tableName`
 export const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'

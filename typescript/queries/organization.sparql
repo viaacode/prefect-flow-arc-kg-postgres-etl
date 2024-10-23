@@ -6,7 +6,7 @@ PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 PREFIX haPref: <https://data.hetarchief.be/id/organization-preferences/>
 prefix schema: <https://schema.org/>
 
-PREFIX : <https://data.hetarchief.be/ns/test/>
+PREFIX : <urn:kg-to-postgres:>
 
 CONSTRUCT {
 ?org :tableName "graph.organization";
