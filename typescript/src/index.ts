@@ -303,7 +303,7 @@ async function main() {
 
     await processGraph(graph)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
-
+    
     logInfo('--- Step 3: upsert tables --')
     start = performance.now();
 
