@@ -10,6 +10,10 @@ export function logDebug(message: any, ...optionalParams: any[]) {
     logPrefect('DEBUG', message, optionalParams)
 }
 
+export function logWarning(message: any, ...optionalParams: any[]) {
+    logPrefect('WARNING', message, optionalParams)
+}
+
 export function logPrefect(level: "INFO" | "ERROR" | "DEBUG" | "WARNING", message: any, ...optionalParams: any[]) {
     console.log(JSON.stringify({ PREFECT: { level, message, optionalParams } }))
 }

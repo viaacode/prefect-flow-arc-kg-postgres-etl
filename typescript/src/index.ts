@@ -18,7 +18,7 @@ import {
     SKIP_VIEW,
     SKIP_CLEANUP
 } from './configuration.js'
-import { logInfo, logError, logDebug, getErrorMessage, msToTime } from './util.js'
+import { logInfo, logError, logDebug, getErrorMessage, msToTime, logWarning } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
@@ -176,6 +176,8 @@ async function processGraph(graph: Graph) {
                     // Workaround: if label is nl, override existing value
                     if (!currentRecord[columnName] || language === 'nl') {
                         currentRecord[columnName] = object
+                    } else {
+                        logWarning(`Possible unexpected additional value for ${columnName}: ${object} (lang: ${language}).`)
                     }
                 }
             })
