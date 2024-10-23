@@ -1,0 +1,122 @@
+# position: 2
+prefix schema: <https://schema.org/>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+
+PREFIX : <urn:kg-to-postgres:>
+
+CONSTRUCT {
+  ?id :tableName "graph.collection";
+  :id ?id;
+  :bibframe_preceeded_by ?bibframe_preceeded_by;
+  :bibframe_succeeded_by ?bibframe_succeeded_by; 
+  :bibframe_supplement_to ?bibframe_supplement_to;
+  :collection_type ?collection_type;
+  :schema_end_date ?schema_end_date;
+  :schema_identifier ?schema_identifier ;
+  :schema_is_part_of ?schema_is_part_of;
+  :schema_location_created ?schema_location_created;
+  :schema_name ?schema_name;
+  :schema_publisher ?schema_publisher;
+  :schema_season_number ?schema_season_number;
+  :schema_start_date ?schema_start_date.
+
+  ?il :tableName "graph.newspaper_schema_in_language";
+  :collection_id ?id;
+  :schema_in_language ?schema_in_language.
+
+  ?an :tableName "graph.newspaper_schema_alternate_name";
+  :collection_id ?id;
+  :schema_alternate_name ?schema_alternate_name.
+
+  ?ie_isp :tableName "graph.schema_is_part_of";
+  :intellectual_entity_id ?ie;
+  :type ?collection_type;
+  :collection_id ?id.
+}
+WHERE {
+  {
+    ?id a schema:Newspaper;
+        schema:identifier ?schema_identifier;
+        schema:name ?schema_name;
+        schema:hasPart ?serie.
+    
+    OPTIONAL {
+      ?id schema:inLanguage ?schema_in_language.
+      BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
+    }
+
+    OPTIONAL {
+      ?id schema:alternateName ?schema_alternate_name.
+      BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
+    }
+
+    OPTIONAL {
+      ?serie schema:locationCreated/schema:name ?schema_location_created_res.
+      FILTER langMatches(lang(?schema_location_created_res), "nl")
+    }
+
+    OPTIONAL {    
+      ?serie  schema:endDate ?schema_end_date_res.
+    }
+
+    OPTIONAL {
+      ?serie schema:startDate ?schema_start_date_res.
+    }
+
+    OPTIONAL {
+      ?serie schema:publisher ?schema_publisher_res.
+    }
+
+    #OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
+
+    #OPTIONAL { ?id bf:succeededBy ?bibframe_succeeded_by }
+
+    #OPTIONAL { ?id bf:supplementTo ?bibframe_supplement_to } 
+    BIND ("newspaper" AS ?collection_type)
+  }
+  UNION {
+    ?id a schema:Episode; schema:name ?schema_name.
+    BIND ("episode" AS ?collection_type)
+  }
+  UNION {
+    ?id a schema:CreativeWorkSeries; schema:name ?schema_name.
+    OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
+    BIND ("series" AS ?collection_type)
+  }
+  UNION {
+    ?id a schema:CreativeWorkSeason; schema:name ?schema_name;
+    OPTIONAL { ?id schema:seasonNumber ?schema_season_number }
+    BIND ("season" AS ?collection_type)
+  }
+  UNION {
+    ?id a schema:ArchiveComponent; schema:name ?schema_name.
+    OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
+    BIND ("archive" AS ?collection_type)
+  }
+  
+  # Only get collections where the IEs are disseminated
+ ?ie schema:license ?schema_license;
+        dct:format ?format ;
+        schema:isPartOf ?id;
+        prov:wasDerivedFrom/schema:dateModified ?modified.
+
+    # Only include the right licenses
+    FILTER (?schema_license IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ) && ?format != "image")
+
+    # for incremental 
+    FILTER (!BOUND(?since) || ?modified >= ?since )
+
+    BIND(IRI(CONCAT(str(?id),md5(?ie))) AS ?ie_isp)
+}

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+npm run build
+dotenvx run -f .env -- node lib/index.js
