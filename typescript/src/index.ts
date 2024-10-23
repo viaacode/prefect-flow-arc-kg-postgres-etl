@@ -233,7 +233,7 @@ async function main() {
                 output: 'response',
             }
             const query = await addQuery(account, 'squash-graphs', params)
-            logInfo(`Starting pipeline for ${query.slug}.`)
+            logInfo(`Starting pipeline for ${query.slug} to ${graphName}.`)
             await query.runPipeline({
                 onProgress: progress => logInfo(`Pipeline ${query.slug}: ${Math.round(progress.progress * 100)}% complete.`),
                 destination: {
@@ -252,7 +252,7 @@ async function main() {
 
         const queries = await addJobQueries(account, dataset)
 
-        logInfo(`Starting pipelines for ${queries.map(q => q.slug)}.`)
+        logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph}.`)
 
         await account.runPipeline({
             destination,
@@ -317,7 +317,8 @@ async function main() {
     if (!SKIP_CLEANUP) {
         logInfo('--- Step 5: Graph cleanup --')
         start = performance.now();
-        await graph.delete()
+        await destination.dataset.clear("graphs")
+        
         logInfo(`Cleanup completed (${msToTime(performance.now() - start)}).`)
     } else {
         logInfo('--- Skipping graph cleanup ---')
