@@ -87,8 +87,9 @@ async function createTableNode(tableName: string): Promise<TableNode> {
 
 
 async function processBatch(tableName: string, batch: Array<Record<string, string>>) {
-    // Create temp table if not exists
+    // Get table information from the table index, or create a temp table if not exists
     const tableNode = tableIndex.hasNode(tableName) ? tableIndex.getNodeData(tableName) : await createTableNode(tableName)
+    // Copy the batch to database
     await batchInsertUsingCopy(tableNode, batch)
 }
 
@@ -98,39 +99,40 @@ async function processRecord(
     record: Record<string, string>,
     tableName: string,
     batches: { [tableName: string]: Array<Record<string, string>> }
-) {
+): Promise<Record<string, string>[] | undefined> {
     logDebug(`Process record for ${subject}: ${JSON.stringify(record)}`)
-
+    // If parts are missing, do nothing
     if (!record || !tableName || !subject) return
-
+    // Init batch for table if it does not exist yet
     if (!batches[tableName]) {
         batches[tableName] = []
     }
-
+    // Add records to table batch
     batches[tableName].push(record)
-
-    if (batches[tableName].length >= BATCH_SIZE) {
-        logDebug(`Maximum batch size reached for ${tableName}; processing.`)
-        const batch = batches[tableName]
-        await processBatch(tableName, batch)
-        batches[tableName] = []
-    }
+    return batches[tableName]
 }
 
 // Main function to parse and process the gzipped TriG file from a URL
 async function processGraph(graph: Graph) {
+    // Retrieve the graph as a stream of RDFjs objects
     const quadStream = await graph.toStream('rdf-js')
+    // Wrap stream processing in a promise so we can use a simple async/await
     return new Promise<void>((resolve, reject) => {
-
+        // Init counter for records
         let recordCount = 0
 
+        // Init the batch cache
         const batches: { [tableName: string]: Record<string, string>[] } = {}
+        
+        // Init variables that track the current subject, record and table
         let currentRecord: Record<string, string> = {}
         let currentSubject: string | null = null
         let currentTableName: string | null = null
 
+        // Process the stream
         quadStream
             .on('data', async (quad: Quad) => {
+                // Deconstruct the RDF terms to simple JS variables
                 const subject = quad.subject.value
                 const predicate = quad.predicate.value
                 let object = quad.object.value
@@ -138,26 +140,42 @@ async function processGraph(graph: Graph) {
                 // Convert literal to primitive
                 if (quad.object.termType === "Literal") {
                     language = quad.object.language
-                    // Convert duration to seconds first
+                    // Turn literals to JS primitives, but convert duration to seconds first
                     object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
                 }
 
-                // If the subject changes, process the current record
+                // If the subject changes, create a new record
                 if (subject !== currentSubject) {
+                    // Process the current record if there is one
                     if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null) {
                         try {
+                            // Pause the stream so it does not prevent async processRecord function from executing
                             quadStream.pause()
-                            await processRecord(currentSubject, currentRecord, currentTableName, batches)
+                            // Add the current record to the table batch
+                            const batch = await processRecord(currentSubject, currentRecord, currentTableName, batches)
+
+                            // If the maximum batch size is reached for this table, process it
+                            if (batch && batch.length >= BATCH_SIZE) {
+                                logDebug(`Maximum batch size reached for ${currentTableName}; processing.`)
+                                await processBatch(currentTableName, batch)
+                                // empty table batch when it's processed
+                                batches[currentTableName] = []
+                            }
+
                             logDebug(`Record ${recordCount} (${currentSubject}) processed`)
                         } finally {
+                            // Resume the stream after the async function is done, also when failed.
                             quadStream.resume()
                         }
                     }
-                    recordCount++
-
+                    
+                    // If a set record limit is reached, stop the RDF stream
                     if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
                         return quadStream.destroy()
                     }
+
+                    // Increment the number of processed records
+                    recordCount++
 
                     currentSubject = subject
                     currentTableName = null
@@ -172,8 +190,8 @@ async function processGraph(graph: Graph) {
                 else if (predicate.startsWith(NAMESPACE)) {
                     const columnName = predicate.replace(NAMESPACE, '')
 
-                    // Pick first value
-                    // Workaround: if label is nl, override existing value
+                    // Pick first value and ignore other values. 
+                    // Workaround for languages: if the label is nl, override the existing value
                     if (!currentRecord[columnName] || language === 'nl') {
                         currentRecord[columnName] = object
                     } else {
@@ -181,6 +199,7 @@ async function processGraph(graph: Graph) {
                     }
                 }
             })
+            // When the stream has ended
             .on('end', async () => {
                 // Process the last record
                 if (currentSubject && currentRecord && currentTableName) {
@@ -195,6 +214,7 @@ async function processGraph(graph: Graph) {
                 }
 
                 logInfo(`Processing completed: ${recordCount} records (${batchCount}/${Math.ceil(recordCount / BATCH_SIZE) + tableIndex.size()} batches).`)
+                // stream has been completely processed, resolve the promise.
                 resolve()
             })
             .on('error', (err: Error) => {
