@@ -27,40 +27,35 @@ PREFIX : <urn:kg-to-postgres:>
 CONSTRUCT {
     ?fragment :is_deleted ?is_deleted
 } WHERE {
-    # 1. Fragment was not deleted, but the IntellectualEntity derived from the fragment does not have the right licenses
-    {
-        ?ie a premis:IntellectualEntity;
-        dct:format ?format ;
-        prov:wasDerivedFrom ?fragment.
 
-        ?fragment a mh:Fragment;
-                schema:dateModified ?modified.
-
-        # only take into account fragments that were modified since
-        FILTER ((!BOUND(?since) || ?modified >= ?since ) && ?format != "image")
-
-        BIND (!(EXISTS {
-        ?ie schema:license ?schema_license
-        values ?schema_license {
-            haLicId:VIAA-PUBLIEK-METADATA-LTD
-            haLicId:VIAA-PUBLIEK-METADATA-ALL
-            haLicId:VIAA-PUBLIEK-CONTENT
-            haLicId:BEZOEKERTOOL-METADATA-ALL
-            haLicId:BEZOEKERTOOL-CONTENT
-            haLicId:VIAA-INTRA_CP-METADATA-ALL
-            haLicId:VIAA-INTRA_CP-CONTENT
-        }
-        }) AS ?is_deleted)
-
-    } 
-    # 2. The fragment was deleted
-    UNION{
-        ?fragment a mh:Fragment;
+    ?fragment a mh:Fragment;
         schema:dateModified ?modified.
 
         # only take into account fragments that were modified since
         FILTER (!BOUND(?since) || ?modified >= ?since )
-        BIND(EXISTS { ?fragment schema:dateDeleted ?date_deleted } AS ?is_deleted)
-    }
+        
+    BIND(   
+        # 1. The fragment was deleted 
+        (EXISTS { ?fragment schema:dateDeleted ?date_deleted } ||
+        # 2. Fragment was not deleted, but the IntellectualEntity derived from the fragment does not have the right licenses anymore
+        !(EXISTS {                
+            ?ie a premis:IntellectualEntity;
+                dct:format ?format ;
+                prov:wasDerivedFrom ?fragment ;    
+                schema:license ?schema_license .
 
+            FILTER (?format != "image")
+
+            values ?schema_license {
+                haLicId:VIAA-PUBLIEK-METADATA-LTD
+                haLicId:VIAA-PUBLIEK-METADATA-ALL
+                haLicId:VIAA-PUBLIEK-CONTENT
+                haLicId:BEZOEKERTOOL-METADATA-ALL
+                haLicId:BEZOEKERTOOL-CONTENT
+                haLicId:VIAA-INTRA_CP-METADATA-ALL
+                haLicId:VIAA-INTRA_CP-CONTENT
+            }
+        })
+        )
+    AS ?is_deleted)
 }
