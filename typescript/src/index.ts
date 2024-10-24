@@ -357,3 +357,24 @@ main().catch(err => {
     logDebug(`Unprocessed batches: ${unprocessedBatches}`)
     await closeConnectionPool()
 })
+
+// Disaster handling
+process.on('SIGTERM', signal => {
+    logWarning(`Process ${process.pid} received a SIGTERM signal`, signal)
+    process.exit(0)
+})
+
+process.on('SIGINT', signal => {
+    logWarning(`Process ${process.pid} has been interrupted`, signal)
+    process.exit(0)
+})
+
+process.on('uncaughtException', err => {
+    logError('Uncaught Exception', err)
+    process.exit(1)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+    logError(`Unhandled rejection at ${promise}`, reason)
+    process.exit(1)
+})
