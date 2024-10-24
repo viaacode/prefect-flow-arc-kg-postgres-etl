@@ -59,13 +59,18 @@ WHERE {
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
-    
-    ?id a ?collection_type_res; schema:name ?schema_name.
-    # TODO: Don't include IEs using schema:isPartOf; can be removed when graph is updated
-    FILTER (?collection_type_res != premis:IntellectualEntity)
 
-    BIND(lcase(strafter(str(?collection_type_res), "https://schema.org/")) AS ?collection_type)
-    BIND(IRI(CONCAT(str(?id),md5(str(?ie)))) AS ?ie_isp)
+    VALUES ?collection_type_res { 
+      schema:Newspaper 
+      schema:Episode 
+      schema:ArchiveComponent 
+      schema:CreativeWorkSeries
+      schema:CreativeWorkSeason
+    }
+    ?id a ?collection_type_res; schema:name ?schema_name.
+
+    BIND(lcase(REPLACE(STR(?collection_type_res), "^.*/([^/]*)$", "$1")) AS ?collection_type)
+    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
 
     OPTIONAL {
       ?id a schema:Newspaper;
