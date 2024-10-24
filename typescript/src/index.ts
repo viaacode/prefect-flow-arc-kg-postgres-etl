@@ -22,7 +22,7 @@ import { logInfo, logError, logDebug, getErrorMessage, msToTime, logWarning } fr
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
-import { performance } from 'perf_hooks';
+import { performance } from 'perf_hooks'
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -123,7 +123,7 @@ async function processGraph(graph: Graph) {
 
         // Init the batch cache
         const batches: { [tableName: string]: Record<string, string>[] } = {}
-        
+
         // Init variables that track the current subject, record and table
         let currentRecord: Record<string, string> = {}
         let currentSubject: string | null = null
@@ -168,7 +168,7 @@ async function processGraph(graph: Graph) {
                             quadStream.resume()
                         }
                     }
-                    
+
                     // If a set record limit is reached, stop the RDF stream
                     if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
                         return quadStream.destroy()
@@ -192,10 +192,10 @@ async function processGraph(graph: Graph) {
 
                     // Pick first value and ignore other values. 
                     // Workaround for languages: if the label is nl, override the existing value
-                    if (!currentRecord[columnName] || language === 'nl') {
+                    if (currentRecord[columnName] === undefined || language === 'nl') {
                         currentRecord[columnName] = object
                     } else {
-                        logWarning(`Possible unexpected additional value for ${columnName}: ${object} (lang: ${language}).`)
+                        logWarning(`Possible unexpected additional value for ${columnName}: ${object}`, { language, currentTableName, currentSubject })
                     }
                 }
             })
@@ -242,7 +242,7 @@ async function main() {
     if (!SKIP_VIEW) {
         if (!SKIP_SQUASH) {
             logInfo('--- Step 0: Squash graphs ---')
-            start = performance.now();
+            start = performance.now()
             const graphName = GRAPH_BASE + DATASET
 
             await destination.dataset.clear("graphs")
@@ -270,7 +270,7 @@ async function main() {
         }
 
         logInfo('--- Step 1: Construct view ---')
-        start = performance.now();
+        start = performance.now()
 
         const queries = await addJobQueries(account, dataset)
 
@@ -296,16 +296,16 @@ async function main() {
 
     // Parse and process the gzipped TriG file from the URL
     logInfo('--- Step 2: load temporary tables and delete records --')
-    start = performance.now();
+    start = performance.now()
 
     // Get destination graph and process
     const graph = await destination.dataset.getGraph(destination.graph)
 
     await processGraph(graph)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
-    
+
     logInfo('--- Step 3: upsert tables --')
-    start = performance.now();
+    start = performance.now()
 
     // Resolve dependencies to table graph
     tableIndex.entryNodes().forEach(tableName => {
@@ -329,7 +329,7 @@ async function main() {
 
     if (SINCE) {
         logInfo('--- Step 4: Perform deletes --')
-        start = performance.now();
+        start = performance.now()
         await processDeletes()
         logInfo(`Deletes completed (${msToTime(performance.now() - start)}).`)
     } else {
@@ -338,9 +338,9 @@ async function main() {
 
     if (!SKIP_CLEANUP) {
         logInfo('--- Step 5: Graph cleanup --')
-        start = performance.now();
+        start = performance.now()
         await destination.dataset.clear("graphs")
-        
+
         logInfo(`Cleanup completed (${msToTime(performance.now() - start)}).`)
     } else {
         logInfo('--- Skipping graph cleanup ---')
