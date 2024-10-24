@@ -255,9 +255,9 @@ CONSTRUCT {
         ?premis_identifier a ?premis_identifier_type_res; rdf:value ?premis_identifier_value.
         BIND (
           IF(
-            EXISTS{?ie haObj:primaryIdentifier ?premis_identifier }, 
+            EXISTS{ ?ie haObj:primaryIdentifier ?premis_identifier }, 
             "primary", 
-            REPLACE(STR(?premis_identifier_type_res), "^.*/([^/]*)$", "$1")
+            IF(?premis_identifier_type_res != haObj:LocalIdentifier, REPLACE(STR(?premis_identifier_type_res), "^.*/([^/]*)$", "$1"), ?unbound)
           ) 
           as ?premis_identifier_type)
 
