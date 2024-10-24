@@ -60,6 +60,8 @@ WHERE {
     FILTER (!BOUND(?since) || ?modified >= ?since )
     
     ?id a ?collection_type_res; schema:name ?schema_name.
+    # TODO: Don't include IEs using schema:isPartOf; can be removed when graph is updated
+    FILTER (?collection_type_res != premis:IntellectualEntity)
 
     BIND(lcase(strafter(str(?collection_type_res), "https://schema.org/")) AS ?collection_type)
     BIND(IRI(CONCAT(str(?id),md5(str(?ie)))) AS ?ie_isp)
