@@ -192,7 +192,7 @@ async function processGraph(graph: Graph) {
 
                     // Pick first value and ignore other values. 
                     // Workaround for languages: if the label is nl, override the existing value
-                    if (!currentRecord[columnName] || language === 'nl') {
+                    if (currentRecord[columnName] !== undefined || language === 'nl') {
                         currentRecord[columnName] = object
                     } else {
                         logWarning(`Possible unexpected additional value for ${columnName}: ${object}`, { language, currentTableName, currentSubject })
