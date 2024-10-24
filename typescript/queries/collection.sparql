@@ -37,71 +37,11 @@ CONSTRUCT {
   :collection_id ?id.
 }
 WHERE {
-  {
-    ?id a schema:Newspaper;
-        schema:identifier ?schema_identifier;
-        schema:name ?schema_name;
-        schema:hasPart ?serie.
-    
-    OPTIONAL {
-      ?id schema:inLanguage ?schema_in_language.
-      BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
-    }
-
-    OPTIONAL {
-      ?id schema:alternateName ?schema_alternate_name.
-      BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
-    }
-
-    OPTIONAL {
-      ?serie schema:locationCreated/schema:name ?schema_location_created_res.
-      FILTER langMatches(lang(?schema_location_created_res), "nl")
-    }
-
-    OPTIONAL {    
-      ?serie  schema:endDate ?schema_end_date_res.
-    }
-
-    OPTIONAL {
-      ?serie schema:startDate ?schema_start_date_res.
-    }
-
-    OPTIONAL {
-      ?serie schema:publisher ?schema_publisher_res.
-    }
-
-    #OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
-
-    #OPTIONAL { ?id bf:succeededBy ?bibframe_succeeded_by }
-
-    #OPTIONAL { ?id bf:supplementTo ?bibframe_supplement_to } 
-    BIND ("newspaper" AS ?collection_type)
-  }
-  UNION {
-    ?id a schema:Episode; schema:name ?schema_name.
-    BIND ("episode" AS ?collection_type)
-  }
-  UNION {
-    ?id a schema:CreativeWorkSeries; schema:name ?schema_name.
-    OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
-    BIND ("series" AS ?collection_type)
-  }
-  UNION {
-    ?id a schema:CreativeWorkSeason; schema:name ?schema_name;
-    OPTIONAL { ?id schema:seasonNumber ?schema_season_number }
-    BIND ("season" AS ?collection_type)
-  }
-  UNION {
-    ?id a schema:ArchiveComponent; schema:name ?schema_name.
-    OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
-    BIND ("archive" AS ?collection_type)
-  }
-  
-  # Only get collections where the IEs are disseminated
- ?ie schema:license ?schema_license;
-        dct:format ?format ;
-        schema:isPartOf ?id;
-        prov:wasDerivedFrom/schema:dateModified ?modified.
+    # Only get collections where the IEs are disseminated
+   ?ie schema:license ?schema_license;
+       dct:format ?format ;
+       prov:wasDerivedFrom/schema:dateModified ?modified;
+       schema:isPartOf ?id.
 
     # Only include the right licenses
     FILTER (?schema_license IN ( 
@@ -118,6 +58,44 @@ WHERE {
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
+    
+    ?id a ?collection_type_res; schema:name ?schema_name.
 
-    BIND(IRI(CONCAT(str(?id),md5(?ie))) AS ?ie_isp)
+    BIND(lcase(strafter(str(?collection_type_res), "https://schema.org/")) AS ?collection_type)
+    BIND(IRI(CONCAT(str(?id),md5(str(?ie)))) AS ?ie_isp)
+
+    OPTIONAL {
+      ?id a schema:Newspaper;
+          schema:identifier ?schema_identifier;
+          schema:hasPart ?serie.
+
+      OPTIONAL {
+        ?id schema:inLanguage ?schema_in_language.
+        BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
+      }
+  
+      OPTIONAL {
+        ?id schema:alternateName ?schema_alternate_name.
+        BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
+      }
+  
+      OPTIONAL {
+        ?serie schema:locationCreated/schema:name ?schema_location_created_res.
+        FILTER langMatches(lang(?schema_location_created_res), "nl")
+      }
+  
+      OPTIONAL { ?serie schema:endDate ?schema_end_date. }
+      OPTIONAL { ?serie schema:startDate ?schema_start_date. }
+      OPTIONAL { ?serie schema:publisher ?schema_publisher. }
+  
+      #OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
+  
+      #OPTIONAL { ?id bf:succeededBy ?bibframe_succeeded_by }
+  
+      #OPTIONAL { ?id bf:supplementTo ?bibframe_supplement_to } 
+    }
+        
+    OPTIONAL { ?id schema:seasonNumber ?schema_season_number }
+    OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
+  
 }
