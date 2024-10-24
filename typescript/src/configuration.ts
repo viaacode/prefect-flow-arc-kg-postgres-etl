@@ -28,6 +28,7 @@ export const dbConfig = {
     host: process.env.POSTGRES_HOST ?? 'localhost',
     user: process.env.POSTGRES_USERNAME ?? 'hetarchief',
     password: process.env.POSTGRES_PASSWORD ?? 'password',
+    ssl: true
 }
 
 
