@@ -186,7 +186,7 @@ CONSTRUCT {
         haLicId:VIAA-INTRA_CP-CONTENT ,
         haLicId:Publiek-Domein,
         haLicId:COPYRIGHT-UNDETERMINED
-    ) && ?dcterms_format != "image" && langMatches(lang(?schema_name), "nl"))
+    ) && ?dcterms_format != "image" )
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
