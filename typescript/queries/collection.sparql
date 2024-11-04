@@ -66,6 +66,7 @@ WHERE {
       schema:ArchiveComponent 
       schema:CreativeWorkSeries
       schema:CreativeWorkSeason
+      schema:BroadcastEvent
     }
     ?id a ?collection_type; schema:name ?schema_name.
 
