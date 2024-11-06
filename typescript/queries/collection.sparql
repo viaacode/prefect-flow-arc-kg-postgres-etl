@@ -60,16 +60,16 @@ WHERE {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    VALUES ?collection_type_res { 
+    VALUES ?collection_type { 
       schema:Newspaper 
       schema:Episode 
       schema:ArchiveComponent 
       schema:CreativeWorkSeries
       schema:CreativeWorkSeason
+      schema:BroadcastEvent
     }
-    ?id a ?collection_type_res; schema:name ?schema_name.
+    ?id a ?collection_type; schema:name ?schema_name.
 
-    BIND(lcase(REPLACE(STR(?collection_type_res), "^.*/([^/]*)$", "$1")) AS ?collection_type)
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
 
     OPTIONAL {

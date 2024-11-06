@@ -157,8 +157,6 @@ CONSTRUCT {
   :schema_name ?file_schema_name;
   :schema_thumbnail_url ?file_schema_thumbnail_url.
 
-
-
 } WHERE {
 
     # 1. Intellectual Entity data
