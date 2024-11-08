@@ -189,7 +189,13 @@ CONSTRUCT {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
+    BIND(IF(
+      # Do not include haLicId:VIAA-PUBLIEK-CONTENT when object is AV
+      ?dcterms_format NOT IN ("newspaper", "newspaperpage") && ?schema_license_res = haLicId:VIAA-PUBLIEK-CONTENT,
+      ?unbound,
+      REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
+    ) as ?schema_license)
+    #BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_license)))) AS ?ie_lic)
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?dcterms_format)))) AS ?ie_format)
 
