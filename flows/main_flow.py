@@ -122,7 +122,7 @@ def insert_schema_transcript(
 )
 def arc_alto_to_json(
     s3_endpoint: str = "http://assets-int.hetarchief.be",
-    s3_bucket_name: str = "hetarchief-int",
+    s3_bucket_name: str = "hetarchief",
     s3_block_name: str = "arc-object-store",
     db_block_name: str = "local",
     full_sync: bool = False,
@@ -143,7 +143,6 @@ def arc_alto_to_json(
     ).result()
     for representation_id, url in url_list:
         json_string = run_node_script.submit(url=url)
-
         transcript = extract_transcript.submit(json_string=json_string.result())
         s3_key = s3_upload.submit(
             bucket=s3_bucket_name,
@@ -152,7 +151,7 @@ def arc_alto_to_json(
             aws_credentials=s3_creds,
             aws_client_parameters=client_parameters,
         )
-        insert_schema_transcript.submit(
+        result = insert_schema_transcript.submit(
             representation_id=representation_id,
             s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
             transcript=transcript.result(),
@@ -178,7 +177,7 @@ def main_flow(
     skip_cleanup: bool = False,
     db_block_name: str = "local",  # "hetarchief-tst",
     s3_endpoint: str = "http://assets-int.hetarchief.be",
-    s3_bucket_name: str = "hetarchief-int",
+    s3_bucket_name: str = "hetarchief",
     s3_block_name: str = "arc-object-store",
     record_limit: int = None,
     batch_size: int = 100,
