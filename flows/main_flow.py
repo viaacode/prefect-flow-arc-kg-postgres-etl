@@ -6,6 +6,7 @@ from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_co
 from prefect.task_runners import ConcurrentTaskRunner
 from arc_alto_to_json import arc_alto_to_json
 
+
 @flow(
     name="prefect-flow-arc-kg-postgres-etl",
     task_runner=ConcurrentTaskRunner(),

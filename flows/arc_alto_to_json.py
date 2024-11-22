@@ -9,6 +9,7 @@ import json
 from prefect_aws.s3 import s3_upload
 from prefect_aws import AwsCredentials, AwsClientParameters
 
+
 # Task to execute SPARQL query via API call and get file list
 @task()
 def get_url_list(
@@ -149,7 +150,7 @@ def arc_alto_to_json(
             aws_client_parameters=client_parameters,
             wait_for=json_string
         )
-        result = insert_schema_transcript.submit(
+        insert_schema_transcript.submit(
             representation_id=representation_id,
             s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
             transcript=transcript.result(),
