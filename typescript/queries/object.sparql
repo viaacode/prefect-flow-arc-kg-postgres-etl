@@ -164,8 +164,7 @@ CONSTRUCT {
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name ;
            schema:maintainer ?schema_maintainer;
-           #(schema:license|rel:isp/schema:license) ?schema_license_res;
-           schema:license ?schema_license_res ;
+           (schema:license|(rel:isp/schema:license)) ?schema_license_res;
            dct:format ?dcterms_format ;
            prov:wasDerivedFrom ?ie_fragment.
            
