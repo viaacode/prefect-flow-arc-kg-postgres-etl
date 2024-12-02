@@ -1,4 +1,6 @@
 import Dataset from '@triply/triplydb/Dataset.js'
+import Org from '@triply/triplydb/Org.js'
+import User from '@triply/triplydb/User.js'
 
 export class TableInfo {
     private _name: string
@@ -31,3 +33,4 @@ export class TableInfo {
 export type ColumnInfo = { name: string, datatype: string }
 export type TableNode = { tableInfo: TableInfo, tempTable: TableInfo, columns: ColumnInfo[], dependencies: TableInfo[], primaryKeys: string[] }
 export type Destination = { dataset: Dataset, graph: string }
+export type GraphInfo = { account : User | Org, dataset: Dataset, destination: Destination, }
