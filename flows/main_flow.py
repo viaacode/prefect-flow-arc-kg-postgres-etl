@@ -4,6 +4,7 @@ from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect.task_runners import ConcurrentTaskRunner
+from arc_alto_to_json import arc_alto_to_json
 
 
 @flow(
@@ -23,6 +24,9 @@ def main_flow(
     skip_view: bool = False,
     skip_cleanup: bool = False,
     db_block_name: str = "local",  # "hetarchief-tst",
+    s3_endpoint: str = "https://assets-int.hetarchief.be",
+    s3_bucket_name: str = "hetarchief",
+    s3_block_name: str = "arc-object-store",
     record_limit: int = None,
     batch_size: int = 100,
     full_sync: bool = False,
@@ -43,8 +47,8 @@ def main_flow(
 
     # Run javascript
     sync_service_script: str = "index.js"
-    
-    run_javascript.with_options(
+
+    load_db = run_javascript.with_options(
         name=f"Sync KG to services with {sync_service_script}",
     ).submit(
         script_path=base_path + script_path + sync_service_script,
@@ -63,14 +67,23 @@ def main_flow(
         since=last_modified_date,
     )
 
+    arc_alto_to_json(
+        s3_block_name=s3_block_name,
+        s3_bucket_name=s3_bucket_name,
+        s3_endpoint=s3_endpoint,
+        db_block_name=db_block_name,
+        full_sync=full_sync,
+        wait_for=load_db,
+    )
+
 
 if __name__ == "__main__":
     main_flow(
-        triplydb_block_name="triplydb-meemoo", 
-        postgres_block_name="local-hasura", 
+        triplydb_block_name="triplydb-meemoo",
+        db_block_name="local-hasura",
         base_path="./typescript/",
         triplydb_dataset="hetarchief",
         skip_squash=True,
         skip_view=True,
-        full_sync=True
+        full_sync=True,
     )
