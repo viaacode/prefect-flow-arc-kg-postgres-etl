@@ -20,7 +20,7 @@ import {
 } from './configuration.js'
 import { logInfo, logError, logDebug, getErrorMessage, msToTime, logWarning } from './util.js'
 import { DepGraph } from 'dependency-graph'
-import { TableNode, TableInfo, Destination } from './types.js'
+import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
 import { performance } from 'perf_hooks'
 
@@ -224,18 +224,37 @@ async function processGraph(graph: Graph) {
     })
 }
 
-// Main execution function
-async function main() {
-    logInfo(`Starting sync from ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+async function cleanup() {
+    const { destination } = await getInfo()
+    // Clear graphs
+    logInfo(`- Clearing graphs in dataset ${destination.dataset.slug}`)
+    await destination.dataset.clear("graphs")
+    // Clear temp tables
+    for (const tableName of tableIndex.overallOrder()) {
+        const tableNode = tableIndex.getNodeData(tableName)
+        logInfo(`- Dropping ${tableNode.tempTable}`)
+        // drop temp table when done
+        await dropTable(tableNode.tempTable)
+    }
+}
+
+async function getInfo(): Promise<GraphInfo> {
     const triply = App.get({ token: TOKEN })
 
     const account = await triply.getAccount(ACCOUNT)
     // TODO: create dataset if not exists
-    let dataset = await account.getDataset(DATASET)
+    const dataset = await account.getDataset(DATASET)
     const destination: Destination = {
         dataset: await account.getDataset(DESTINATION_DATASET),
         graph: GRAPH_BASE + DESTINATION_GRAPH
     }
+    return { account, dataset, destination }
+}
+
+// Main execution function
+async function main() {
+    logInfo(`Starting sync from ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+    let { account, dataset, destination } = await getInfo()
 
     logInfo(`--- Syncing ${DATASET} to graph ${destination.graph} of ${DESTINATION_DATASET} ---`)
     let start: number
@@ -339,7 +358,7 @@ async function main() {
     if (!SKIP_CLEANUP) {
         logInfo('--- Step 5: Graph cleanup --')
         start = performance.now()
-        await destination.dataset.clear("graphs")
+        await cleanup()
 
         logInfo(`Cleanup completed (${msToTime(performance.now() - start)}).`)
     } else {
@@ -349,9 +368,15 @@ async function main() {
     logInfo('--- Sync done. --')
 }
 
-main().catch(err => {
+main().catch(async err => {
     const msg = getErrorMessage(err)
     logError(msg)
+    if (!SKIP_CLEANUP) {
+        logInfo('--- Graph and table cleanup because of error --')
+        await cleanup()
+    } else {
+        logInfo('--- Skipping graph cleanup ---')
+    }
     process.exit(1)
 }).finally(async () => {
     logDebug(`Unprocessed batches: ${unprocessedBatches}`)
