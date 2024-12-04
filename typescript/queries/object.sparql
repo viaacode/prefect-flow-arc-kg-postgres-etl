@@ -1,6 +1,5 @@
-# position: 1
-prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX schema: <https://schema.org/>
 PREFIX dct: <http://purl.org/dc/terms/>
@@ -20,9 +19,7 @@ PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
 
-
 PREFIX : <urn:kg-to-postgres:>
-
 
 CONSTRUCT {
 
@@ -200,61 +197,61 @@ CONSTRUCT {
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_license)))) AS ?ie_lic)
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?dcterms_format)))) AS ?ie_format)
 
-    OPTIONAL {
+    {} UNION {
         ?ie schema:alternateName ?schema_alternate_name.
         FILTER langMatches(lang(?schema_alternate_name), "nl")
         
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_alternate_name)))) AS ?ie_an)
     }
 
-    OPTIONAL {
+    UNION {
         ?ie schema:inLanguage ?schema_in_language.
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_in_language)))) AS ?ie_il)
     }
 
-    OPTIONAL {
+    UNION {
       ?ie schema:keywords ?schema_keywords.
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_keywords)))) AS ?ie_kw)
     }
 
-    OPTIONAL {
+    UNION {
         ?ie schema:genre ?schema_genre.
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_genre)))) AS ?ie_g)
     }
-    OPTIONAL {
+    UNION {
         ?ie schema:spatial/schema:name ?schema_spatial.
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_spatial)))) AS ?ie_spat)
     }
-    OPTIONAL {
+    UNION {
         ?ie schema:temporal ?schema_temporal.
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_temporal)))) AS ?ie_temp)
     }
   
-    OPTIONAL {
+    UNION {
       ?ie schema:dateCreated ?schema_date_created .
       
       OPTIONAL { ?ie haDes:minDateCreated ?ha_des_min_date_created }
       OPTIONAL { ?ie haDes:maxDateCreated ?ha_des_max_date_created }
     }
 
-    OPTIONAL { 
+    UNION { 
       ?ie schema:datePublished ?schema_date_published .
 
       OPTIONAL { ?ie haDes:minDatePublished ?ha_des_min_date_published }
       OPTIONAL { ?ie haDes:maxDatePublished ?ha_des_max_date_published }
     }
 
-    OPTIONAL{ 
+    UNION{ 
       ?ie schema:description ?schema_description
       FILTER langMatches(lang(?schema_description), "nl")
     }
   
-    OPTIONAL{ 
+    UNION{ 
       ?ie schema:abstract ?schema_abstract 
       FILTER langMatches(lang(?schema_abstract), "nl")
     }
 
-    OPTIONAL {
+    UNION {
         ?ie premis:identifier ?premis_identifier.
 
         ?premis_identifier a ?premis_identifier_type_res; rdf:value ?premis_identifier_value.
@@ -269,32 +266,32 @@ CONSTRUCT {
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?premis_identifier)))) AS ?ie_local_id)
     }
   
-    OPTIONAL { ?ie haDes:pageNumber ?schema_position }
-    OPTIONAL { ?ie haDes:numberOfPages ?ha_des_number_of_pages }
-    OPTIONAL { ?ie schema:issueNumber ?schema_issue_number }
-    OPTIONAL { ?ie rel:isp ?relation_is_part_of }
-    OPTIONAL { ?ie dct:available ?dcterms_available }
-    OPTIONAL { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
-    OPTIONAL { ?ie ebucore:hasCastMember ?ebucore_has_cast_member }
-    OPTIONAL { ?ie schema:copyrightYear ?schema_copyright_year }
-    OPTIONAL { ?ie schema:copyrightNotice ?schema_copyright_notice }
-    OPTIONAL { ?ie dct:rights ?dcterms_rights }
-    OPTIONAL { ?ie schema:creditText ?schema_credit_text }    
-    OPTIONAL { ?ie ebucore:synopsis ?ebucore_synopsis }
+    UNION { ?ie haDes:pageNumber ?schema_position }
+    UNION { ?ie haDes:numberOfPages ?ha_des_number_of_pages }
+    UNION { ?ie schema:issueNumber ?schema_issue_number }
+    UNION { ?ie rel:isp ?relation_is_part_of }
+    UNION { ?ie dct:available ?dcterms_available }
+    UNION { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
+    UNION { ?ie ebucore:hasCastMember ?ebucore_has_cast_member }
+    UNION { ?ie schema:copyrightYear ?schema_copyright_year }
+    UNION { ?ie schema:copyrightNotice ?schema_copyright_notice }
+    UNION { ?ie dct:rights ?dcterms_rights }
+    UNION { ?ie schema:creditText ?schema_credit_text }    
+    UNION { ?ie ebucore:synopsis ?ebucore_synopsis }
 
-    OPTIONAL {
+    UNION {
       ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
     }
     # krant
-    OPTIONAL{ 
+    UNION{ 
       ?ie bf:edition/skos:prefLabel ?bibframe_edition .
       FILTER langMatches(lang(?bibframe_edition), "nl")
     }
 
     # - roles & things
 
-    OPTIONAL {
+    UNION {
       ?ie ?role_pred ?role.
 
       BIND (
@@ -312,17 +309,14 @@ CONSTRUCT {
   
     }
 
-    # 2. Carrier
-    # - carrier rep
-    OPTIONAL {
+  
+    UNION {
+      # 2. Carrier
+      # - carrier rep
+
       ?ie rel:isr ?crep.
       ?crep a haObj:CarrierRepresentation; 
           premis:storedAt ?pc.
-      
-      OPTIONAL {
-        ?crep bf:productionMethod/skos:prefLabel ?car_bibframe_production_method.
-        FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
-      }
       
       # - physical carrier
       ?pc a haObj:PhysicalCarrier;
@@ -330,17 +324,27 @@ CONSTRUCT {
       premis:medium/skos:prefLabel ?car_premis_medium.
       FILTER (langMatches(lang(?car_schema_name), "nl") && langMatches(lang(?car_premis_medium), "nl"))
 
-      OPTIONAL {
+      BIND(EXISTS {
+        ?pc ebucore:hasCaptioning/rdf:type ebucore:OpenCaptions 
+      } AS ?car_ebucore_has_captioning)
+
+
+      {} UNION {
+        ?crep bf:productionMethod/skos:prefLabel ?car_bibframe_production_method.
+        FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+      }
+      
+      UNION {
         ?pc schema:identifier ?car_schema_identifier
       }
 
-      OPTIONAL {
+      UNION {
         ?pc ^eror:sou ?event.
         ?event a haEvt:digitization; 
           prov:startedAtTime ?car_digitization_date; 
       }
     
-      OPTIONAL {
+      UNION {
         ?pc schema:height ?height.
         ?height schema:value ?height_value;
                 schema:unitText ?height_unit.
@@ -348,25 +352,21 @@ CONSTRUCT {
       }
       
     
-      OPTIONAL {
+      UNION {
         ?pc schema:width ?width.
         ?width schema:value ?width_value;
                 schema:unitText ?width_unit.
         BIND( CONCAT(?width_value, ' ', ?width_unit) as ?car_schema_width)
       }
       
-      OPTIONAL {
+      UNION {
         ?pc schema:materialExtent ?car_schema_material_extent
       }
-      OPTIONAL {
+      UNION {
         ?pc schema:material ?car_schema_material
       }
 
-      BIND(EXISTS {
-        ?pc ebucore:hasCaptioning/rdf:type ebucore:OpenCaptions 
-      } AS ?car_ebucore_has_captioning)
-
-      OPTIONAL {
+      UNION {
         ?pc a ?type_res.
         VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
         ?type_res rdfs:label ?car_type.
@@ -382,7 +382,7 @@ CONSTRUCT {
 
     # 3. Representation
 
-    OPTIONAL {
+    UNION {
       {
         # - digital reps
         ?rep a haObj:DigitalRepresentation;
@@ -397,13 +397,14 @@ CONSTRUCT {
       }
       ?rep schema:name ?rep_schema_name.
       FILTER langMatches(lang(?rep_schema_name), "nl")
-
-      OPTIONAL { ?rep schema:inLanguage ?rep_schema_in_language }
-      OPTIONAL { ?rep rel:hsr ?rep_relation_has_root }
-      OPTIONAL { ?rep rel:hss ?rep_relation_has_source }
-      OPTIONAL { ?rep edm:isNextInSequence ?rep_edm_is_next_in_sequence }
-      OPTIONAL { ?rep schema:caption ?rep_schema_caption }
-      OPTIONAL { ?rep schema:transcript ?rep_schema_transcript }
+      
+      {}
+      UNION { ?rep schema:inLanguage ?rep_schema_in_language }
+      UNION { ?rep rel:hsr ?rep_relation_has_root }
+      UNION { ?rep rel:hss ?rep_relation_has_source }
+      UNION { ?rep edm:isNextInSequence ?rep_edm_is_next_in_sequence }
+      UNION { ?rep schema:caption ?rep_schema_caption }
+      UNION { ?rep schema:transcript ?rep_schema_transcript }
 
       # 3. File
       ?file a premis:File;
@@ -416,15 +417,14 @@ CONSTRUCT {
       VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "image/jpeg" "audio/mpeg" "audio/m4a" }
       FILTER (langMatches(lang(?file_schema_name), "nl"))
 
-      OPTIONAL { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
-      OPTIONAL { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
-      OPTIONAL { ?file schema:duration ?file_schema_duration }
+      {}
+      UNION { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
+      UNION { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
+      UNION { ?file schema:duration ?file_schema_duration }
 
       # 4. includes
       BIND(IRI(
            CONCAT(str(?file), "/", md5(str(?rep)))
            ) AS ?inc)
-    }
-
-    
+    } 
 }
