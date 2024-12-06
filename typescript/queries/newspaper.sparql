@@ -59,7 +59,8 @@ CONSTRUCT {
 
 ?ie_fragment :tableName "graph.mh_fragment_identifier";
   :intellectual_entity_id ?ie;
-  :mh_fragment_identifier ?mh_fragment_identifier.
+  :mh_fragment_identifier ?mh_fragment_identifier;
+  :is_deleted false.
 
 ?ie_lic :tableName "graph.schema_license";
 :intellectual_entity_id ?ie;
