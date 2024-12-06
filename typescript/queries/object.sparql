@@ -56,7 +56,8 @@ CONSTRUCT {
 
 ?ie_fragment :tableName "graph.mh_fragment_identifier";
   :intellectual_entity_id ?ie;
-  :mh_fragment_identifier ?mh_fragment_identifier.
+  :mh_fragment_identifier ?mh_fragment_identifier;
+  :is_deleted false.
 
 ?ie_lic :tableName "graph.schema_license";
 :intellectual_entity_id ?ie;
@@ -162,7 +163,6 @@ CONSTRUCT {
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name ;
            schema:maintainer ?schema_maintainer;
-           #(schema:license|(rel:isp/schema:license)) ?schema_license_res;
            schema:license ?schema_license_res;
            dct:format ?dcterms_format ;
            prov:wasDerivedFrom ?ie_fragment.
