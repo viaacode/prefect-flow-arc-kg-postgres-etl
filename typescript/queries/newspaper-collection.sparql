@@ -41,8 +41,8 @@ CONSTRUCT {
 }
 WHERE {
     # Only get collections where the IEs are disseminated
-   VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
-      ?ie a ?ie_type;
+   VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage }
+   ?ie a ?ie_type;
       (schema:license|(rel:isp/schema:license)) ?schema_license;
       prov:wasDerivedFrom/schema:dateModified ?modified;
       schema:isPartOf ?id.
@@ -63,8 +63,8 @@ WHERE {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    VALUES ?collection_type { 
-      schema:Newspaper 
+    VALUES ?collection_type {
+      schema:Newspaper
       schema:Episode 
       schema:ArchiveComponent 
       schema:CreativeWorkSeries
@@ -74,43 +74,44 @@ WHERE {
     ?id a ?collection_type; schema:name ?schema_name.
 
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
-
+    
+    {}
+    UNION { ?id schema:seasonNumber ?schema_season_number }
+    UNION { ?id schema:isPartOf ?schema_is_part_of }
+    
     OPTIONAL {
       ?id a schema:Newspaper;
           schema:identifier ?schema_identifier;
           schema:hasPart ?serie.
-
-      OPTIONAL {
+      {}
+      UNION {
         ?id schema:inLanguage ?schema_in_language.
         BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
       }
   
-      OPTIONAL {
+      UNION {
         ?id schema:alternateName ?schema_alternate_name.
         BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
       }
   
-      OPTIONAL {
+      UNION {
         ?serie schema:locationCreated/schema:name ?schema_location_created.
         FILTER langMatches(lang(?schema_location_created), "nl")
       }
   
-      OPTIONAL { ?serie schema:endDate ?schema_end_date. }
-      OPTIONAL { ?serie schema:startDate ?schema_start_date. }
-      OPTIONAL { 
+      UNION { ?serie schema:endDate ?schema_end_date. }
+      UNION { ?serie schema:startDate ?schema_start_date. }
+      UNION { 
         # TODO: can also result into entry in graph.thing table
         ?serie schema:publisher/schema:name ?schema_publisher. 
         FILTER langMatches(lang(?schema_publisher), "nl")
       }
   
-      #OPTIONAL { ?id bf:preceededBy ?bibframe_preceeded_by }
+      #UNION { ?id bf:preceededBy ?bibframe_preceeded_by }
   
-      #OPTIONAL { ?id bf:succeededBy ?bibframe_succeeded_by }
+      #UNION { ?id bf:succeededBy ?bibframe_succeeded_by }
   
-      #OPTIONAL { ?id bf:supplementTo ?bibframe_supplement_to } 
+      #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
     }
         
-    OPTIONAL { ?id schema:seasonNumber ?schema_season_number }
-    OPTIONAL { ?id schema:isPartOf ?schema_is_part_of }
-  
 }

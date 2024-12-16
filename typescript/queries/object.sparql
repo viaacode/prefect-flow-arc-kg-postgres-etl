@@ -107,6 +107,19 @@ CONSTRUCT {
 :id ?thing;
 :schema_name ?thing_schema_name.
 
+?collection :tableName "graph.collection";
+:id ?collection;
+:collection_type ?collection_type;
+#:schema_identifier ?schema_identifier ;
+:schema_is_part_of ?collection_schema_is_part_of;
+:schema_name ?collection_schema_name;
+:schema_season_number ?collection_schema_season_number.
+
+?ie_isp :tableName "graph.schema_is_part_of";
+:intellectual_entity_id ?ie;
+:type ?collection_type;
+:collection_id ?collection.
+
 ?rep :tableName "graph.representation";
   :id ?rep;
   :edm_is_next_in_sequence  ?rep_edm_is_next_in_sequence ;
@@ -307,6 +320,25 @@ CONSTRUCT {
       ?thing a schema:Thing; 
             schema:name ?thing_schema_name.
   
+    }
+
+    # Collection
+    UNION {
+      ?ie schema:isPartOf ?collection.
+      VALUES ?collection_type { 
+        schema:Episode 
+        schema:ArchiveComponent 
+        schema:CreativeWorkSeries
+        schema:CreativeWorkSeason
+        schema:BroadcastEvent
+      }
+      ?collection a ?collection_type; schema:name ?collection_schema_name.
+
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?collection)))) AS ?ie_isp)
+
+      {}    
+      UNION { ?collection schema:seasonNumber ?collection_schema_season_number }
+      UNION { ?collection schema:isPartOf ?collection_schema_is_part_of }
     }
 
   
