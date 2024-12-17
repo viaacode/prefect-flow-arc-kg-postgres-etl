@@ -381,7 +381,7 @@ CONSTRUCT {
           rel:isi ?rep;
           ebucore:hasMimeType ?file_ebucore_has_mime_type .
 
-      VALUES ?file_ebucore_has_mime_type {"image/jpeg" "application/xml" "image/jp2" }
+      VALUES ?file_ebucore_has_mime_type {"image/jpeg" "application/xml" "image/jp2" "text/plain" }
       FILTER (langMatches(lang(?file_schema_name), "nl"))
 
       {} UNION { ?rep schema:inLanguage ?rep_schema_in_language }
