@@ -50,6 +50,7 @@ def get_url_list(
 def create_transcript(url_list: list[tuple[str, str]]):
     logger = get_run_logger()
 
+    output = []
     for representation_id, url in url_list:
         logger.info(
             f"Creating JSON transcript for {url} from representation {representation_id}"
@@ -70,16 +71,17 @@ def create_transcript(url_list: list[tuple[str, str]]):
             parsed_json = json.loads(json_string)
             # get the full text
             full_text = " ".join(item["text"] for item in parsed_json["text"])
-            yield (
+            output.append((
                 representation_id,
                 f"{os.path.basename(url)}.json",
                 json_string,
                 full_text,
-            )
+            ))
         except Exception as e:
             logger.error(f"Failed to process {url}: {str(e)}")
             # raise e
-    logger.info(f"Processed {len(url_list)} URLs.")
+    logger.info(f"Processed {len(output)}/{len(url_list)} URLs.")
+    return output
 
 @task(task_run_name="insert-{s3_url}-in-database")
 def insert_schema_transcript(
