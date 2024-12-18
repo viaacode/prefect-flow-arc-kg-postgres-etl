@@ -296,11 +296,6 @@ CONSTRUCT {
       ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
     }
-    # krant
-    UNION{ 
-      ?ie bf:edition/skos:prefLabel ?bibframe_edition .
-      FILTER langMatches(lang(?bibframe_edition), "nl")
-    }
 
     # - roles & things
 
@@ -418,7 +413,7 @@ CONSTRUCT {
       {
         # - digital reps
         ?rep a haObj:DigitalRepresentation;
-              haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?ie.
+              haObj:isAccessCopyOf|^haObj:hasIIIFCopy ?ie.
       } UNION {
         # - fragment rep 
         ?rep a haObj:FragmentRepresentation;
