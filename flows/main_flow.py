@@ -51,7 +51,7 @@ def main_flow(
 
     # Figure out start time
     last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None
-
+    load_db = None
     if run_mode == runMode.All or run_mode == runMode.LoadDbOnly:
         # Run javascript
         sync_service_script: str = "index.js"
