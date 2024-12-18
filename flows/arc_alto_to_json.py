@@ -41,8 +41,8 @@ def get_url_list(
     cur = conn.cursor()
     cur.execute(sql_query)
     url_list = cur.fetchall()
-    url_list_text = ', '.join(map(lambda x: str(x[1]), url_list))
-    logger.info(f"Retrieved the following URL list: {url_list_text}")
+    url_list_text = '\n'.join(map(lambda x: str(x[0]) + "," + str(x[1]), url_list))
+    logger.info(f"Retrieved the following URL list:\n{url_list_text}")
     return url_list
 
 
