@@ -107,7 +107,7 @@ def insert_schema_transcript(
         INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
         VALUES (%s, %s) 
         ON CONFLICT(representation_id) 
-        DO UPDATE SET schema_transcript_url = EXCLUDED.schema_transcript_url,
+        DO UPDATE SET schema_transcript_url = EXCLUDED.schema_transcript_url;
         """,
         (representation_id, s3_url),
     )
