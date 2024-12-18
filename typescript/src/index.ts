@@ -291,10 +291,18 @@ async function main() {
         logInfo('--- Step 1: Construct view ---')
         start = performance.now()
 
-        const queries = await addJobQueries(account, dataset)
+        const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset )
+
+        logInfo(`Deleting destination graph ${destination.graph}.`)
+
+        try {
+            const g = await destination.dataset.getGraph(destination.graph)
+            await g.delete()
+        } catch (err) {
+            logInfo(`Graph ${destination.graph} does not exist.\n`)
+        }
 
         logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph}.`)
-
         await account.runPipeline({
             destination,
             onProgress: progress => logInfo(`Pipeline ${queries.map(q => q.slug)}: ${Math.round(progress.progress * 100)}% complete.`),
