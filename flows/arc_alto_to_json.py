@@ -50,16 +50,16 @@ def get_url_list(
 def run_node_script(url_list: list[tuple[str, str]]):
     logger = get_run_logger()
 
-    for representation_id, url in url_list:
+    for representation_id, premis_stored_at in url_list:
         try:
             # Run the Node.js script using subprocess
             result = subprocess.run(
-                ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
+                ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", premis_stored_at],
                 capture_output=True,
                 text=True,
             )
             if result.returncode != 0:
-                raise Exception(f"Error running script for {url}: {result.stderr}")
+                raise Exception(f"Error running script for {premis_stored_at}: {result.stderr}")
 
             json_string = result.stdout
 
@@ -69,12 +69,12 @@ def run_node_script(url_list: list[tuple[str, str]]):
             full_text = " ".join(item["text"] for item in parsed_json["text"])
             yield (
                 representation_id,
-                f"{os.path.basename(url)}.json",
+                f"{os.path.basename(premis_stored_at)}.json",
                 json_string,
                 full_text,
             )
         except Exception as e:
-            logger.error(f"Failed to process {url}: {str(e)}")
+            logger.error(f"Failed to process {premis_stored_at}: {str(e)}")
             # raise e
     logger.error(f"Processed {len(url_list)} URLs.")
 
