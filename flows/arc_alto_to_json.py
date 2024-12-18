@@ -130,6 +130,7 @@ def arc_alto_to_json(
     db_block_name: str = "local",
     full_sync: bool = False,
 ):
+    logger = get_run_logger()
 
     # Load credentials
     postgres_creds = DatabaseCredentials.load(db_block_name)
@@ -144,6 +145,9 @@ def arc_alto_to_json(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
     ).result()
+
+    logger.info(f"Retrieved the following URL list: {url_list}")
+
     for representation_id, url in url_list:
         json_string = run_node_script.submit(url=url)
         transcript = extract_transcript.submit(json_string=json_string.result())
