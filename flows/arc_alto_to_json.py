@@ -46,49 +46,40 @@ def get_url_list(
 
 
 # Task to run the Node.js script and capture stdout as JSON
-@task
-def run_node_script(url_list: list[tuple[str, str]]):
+@task()
+def create_transcript(url_list: list[tuple[str, str]]):
     logger = get_run_logger()
 
-    for representation_id, url in url_list:
-        logger.info(
-            f"Creating JSON transcript for {url} from representation {representation_id}"
+    representation_id, url = url_list
+
+    logger.info(
+        f"Creating JSON transcript for {url} from representation {representation_id}"
+    )
+    try:
+        # Run the Node.js script using subprocess
+        result = subprocess.run(
+            ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
+            capture_output=True,
+            text=True,
         )
-        try:
-            # Run the Node.js script using subprocess
-            result = subprocess.run(
-                ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                raise Exception(f"Error running script for {url}: {result.stderr}")
+        if result.returncode != 0:
+            raise Exception(f"Error running script for {url}: {result.stderr}")
 
-            json_string = result.stdout
+        json_string = result.stdout
 
-            # process JSON
-            parsed_json = json.loads(json_string)
-            # get the full text
-            full_text = " ".join(item["text"] for item in parsed_json["text"])
-            yield (
-                representation_id,
-                f"{os.path.basename(url)}.json",
-                json_string,
-                full_text,
-            )
-        except Exception as e:
-            logger.error(f"Failed to process {url}: {str(e)}")
-            # raise e
-    logger.info(f"Processed {len(url_list)} URLs.")
-
-
-# @task()
-# def extract_transcript(json_string: str):
-#     # process JSON
-#     parsed_json = json.loads(json_string)
-#     # get the full text
-#     return " ".join(item["text"] for item in parsed_json["text"])
-
+        # process JSON
+        parsed_json = json.loads(json_string)
+        # get the full text
+        full_text = " ".join(item["text"] for item in parsed_json["text"])
+        return (
+            representation_id,
+            f"{os.path.basename(url)}.json",
+            json_string,
+            full_text,
+        )
+    except Exception as e:
+        logger.error(f"Failed to process {url}: {str(e)}")
+        # raise e
 
 @task(task_run_name="insert-{s3_url}-in-database")
 def insert_schema_transcript(
@@ -162,7 +153,7 @@ def arc_alto_to_json(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
     )
-    entries = run_node_script(url_list=url_list)
+    entries = create_transcript.map(url_list)
 
     for representation_id, key, json_string, full_text in entries:
 
