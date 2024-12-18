@@ -103,7 +103,12 @@ def insert_schema_transcript(
         f"Inserting {s3_url} into 'graph.schema_transcript_url' for {representation_id}"
     )
     cur.execute(
-        "INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) VALUES (%s, %s)",
+        """
+        INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
+        VALUES (%s, %s) 
+        ON CONFLICT(representation_id,schema_transcript_url) 
+        DO NOTHING
+        """,
         (representation_id, s3_url),
     )
     conn.commit()
@@ -148,7 +153,7 @@ def arc_alto_to_json(
             data=json_string.result().encode(),
             aws_credentials=s3_creds,
             aws_client_parameters=client_parameters,
-            wait_for=json_string
+            wait_for=json_string,
         )
         insert_schema_transcript.submit(
             representation_id=representation_id,
