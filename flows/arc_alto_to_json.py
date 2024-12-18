@@ -155,12 +155,11 @@ def arc_alto_to_json(
     if not full_sync:
         last_modified_date = get_last_run_config("%Y-%m-%d")
 
-    url_list = get_url_list.submit(
+    url_list = get_url_list(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
-    ).result()
-
-    entries = run_node_script.submit(url_list=url_list).result()
+    )
+    entries = run_node_script(url_list=url_list)
 
     for representation_id, key, json_string, full_text in entries:
 
