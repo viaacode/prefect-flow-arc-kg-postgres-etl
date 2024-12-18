@@ -40,7 +40,9 @@ def get_url_list(
     logger.info(f"Executing query on {postgres_credentials.host}: {sql_query}")
     cur = conn.cursor()
     cur.execute(sql_query)
-    return cur.fetchall()
+    url_list = cur.fetchall()
+    logger.info(f"Retrieved the following URL list: {url_list}")
+    return url_list
 
 
 # Task to run the Node.js script and capture stdout as JSON
@@ -106,8 +108,8 @@ def insert_schema_transcript(
         """
         INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
         VALUES (%s, %s) 
-        ON CONFLICT(representation_id,schema_transcript_url) 
-        DO NOTHING
+        ON CONFLICT(representation_id) 
+        DO UPDATE SET schema_transcript_url = EXCLUDED.schema_transcript_url;
         """,
         (representation_id, s3_url),
     )
@@ -130,7 +132,6 @@ def arc_alto_to_json(
     db_block_name: str = "local",
     full_sync: bool = False,
 ):
-
     # Load credentials
     postgres_creds = DatabaseCredentials.load(db_block_name)
     s3_creds = AwsCredentials.load(s3_block_name)
@@ -144,6 +145,7 @@ def arc_alto_to_json(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
     ).result()
+
     for representation_id, url in url_list:
         json_string = run_node_script.submit(url=url)
         transcript = extract_transcript.submit(json_string=json_string.result())
