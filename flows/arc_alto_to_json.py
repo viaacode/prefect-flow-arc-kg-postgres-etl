@@ -158,7 +158,7 @@ def arc_alto_to_json(
     url_list = get_url_list.submit(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
-    )
+    ).result()
 
     entries = run_node_script.submit(url_list=url_list).result()
 
@@ -167,10 +167,9 @@ def arc_alto_to_json(
         s3_key = s3_upload.submit(
             bucket=s3_bucket_name,
             key=key,
-            data=json_string.result().encode(),
+            data=json_string.encode(),
             aws_credentials=s3_creds,
             aws_client_parameters=client_parameters,
-            wait_for=json_string,
         )
         insert_schema_transcript.submit(
             representation_id=representation_id,
