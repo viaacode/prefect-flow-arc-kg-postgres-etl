@@ -51,6 +51,9 @@ def run_node_script(url_list: list[tuple[str, str]]):
     logger = get_run_logger()
 
     for representation_id, url in url_list:
+        logger.info(
+            f"Creating JSON transcript for {url} from representation {representation_id}"
+        )
         try:
             # Run the Node.js script using subprocess
             result = subprocess.run(
@@ -76,7 +79,7 @@ def run_node_script(url_list: list[tuple[str, str]]):
         except Exception as e:
             logger.error(f"Failed to process {url}: {str(e)}")
             # raise e
-    logger.error(f"Processed {len(url_list)} URLs.")
+    logger.info(f"Processed {len(url_list)} URLs.")
 
 
 # @task()
