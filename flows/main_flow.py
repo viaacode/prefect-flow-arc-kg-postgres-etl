@@ -5,7 +5,7 @@ from prefect_sqlalchemy.credentials import DatabaseCredentials
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect.task_runners import ConcurrentTaskRunner
 from arc_alto_to_json import arc_alto_to_json
-
+from enum import Enum
 
 class runMode(Enum):
     All = "All"
