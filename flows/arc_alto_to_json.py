@@ -22,7 +22,7 @@ def get_url_list(
     SELECT representation_id, premis_stored_at
     FROM graph.file f
     JOIN graph.includes i ON i.file_id = f.id
-    WHERE f.ebucore_has_mime_type IN ('application/xml', 'text/plain)  AND schema_name LIKE '%alto%'
+    WHERE f.ebucore_has_mime_type IN ('application/xml', 'text/plain') AND schema_name LIKE '%alto%'
     """
 
     if since is not None:
