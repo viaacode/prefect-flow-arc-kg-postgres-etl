@@ -15,7 +15,7 @@ from prefect_aws import AwsCredentials, AwsClientParameters
 def get_url_list(
     postgres_credentials: DatabaseCredentials,
     since: str = None,
-):
+) -> list[tuple[str, str]]:
     logger = get_run_logger()
 
     sql_query = """
@@ -47,30 +47,44 @@ def get_url_list(
 
 # Task to run the Node.js script and capture stdout as JSON
 @task(task_run_name="create-json-from-{url}")
-def run_node_script(url: str):
+def run_node_script(url_list: list[tuple[str, str]]):
     logger = get_run_logger()
 
-    try:
-        # Run the Node.js script using subprocess
-        result = subprocess.run(
-            ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise Exception(f"Error running script for {url}: {result.stderr}")
-        return result.stdout
-    except Exception as e:
-        logger.error(f"Failed to process {url}: {str(e)}")
-        raise e
+    for representation_id, url in url_list:
+        try:
+            # Run the Node.js script using subprocess
+            result = subprocess.run(
+                ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise Exception(f"Error running script for {url}: {result.stderr}")
+
+            json_string = result.stdout
+
+            # process JSON
+            parsed_json = json.loads(json_string)
+            # get the full text
+            full_text = " ".join(item["text"] for item in parsed_json["text"])
+            yield (
+                representation_id,
+                f"{os.path.basename(url)}.json",
+                json_string,
+                full_text,
+            )
+        except Exception as e:
+            logger.error(f"Failed to process {url}: {str(e)}")
+            # raise e
+    logger.error(f"Processed {len(url_list)} URLs.")
 
 
-@task()
-def extract_transcript(json_string: str):
-    # process JSON
-    parsed_json = json.loads(json_string)
-    # get the full text
-    return " ".join(item["text"] for item in parsed_json["text"])
+# @task()
+# def extract_transcript(json_string: str):
+#     # process JSON
+#     parsed_json = json.loads(json_string)
+#     # get the full text
+#     return " ".join(item["text"] for item in parsed_json["text"])
 
 
 @task(task_run_name="insert-{s3_url}-in-database")
@@ -144,14 +158,15 @@ def arc_alto_to_json(
     url_list = get_url_list.submit(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
-    ).result()
+    )
 
-    for representation_id, url in url_list:
-        json_string = run_node_script.submit(url=url)
-        transcript = extract_transcript.submit(json_string=json_string.result())
+    entries = run_node_script.submit(url_list=url_list).result()
+
+    for representation_id, key, json_string, full_text in entries:
+
         s3_key = s3_upload.submit(
             bucket=s3_bucket_name,
-            key=f"{os.path.basename(url)}.json",
+            key=key,
             data=json_string.result().encode(),
             aws_credentials=s3_creds,
             aws_client_parameters=client_parameters,
@@ -160,6 +175,7 @@ def arc_alto_to_json(
         insert_schema_transcript.submit(
             representation_id=representation_id,
             s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
-            transcript=transcript.result(),
+            transcript=full_text,
             postgres_credentials=postgres_creds,
+            wait_for=s3_key,
         )
