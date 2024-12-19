@@ -3,10 +3,8 @@ from prefect_sqlalchemy.credentials import DatabaseCredentials
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect.task_runners import ConcurrentTaskRunner
 
-# import subprocess
 import os
 import psycopg2
-import json
 from prefect_aws.s3 import s3_upload
 from prefect_aws import AwsCredentials, AwsClientParameters
 

@@ -7,6 +7,7 @@ from prefect.task_runners import ConcurrentTaskRunner
 from arc_alto_to_json import arc_alto_to_json
 from enum import Enum
 
+
 class runMode(Enum):
     All = "All"
     LoadDbOnly = "Load Database only"
