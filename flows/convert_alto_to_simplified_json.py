@@ -51,9 +51,11 @@ def extract_text_lines_from_alto(alto_tree: ET.ElementTree) -> SimplifiedAlto:
     alto_version = namespace.split("/")[-1]
 
     # Fallback for XML that is not well-formed
-    if namespace is None or not namespace.startswith("http://www.loc.gov/standards/alto/"):
+    if namespace is None or not namespace.startswith(
+        "http://www.loc.gov/standards/alto/"
+    ):
         alto_version = root.attrib.get("xsi:schemaLocation").split()[0].split("/")[-1]
-        namespace = ''
+        namespace = ""
 
     def get_text_lines_v2(layout):
         text_lines = []
