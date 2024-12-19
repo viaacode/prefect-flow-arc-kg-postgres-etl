@@ -1,7 +1,7 @@
 import {
 	convertAltoXmlFileUrlToSimplifiedJson,
 	type SimplifiedAlto,
-} from './extract-text-lines-from-alto-internal';
+} from './extract-text-lines-from-alto-internal.js';
 
 convertAltoXmlFileUrlToSimplifiedJson(process.argv[2]).then(
 	(simplifiedAltoJson: SimplifiedAlto) => {
