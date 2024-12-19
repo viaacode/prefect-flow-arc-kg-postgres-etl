@@ -47,50 +47,43 @@ def get_url_list(
 
 # Task to run the Node.js script and capture stdout as JSON
 @task
-def create_transcript(url_list: list[tuple[str, str]]):
+def create_transcript(url: str):
     logger = get_run_logger()
 
-    output = []
-    for representation_id, url in url_list:
-        logger.info(
-            f"Creating JSON transcript for {url} from representation {representation_id}"
+    try:
+        # Run the Node.js script using subprocess
+        result = subprocess.run(
+            ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
+            capture_output=True,
+            text=True,
         )
-        try:
-            # Run the Node.js script using subprocess
-            result = subprocess.run(
-                ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                raise Exception(f"Error running script for {url}: {result.stderr}")
+        if result.returncode != 0:
+            raise Exception(f"Error running script for {url}: {result.stderr}")
 
-            json_string = result.stdout
+        json_string = result.stdout
 
-            # process JSON
-            parsed_json = json.loads(json_string)
-            # get the full text
-            full_text = " ".join(item["text"] for item in parsed_json["text"])
-            output.append((
-                representation_id,
-                f"{os.path.basename(url)}.json",
-                json_string,
-                full_text,
-            ))
-        except Exception as e:
-            logger.error(f"Failed to process {url}: {str(e)}")
-            # raise e
-    logger.info(f"Processed {len(output)}/{len(url_list)} URLs.")
-    return output
+        return (
+            f"{os.path.basename(url)}.json",
+            json_string,
+        )
+    except Exception as e:
+        logger.error(f"Failed to process {url}: {str(e)}")
+        raise e
+
 
 @task(task_run_name="insert-{s3_url}-in-database")
 def insert_schema_transcript(
     representation_id: str,
     s3_url: str,
-    transcript: str,
+    json_string: str,
     postgres_credentials: DatabaseCredentials,
 ):
     logger = get_run_logger()
+
+    # process JSON
+    parsed_json = json.loads(json_string)
+    # get the full text
+    transcript = " ".join(item["text"] for item in parsed_json["text"])
 
     # connect to database
     conn = psycopg2.connect(
@@ -155,21 +148,27 @@ def arc_alto_to_json(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
     )
-    entries = create_transcript(url_list=url_list)
 
-    for representation_id, key, json_string, full_text in entries:
+    for representation_id, url in url_list:
+        transcript = create_transcript.submit(url=url)
 
-        s3_key = s3_upload.submit(
-            bucket=s3_bucket_name,
-            key=key,
-            data=json_string.encode(),
-            aws_credentials=s3_creds,
-            aws_client_parameters=client_parameters,
-        )
-        insert_schema_transcript.submit(
-            representation_id=representation_id,
-            s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
-            transcript=full_text,
-            postgres_credentials=postgres_creds,
-            wait_for=s3_key,
-        )
+        if not transcript.wait().is_failed():
+
+            key, json_string = transcript.result()
+
+            s3_key = s3_upload.submit(
+                bucket=s3_bucket_name,
+                key=key,
+                data=json_string.encode(),
+                aws_credentials=s3_creds,
+                aws_client_parameters=client_parameters,
+                wait_for=transcript,
+            )
+
+            insert_schema_transcript.submit(
+                representation_id=representation_id,
+                s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
+                transcript=json_string,
+                postgres_credentials=postgres_creds,
+                wait_for=s3_key,
+            )
