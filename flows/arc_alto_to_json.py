@@ -6,7 +6,6 @@ from prefect.task_runners import ConcurrentTaskRunner
 # import subprocess
 import os
 import psycopg2
-import json
 from prefect_aws.s3 import s3_upload
 from prefect_aws import AwsCredentials, AwsClientParameters
 
