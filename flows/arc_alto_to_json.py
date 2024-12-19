@@ -168,7 +168,7 @@ def arc_alto_to_json(
             insert_schema_transcript.submit(
                 representation_id=representation_id,
                 s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
-                transcript=json_string,
+                json_string=json_string,
                 postgres_credentials=postgres_creds,
                 wait_for=s3_key,
             )
