@@ -2,12 +2,18 @@ from prefect import flow, task, get_run_logger
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect.task_runners import ConcurrentTaskRunner
-import subprocess
+
+# import subprocess
 import os
 import psycopg2
 import json
 from prefect_aws.s3 import s3_upload
 from prefect_aws import AwsCredentials, AwsClientParameters
+
+from flows.convert_alto_to_simplified_json import (
+    SimplifiedAlto,
+    convert_alto_xml_url_to_simplified_json,
+)
 
 
 # Task to execute SPARQL query via API call and get file list
@@ -15,14 +21,14 @@ from prefect_aws import AwsCredentials, AwsClientParameters
 def get_url_list(
     postgres_credentials: DatabaseCredentials,
     since: str = None,
-):
+) -> list[tuple[str, str]]:
     logger = get_run_logger()
 
     sql_query = """
     SELECT representation_id, premis_stored_at
     FROM graph.file f
     JOIN graph.includes i ON i.file_id = f.id
-    WHERE f.ebucore_has_mime_type IN ('application/xml', 'text/plain)  AND schema_name LIKE '%alto%'
+    WHERE f.ebucore_has_mime_type IN ('application/xml', 'text/plain') AND schema_name LIKE '%alto%'
     """
 
     if since is not None:
@@ -40,42 +46,31 @@ def get_url_list(
     logger.info(f"Executing query on {postgres_credentials.host}: {sql_query}")
     cur = conn.cursor()
     cur.execute(sql_query)
-    return cur.fetchall()
+    url_list = cur.fetchall()
+    logger.info(f"Retrieved the following URL list: {url_list}")
+    return url_list
 
 
 # Task to run the Node.js script and capture stdout as JSON
-@task(task_run_name="create-json-from-{url}")
-def run_node_script(url: str):
+@task
+def create_transcript(url: str):
     logger = get_run_logger()
 
     try:
-        # Run the Node.js script using subprocess
-        result = subprocess.run(
-            ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
-            capture_output=True,
-            text=True,
+        return (
+            f"{os.path.basename(url)}.json",
+            convert_alto_xml_url_to_simplified_json(url),
         )
-        if result.returncode != 0:
-            raise Exception(f"Error running script for {url}: {result.stderr}")
-        return result.stdout
     except Exception as e:
         logger.error(f"Failed to process {url}: {str(e)}")
         raise e
-
-
-@task()
-def extract_transcript(json_string: str):
-    # process JSON
-    parsed_json = json.loads(json_string)
-    # get the full text
-    return " ".join(item["text"] for item in parsed_json["text"])
 
 
 @task(task_run_name="insert-{s3_url}-in-database")
 def insert_schema_transcript(
     representation_id: str,
     s3_url: str,
-    transcript: str,
+    alto_json: SimplifiedAlto,
     postgres_credentials: DatabaseCredentials,
 ):
     logger = get_run_logger()
@@ -96,14 +91,19 @@ def insert_schema_transcript(
     # insert transcript into table
     cur.execute(
         "UPDATE graph.representation SET schema_transcript = %s WHERE id = %s",
-        (transcript, representation_id),
+        (alto_json.to_transcript(), representation_id),
     )
     # insert url into table
     logger.info(
         f"Inserting {s3_url} into 'graph.schema_transcript_url' for {representation_id}"
     )
     cur.execute(
-        "INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) VALUES (%s, %s)",
+        """
+        INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
+        VALUES (%s, %s) 
+        ON CONFLICT(representation_id) 
+        DO UPDATE SET schema_transcript_url = EXCLUDED.schema_transcript_url;
+        """,
         (representation_id, s3_url),
     )
     conn.commit()
@@ -125,7 +125,6 @@ def arc_alto_to_json(
     db_block_name: str = "local",
     full_sync: bool = False,
 ):
-
     # Load credentials
     postgres_creds = DatabaseCredentials.load(db_block_name)
     s3_creds = AwsCredentials.load(s3_block_name)
@@ -135,24 +134,30 @@ def arc_alto_to_json(
     if not full_sync:
         last_modified_date = get_last_run_config("%Y-%m-%d")
 
-    url_list = get_url_list.submit(
+    url_list = get_url_list(
         postgres_creds,
         since=last_modified_date if not full_sync else None,
-    ).result()
+    )
+
     for representation_id, url in url_list:
-        json_string = run_node_script.submit(url=url)
-        transcript = extract_transcript.submit(json_string=json_string.result())
-        s3_key = s3_upload.submit(
-            bucket=s3_bucket_name,
-            key=f"{os.path.basename(url)}.json",
-            data=json_string.result().encode(),
-            aws_credentials=s3_creds,
-            aws_client_parameters=client_parameters,
-            wait_for=json_string
-        )
-        insert_schema_transcript.submit(
-            representation_id=representation_id,
-            s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
-            transcript=transcript.result(),
-            postgres_credentials=postgres_creds,
-        )
+        transcript = create_transcript.submit(url=url)
+
+        if not transcript.wait().is_failed():
+            key, alto_json = transcript.result()
+
+            s3_key = s3_upload.submit(
+                bucket=s3_bucket_name,
+                key=key,
+                data=str(alto_json).encode(),
+                aws_credentials=s3_creds,
+                aws_client_parameters=client_parameters,
+                wait_for=transcript,
+            )
+
+            insert_schema_transcript.submit(
+                representation_id=representation_id,
+                s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
+                alto_json=alto_json,
+                postgres_credentials=postgres_creds,
+                wait_for=s3_key,
+            )
