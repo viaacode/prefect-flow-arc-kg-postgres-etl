@@ -2,12 +2,17 @@ from prefect import flow, task, get_run_logger
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect.task_runners import ConcurrentTaskRunner
-import subprocess
+
+# import subprocess
 import os
 import psycopg2
 import json
 from prefect_aws.s3 import s3_upload
 from prefect_aws import AwsCredentials, AwsClientParameters
+
+from flows.convert_alto_to_simplified_json import (
+    convert_alto_xml_url_to_simplified_json,
+)
 
 
 # Task to execute SPARQL query via API call and get file list
@@ -51,20 +56,9 @@ def create_transcript(url: str):
     logger = get_run_logger()
 
     try:
-        # Run the Node.js script using subprocess
-        result = subprocess.run(
-            ["node", "typescript/lib/alto/extract-text-lines-from-alto.js", url],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise Exception(f"Error running script for {url}: {result.stderr}")
-
-        json_string = result.stdout
-
         return (
             f"{os.path.basename(url)}.json",
-            json_string,
+            convert_alto_xml_url_to_simplified_json(url),
         )
     except Exception as e:
         logger.error(f"Failed to process {url}: {str(e)}")
