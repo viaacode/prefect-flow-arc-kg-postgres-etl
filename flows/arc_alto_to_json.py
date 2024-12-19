@@ -47,7 +47,7 @@ def get_url_list(
     cur = conn.cursor()
     cur.execute(sql_query)
     url_list = cur.fetchall()
-    logger.info(f"Retrieved the following URL list: {url_list}")
+    logger.info(f"Retrieved {len(url_list)} URLs.")
     return url_list
 
 
