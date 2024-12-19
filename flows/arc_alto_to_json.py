@@ -153,7 +153,6 @@ def arc_alto_to_json(
         transcript = create_transcript.submit(url=url)
 
         if not transcript.wait().is_failed():
-
             key, json_string = transcript.result()
 
             s3_key = s3_upload.submit(
