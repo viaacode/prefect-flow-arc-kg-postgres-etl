@@ -82,6 +82,7 @@ def main_flow(
             s3_endpoint=s3_endpoint,
             db_block_name=db_block_name,
             full_sync=full_sync,
+            batch_size=batch_size,
             wait_for=load_db,
         )
 

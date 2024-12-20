@@ -136,7 +136,7 @@ def insert_schema_transcript_batch(
     psycopg2.extras.execute_values(
         cur,
         insert_query,
-        ((representation_id, s3_url) for representation_id, s3_url in batch),
+        ((representation_id, s3_url) for representation_id, s3_url, alto_json in batch),
         template=None,
         page_size=100,
     )
