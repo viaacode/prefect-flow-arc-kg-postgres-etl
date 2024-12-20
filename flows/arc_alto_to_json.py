@@ -61,7 +61,7 @@ def create_and_upload_transcript_batch(
         output = []
         for representation_id, url in batch:
             transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
-            key = f"{os.path.basename(url)}.json"
+            s3_key = f"{os.path.basename(url)}.json"
 
             logger.info(
                 "Uploading object to bucket %s with key %s", s3_bucket_name, key
@@ -73,8 +73,8 @@ def create_and_upload_transcript_batch(
 
             s3_client.put_object(
                 Bucket=s3_bucket_name,
-                Key=key,
-                Body=transcript,
+                Key=s3_key,
+                Body=str(transcript).encode("utf-8"),
             )
 
             output.append(
