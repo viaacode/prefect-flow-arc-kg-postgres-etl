@@ -48,7 +48,7 @@ def get_url_list(
     return url_list
 
 
-@task
+@task(tags=["etl-alto"])
 def create_and_upload_transcript_batch(
     batch: list[str, str],
     s3_bucket_name: str,
