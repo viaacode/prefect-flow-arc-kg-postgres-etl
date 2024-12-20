@@ -178,16 +178,16 @@ def arc_alto_to_json(
         batch = url_list[i : i + batch_size]
         # representation_id, url
         transcript = create_and_upload_transcript_batch.submit(
-            batch=batch,
+            batch,
             s3_bucket_name=s3_bucket_name,
             s3_credentials=s3_credentials,
             s3_client_parameters=s3_client_parameters,
         )
 
-        if not transcript.wait().is_failed():
-            # representation_id, s3_key, alto_json
-            insert_schema_transcript_batch.submit(
-                batch=transcript.result(),
-                postgres_credentials=postgres_creds,
-                wait_for=transcript,
-            )
+        #if not transcript.wait().is_failed():
+        # representation_id, s3_key, alto_json
+        insert_schema_transcript_batch.submit(
+            transcript,
+            postgres_credentials=postgres_creds,
+            wait_for=transcript,
+        )
