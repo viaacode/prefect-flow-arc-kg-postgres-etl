@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import psycopg2
 from prefect import flow, get_run_logger, task
@@ -61,7 +60,7 @@ def create_and_upload_transcript_batch(
         output = []
         for representation_id, url in batch:
             transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
-            s3_key = f"{Path.name(url)}.json"
+            s3_key = f"{os.path.basename(url)}.json"
 
             logger.info(
                 "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key,
