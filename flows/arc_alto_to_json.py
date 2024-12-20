@@ -57,37 +57,37 @@ def create_and_upload_transcript_batch(
 ) -> list[str, str, str]:
     logger = get_run_logger()
 
-        output = []
-        for representation_id, url in batch:
-            try:
-                transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
-                s3_key = f"{os.path.basename(url)}.json"
+    output = []
+    for representation_id, url in batch:
+        try:
+            transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
+            s3_key = f"{os.path.basename(url)}.json"
 
-                logger.info(
-                    "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key,
-                )
+            logger.info(
+                "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key,
+            )
 
-                s3_client = s3_credentials.get_boto3_session().client(
-                    "s3", **s3_client_parameters.get_params_override(),
-                )
+            s3_client = s3_credentials.get_boto3_session().client(
+                "s3", **s3_client_parameters.get_params_override(),
+            )
 
-                s3_client.put_object(
-                    Bucket=s3_bucket_name,
-                    Key=s3_key,
-                    Body=str(transcript).encode("utf-8"),
-                )
+            s3_client.put_object(
+                Bucket=s3_bucket_name,
+                Key=s3_key,
+                Body=str(transcript).encode("utf-8"),
+            )
 
-                output.append(
-                    (
-                        representation_id,
-                        f"{s3_client_parameters.endpoint_url}/{s3_bucket_name}/{s3_key}",
-                        transcript.to_transcript(),
-                    ),
-                )
-            except Exception as e:
-                logger.error("Failed to process Alto XML at %s to bucket %s with key %s: %s", url, s3_bucket_name, s3_key, str(e))
-                #raise e
-        return output
+            output.append(
+                (
+                    representation_id,
+                    f"{s3_client_parameters.endpoint_url}/{s3_bucket_name}/{s3_key}",
+                    transcript.to_transcript(),
+                ),
+            )
+        except Exception as e:
+            logger.error("Failed to process Alto XML at %s to bucket %s with key %s: %s", url, s3_bucket_name, s3_key, str(e))
+            #raise e
+    return output
 
     
 
