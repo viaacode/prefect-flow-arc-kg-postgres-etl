@@ -1,6 +1,7 @@
 import os
 
 import psycopg2
+import psycopg2.extras
 from prefect import flow, get_run_logger, task
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_aws import AwsClientParameters, AwsCredentials
