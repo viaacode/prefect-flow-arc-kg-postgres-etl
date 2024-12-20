@@ -1,14 +1,15 @@
+from enum import Enum
+
+from arc_alto_to_json import arc_alto_to_json
 from prefect import flow
+from prefect.task_runners import ConcurrentTaskRunner
+from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
-from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
-from prefect.task_runners import ConcurrentTaskRunner
-from arc_alto_to_json import arc_alto_to_json
-from enum import Enum
 
 
-class runMode(Enum):
+class RunMode(Enum):
     All = "All"
     LoadDbOnly = "Load Database only"
     ProcessAltoOnly = "Process Alto XML only"
@@ -20,7 +21,7 @@ class runMode(Enum):
     on_completion=[save_last_run_config],
 )
 def main_flow(
-    run_mode: runMode = runMode.All,
+    run_mode: RunMode = RunMode.All,
     triplydb_block_name: str = "triplydb",
     triplydb_owner: str = "meemoo",
     triplydb_dataset: str = "knowledge-graph",
@@ -39,13 +40,11 @@ def main_flow(
     batch_size: int = 100,
     full_sync: bool = False,
 ):
-    """
-    Flow to query the TriplyDB dataset and update the graphql database.
+    """Flow to query the TriplyDB dataset and update the graphql database.
     Blocks:
         - triplydb (TriplyDBCredentials): Credentials to connect to MediaHaven
         - hetarchief-tst (PostgresCredentials): Credentials to connect to the postgres database
     """
-
     # Load credentials
     triply_creds = TriplyDBCredentials.load(triplydb_block_name)
     postgres_creds = DatabaseCredentials.load(db_block_name)
@@ -53,7 +52,7 @@ def main_flow(
     # Figure out start time
     last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None
     load_db = None
-    if run_mode == runMode.All or run_mode == runMode.LoadDbOnly:
+    if run_mode in (RunMode.All, RunMode.LoadDbOnly):
         # Run javascript
         sync_service_script: str = "index.js"
 
@@ -76,13 +75,14 @@ def main_flow(
             since=last_modified_date,
         )
 
-    if run_mode == runMode.All or run_mode == runMode.ProcessAltoOnly:
+    if run_mode in (RunMode.All, RunMode.ProcessAltoOnly):
         arc_alto_to_json(
             s3_block_name=s3_block_name,
             s3_bucket_name=s3_bucket_name,
             s3_endpoint=s3_endpoint,
             db_block_name=db_block_name,
             full_sync=full_sync,
+            batch_size=batch_size,
             wait_for=load_db,
         )
 
