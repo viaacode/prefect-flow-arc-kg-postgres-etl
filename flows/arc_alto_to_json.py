@@ -64,11 +64,14 @@ def create_and_upload_transcript_batch(
             s3_key = f"{os.path.basename(url)}.json"
 
             logger.info(
-                "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key,
+                "Uploading object to bucket %s with key %s",
+                s3_bucket_name,
+                s3_key,
             )
 
             s3_client = s3_credentials.get_boto3_session().client(
-                "s3", **s3_client_parameters.get_params_override(),
+                "s3",
+                **s3_client_parameters.get_params_override(),
             )
 
             s3_client.put_object(
@@ -85,11 +88,14 @@ def create_and_upload_transcript_batch(
                 ),
             )
         except Exception as e:
-            logger.error("Failed to process Alto XML at %s to bucket %s with key %s: %s", url, s3_bucket_name, s3_key, str(e))
-            #raise e
+            logger.exception(
+                "Failed to process Alto XML at %s to bucket %s with key %s.",
+                url,
+                s3_bucket_name,
+                s3_key,
+            )
+            # raise e
     return output
-
-    
 
 
 @task
@@ -117,11 +123,14 @@ def insert_schema_transcript_batch(
         FROM (VALUES %s) AS data (id, schema_transcript) 
         WHERE graph.representation.id = data.id;
         """
-    
+
     psycopg2.extras.execute_values(
         cur,
         update_query,
-        ((representation_id, alto_json) for representation_id, s3_url, alto_json in batch),
+        (
+            (representation_id, alto_json)
+            for representation_id, s3_url, alto_json in batch
+        ),
         template=None,
         page_size=100,
     )
@@ -185,7 +194,7 @@ def arc_alto_to_json(
             s3_client_parameters=s3_client_parameters,
         )
 
-        #if not transcript.wait().is_failed():
+        # if not transcript.wait().is_failed():
         # representation_id, s3_key, alto_json
         insert_schema_transcript_batch.submit(
             transcript,
