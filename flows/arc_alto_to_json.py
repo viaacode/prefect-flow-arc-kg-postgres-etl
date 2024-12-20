@@ -57,18 +57,21 @@ def create_and_upload_transcript_batch(
 ) -> list[str, str, str]:
     logger = get_run_logger()
 
-    try:
-        output = []
-        for representation_id, url in batch:
+    output = []
+    for representation_id, url in batch:
+        try:
             transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
             s3_key = f"{os.path.basename(url)}.json"
 
             logger.info(
-                "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key,
+                "Uploading object to bucket %s with key %s",
+                s3_bucket_name,
+                s3_key,
             )
 
             s3_client = s3_credentials.get_boto3_session().client(
-                "s3", **s3_client_parameters.get_params_override(),
+                "s3",
+                **s3_client_parameters.get_params_override(),
             )
 
             s3_client.put_object(
@@ -84,11 +87,15 @@ def create_and_upload_transcript_batch(
                     transcript.to_transcript(),
                 ),
             )
-        return output
-
-    except Exception as e:
-        logger.error(f"Failed to process batch: {e!s}")
-        raise e
+        except Exception as e:
+            logger.exception(
+                "Failed to process Alto XML at %s to bucket %s with key %s.",
+                url,
+                s3_bucket_name,
+                s3_key,
+            )
+            # raise e
+    return output
 
 
 @task
@@ -116,11 +123,14 @@ def insert_schema_transcript_batch(
         FROM (VALUES %s) AS data (id, schema_transcript) 
         WHERE graph.representation.id = data.id;
         """
-    
+
     psycopg2.extras.execute_values(
         cur,
         update_query,
-        ((representation_id, alto_json) for representation_id, s3_url, alto_json in batch),
+        (
+            (representation_id, alto_json)
+            for representation_id, s3_url, alto_json in batch
+        ),
         template=None,
         page_size=100,
     )
@@ -184,7 +194,7 @@ def arc_alto_to_json(
             s3_client_parameters=s3_client_parameters,
         )
 
-        #if not transcript.wait().is_failed():
+        # if not transcript.wait().is_failed():
         # representation_id, s3_key, alto_json
         insert_schema_transcript_batch.submit(
             transcript,
