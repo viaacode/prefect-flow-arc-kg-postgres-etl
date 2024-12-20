@@ -110,13 +110,17 @@ def insert_schema_transcript_batch(
     cur = conn.cursor()
     logger.info(f"Updating {len(batch)} transcripts in 'graph.representation'")
     # insert transcript into table
-    update_query = (
-        "UPDATE graph.representation SET schema_transcript = %s WHERE id = %s"
-    )
+    update_query = """
+        UPDATE graph.representation 
+        SET schema_transcript = data.schema_transcript 
+        FROM (VALUES %s) AS data (id, schema_transcript) 
+        WHERE graph.representation.id = data.id;
+        """
+    
     psycopg2.extras.execute_values(
         cur,
         update_query,
-        ((alto_json, representation_id) for representation_id, s3_url, alto_json in batch),
+        ((representation_id, alto_json) for representation_id, s3_url, alto_json in batch),
         template=None,
         page_size=100,
     )
@@ -125,7 +129,7 @@ def insert_schema_transcript_batch(
     logger.info(f"Inserting {len(batch)} URLs into 'graph.schema_transcript_url'.")
     insert_query = """
         INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
-        VALUES (%s, %s) 
+        VALUES %s 
         ON CONFLICT(representation_id) 
         DO UPDATE SET schema_transcript_url = EXCLUDED.schema_transcript_url;
         """
