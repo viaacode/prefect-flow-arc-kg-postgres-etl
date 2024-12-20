@@ -15,7 +15,7 @@ from flows.convert_alto_to_simplified_json import (
 
 
 # Task to execute SPARQL query via API call and get file list
-@task()
+@task
 def get_url_list(
     postgres_credentials: DatabaseCredentials,
     since: str = None,
@@ -49,6 +49,42 @@ def get_url_list(
     return url_list
 
 
+@task
+def create_and_upload_transcript_batch(
+    batch: list[str, str],
+    s3_bucket_name: str,
+    s3_credentials: AwsCredentials,
+    s3_client_parameters: AwsClientParameters = AwsClientParameters(),
+):
+    logger = get_run_logger()
+
+    try:
+        output = []
+        for representation_id, url in batch:
+            transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
+            key = f"{os.path.basename(url)}.json"
+
+            s3_key = s3_upload(
+                bucket=s3_bucket_name,
+                key=key,
+                data=str(transcript).encode(),
+                aws_credentials=s3_credentials,
+                aws_client_parameters=s3_client_parameters,
+            )
+            output.append(
+                (
+                    representation_id,
+                    f"{s3_client_parameters.endpoint_url}/{s3_bucket_name}/{s3_key}",
+                    transcript.to_transcript(),
+                )
+            )
+        return output
+
+    except Exception as e:
+        logger.error(f"Failed to process batch: {str(e)}")
+        raise e
+
+
 # Task to run the Node.js script and capture stdout as JSON
 @task
 def create_transcript(url: str):
@@ -64,11 +100,9 @@ def create_transcript(url: str):
         raise e
 
 
-@task(task_run_name="insert-{s3_url}-in-database")
-def insert_schema_transcript(
-    representation_id: str,
-    s3_url: str,
-    alto_json: SimplifiedAlto,
+@task
+def insert_schema_transcript_batch(
+    batch: list[str, str, str],
     postgres_credentials: DatabaseCredentials,
 ):
     logger = get_run_logger()
@@ -83,26 +117,33 @@ def insert_schema_transcript(
         # connection_factory=LoggingConnection,
     )
     cur = conn.cursor()
-    logger.info(
-        f"Updating transcript in 'graph.representation' for {representation_id}"
-    )
+    logger.info(f"Updating {len(batch)} transcripts in 'graph.representation'")
     # insert transcript into table
-    cur.execute(
-        "UPDATE graph.representation SET schema_transcript = %s WHERE id = %s",
-        (alto_json.to_transcript(), representation_id),
+    update_query = (
+        "UPDATE graph.representation SET schema_transcript = %s WHERE id = %s"
     )
+    psycopg2.extras.execute_values(
+        cur,
+        update_query,
+        map(lambda item: (item[2], item[0]), batch),
+        template=None,
+        page_size=100,
+    )
+
     # insert url into table
-    logger.info(
-        f"Inserting {s3_url} into 'graph.schema_transcript_url' for {representation_id}"
-    )
-    cur.execute(
-        """
+    logger.info(f"Inserting {len(batch)} URLs into 'graph.schema_transcript_url'.")
+    insert_query = """
         INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
         VALUES (%s, %s) 
         ON CONFLICT(representation_id) 
         DO UPDATE SET schema_transcript_url = EXCLUDED.schema_transcript_url;
-        """,
-        (representation_id, s3_url),
+        """
+    psycopg2.extras.execute_values(
+        cur,
+        insert_query,
+        map(lambda item: (item[0], item[1]), batch),
+        template=None,
+        page_size=100,
     )
     conn.commit()
 
@@ -121,12 +162,13 @@ def arc_alto_to_json(
     s3_bucket_name: str = "hetarchief",
     s3_block_name: str = "arc-object-store",
     db_block_name: str = "local",
+    batch_size: int = 100,
     full_sync: bool = False,
 ):
     # Load credentials
     postgres_creds = DatabaseCredentials.load(db_block_name)
-    s3_creds = AwsCredentials.load(s3_block_name)
-    client_parameters = AwsClientParameters(endpoint_url=s3_endpoint)
+    s3_credentials = AwsCredentials.load(s3_block_name)
+    s3_client_parameters = AwsClientParameters(endpoint_url=s3_endpoint)
 
     # Figure out start time
     if not full_sync:
@@ -137,25 +179,20 @@ def arc_alto_to_json(
         since=last_modified_date if not full_sync else None,
     )
 
-    for representation_id, url in url_list:
-        transcript = create_transcript.submit(url=url)
+    for i in range(0, len(url_list), batch_size):
+        batch = url_list[i : i + batch_size]
+        # representation_id, url
+        transcript = create_and_upload_transcript_batch.submit(
+            batch=batch,
+            s3_bucket_name=s3_bucket_name,
+            s3_credentials=s3_credentials,
+            s3_client_parameters=s3_client_parameters,
+        )
 
         if not transcript.wait().is_failed():
-            key, alto_json = transcript.result()
-
-            s3_key = s3_upload.submit(
-                bucket=s3_bucket_name,
-                key=key,
-                data=str(alto_json).encode(),
-                aws_credentials=s3_creds,
-                aws_client_parameters=client_parameters,
-                wait_for=transcript,
-            )
-
-            insert_schema_transcript.submit(
-                representation_id=representation_id,
-                s3_url=f"{s3_endpoint}/{s3_bucket_name}/{s3_key.result()}",
-                alto_json=alto_json,
+            # representation_id, s3_key, alto_json
+            insert_schema_transcript_batch.submit(
+                batch=transcript.result(),
                 postgres_credentials=postgres_creds,
-                wait_for=s3_key,
+                wait_for=transcript,
             )
