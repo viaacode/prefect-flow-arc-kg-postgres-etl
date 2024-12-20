@@ -1,10 +1,11 @@
 import json
+import sys
+from typing import Dict, List, Optional
+
+import requests
 
 # import xml.etree.ElementTree as ET
 from lxml import etree as ET
-from typing import List, Dict, Optional
-import requests
-import sys
 
 
 class TextLine:
@@ -27,7 +28,7 @@ class TextLine:
 
 class SimplifiedAlto:
     def __init__(
-        self, description: Dict[str, Optional[str]], text: Optional[List[TextLine]]
+        self, description: Dict[str, Optional[str]], text: Optional[List[TextLine]],
     ):
         self.description = description
         self.text = text
@@ -52,7 +53,7 @@ def extract_text_lines_from_alto(alto_tree: ET.ElementTree) -> SimplifiedAlto:
 
     # Fallback for XML that is not well-formed
     if namespace is None or not namespace.startswith(
-        "http://www.loc.gov/standards/alto/"
+        "http://www.loc.gov/standards/alto/",
     ):
         alto_version = root.attrib.get("xsi:schemaLocation").split()[0].split("/")[-1]
         namespace = ""
@@ -73,7 +74,7 @@ def extract_text_lines_from_alto(alto_tree: ET.ElementTree) -> SimplifiedAlto:
                                         y=int(string.attrib.get("VPOS", 0)),
                                         width=int(string.attrib.get("WIDTH", 0)),
                                         height=int(string.attrib.get("HEIGHT", 0)),
-                                    )
+                                    ),
                                 )
         return text_lines
 
@@ -92,7 +93,7 @@ def extract_text_lines_from_alto(alto_tree: ET.ElementTree) -> SimplifiedAlto:
                                     y=int(string.attrib.get("VPOS", 0)),
                                     width=int(string.attrib.get("WIDTH", 0)),
                                     height=int(string.attrib.get("HEIGHT", 0)),
-                                )
+                                ),
                             )
         return text_lines
 
@@ -110,17 +111,17 @@ def extract_text_lines_from_alto(alto_tree: ET.ElementTree) -> SimplifiedAlto:
         file_name = description_element.findtext(f".//{{{namespace}}}fileName")
         if processing_step:
             processing_date_time = processing_step.findtext(
-                f".//{{{namespace}}}processingDateTime"
+                f".//{{{namespace}}}processingDateTime",
             )
             processing_step_settings = processing_step.findtext(
-                f".//{{{namespace}}}processingStepSettings"
+                f".//{{{namespace}}}processingStepSettings",
             )
             software_creator = processing_step.findtext(
-                f".//{{{namespace}}}softwareCreator"
+                f".//{{{namespace}}}softwareCreator",
             )
             software_name = processing_step.findtext(f".//{{{namespace}}}softwareName")
             software_version = processing_step.findtext(
-                f".//{{{namespace}}}softwareVersion"
+                f".//{{{namespace}}}softwareVersion",
             )
 
             return {
@@ -151,6 +152,7 @@ def extract_text_lines_from_alto(alto_tree: ET.ElementTree) -> SimplifiedAlto:
                     else {}
                 ),
             }
+        return {}
 
     if alto_version == "ns-v2#":
         layout = root.find(f".//{{{namespace}}}Layout")
@@ -169,7 +171,7 @@ def convert_alto_xml_url_to_simplified_json(url: str) -> SimplifiedAlto:
     response = requests.get(url)
     response.raise_for_status()
     alto_tree = ET.ElementTree(
-        ET.fromstring(response.content, ET.XMLParser(encoding="utf-8", recover=True))
+        ET.fromstring(response.content, ET.XMLParser(encoding="utf-8", recover=True)),
     )
     return extract_text_lines_from_alto(alto_tree)
 

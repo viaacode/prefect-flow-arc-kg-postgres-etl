@@ -1,11 +1,12 @@
-from prefect import flow, task, get_run_logger
-from prefect_sqlalchemy.credentials import DatabaseCredentials
-from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
-from prefect.task_runners import ConcurrentTaskRunner
-
 import os
+from pathlib import Path
+
 import psycopg2
-from prefect_aws import AwsCredentials, AwsClientParameters
+from prefect import flow, get_run_logger, task
+from prefect.task_runners import ConcurrentTaskRunner
+from prefect_aws import AwsClientParameters, AwsCredentials
+from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
+from prefect_sqlalchemy.credentials import DatabaseCredentials
 
 from flows.convert_alto_to_simplified_json import (
     SimplifiedAlto,
@@ -38,7 +39,6 @@ def get_url_list(
         host=postgres_credentials.host,
         port=postgres_credentials.port,
         database=postgres_credentials.database,
-        # connection_factory=LoggingConnection,
     )
     logger.info(f"Executing query on {postgres_credentials.host}: {sql_query}")
     cur = conn.cursor()
@@ -54,21 +54,21 @@ def create_and_upload_transcript_batch(
     s3_bucket_name: str,
     s3_credentials: AwsCredentials,
     s3_client_parameters: AwsClientParameters = AwsClientParameters(),
-):
+) -> list[str, str, str]:
     logger = get_run_logger()
 
     try:
         output = []
         for representation_id, url in batch:
             transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
-            s3_key = f"{os.path.basename(url)}.json"
+            s3_key = f"{Path.name(url)}.json"
 
             logger.info(
-                "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key
+                "Uploading object to bucket %s with key %s", s3_bucket_name, s3_key,
             )
 
             s3_client = s3_credentials.get_boto3_session().client(
-                "s3", **s3_client_parameters.get_params_override()
+                "s3", **s3_client_parameters.get_params_override(),
             )
 
             s3_client.put_object(
@@ -82,27 +82,12 @@ def create_and_upload_transcript_batch(
                     representation_id,
                     f"{s3_client_parameters.endpoint_url}/{s3_bucket_name}/{s3_key}",
                     transcript.to_transcript(),
-                )
+                ),
             )
         return output
 
     except Exception as e:
-        logger.error(f"Failed to process batch: {str(e)}")
-        raise e
-
-
-# Task to run the Node.js script and capture stdout as JSON
-@task
-def create_transcript(url: str):
-    logger = get_run_logger()
-
-    try:
-        return (
-            f"{os.path.basename(url)}.json",
-            convert_alto_xml_url_to_simplified_json(url),
-        )
-    except Exception as e:
-        logger.error(f"Failed to process {url}: {str(e)}")
+        logger.error(f"Failed to process batch: {e!s}")
         raise e
 
 
@@ -131,7 +116,7 @@ def insert_schema_transcript_batch(
     psycopg2.extras.execute_values(
         cur,
         update_query,
-        map(lambda item: (item[2], item[0]), batch),
+        ((alto_json, representation_id) for representation_id, s3_url, alto_json in batch),
         template=None,
         page_size=100,
     )
@@ -147,7 +132,7 @@ def insert_schema_transcript_batch(
     psycopg2.extras.execute_values(
         cur,
         insert_query,
-        map(lambda item: (item[0], item[1]), batch),
+        ((representation_id, s3_url) for representation_id, s3_url in batch),
         template=None,
         page_size=100,
     )
