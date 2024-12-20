@@ -5,7 +5,6 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 import os
 import psycopg2
-from prefect_aws.s3 import s3_upload
 from prefect_aws import AwsCredentials, AwsClientParameters
 
 from flows.convert_alto_to_simplified_json import (
@@ -64,13 +63,20 @@ def create_and_upload_transcript_batch(
             transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
             key = f"{os.path.basename(url)}.json"
 
-            s3_key = s3_upload(
-                bucket=s3_bucket_name,
-                key=key,
-                data=str(transcript).encode(),
-                aws_credentials=s3_credentials,
-                aws_client_parameters=s3_client_parameters,
+            logger.info(
+                "Uploading object to bucket %s with key %s", s3_bucket_name, key
             )
+
+            s3_client = s3_credentials.get_boto3_session().client(
+                "s3", **s3_client_parameters.get_params_override()
+            )
+
+            s3_client.put_object(
+                Bucket=s3_bucket_name,
+                Key=key,
+                Body=transcript,
+            )
+
             output.append(
                 (
                     representation_id,
