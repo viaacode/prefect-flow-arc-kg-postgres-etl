@@ -65,12 +65,6 @@ def create_and_upload_transcript_batch(
             transcript: SimplifiedAlto = convert_alto_xml_url_to_simplified_json(url)
             s3_key = f"{os.path.basename(url)}.json"
 
-            logger.info(
-                "Uploading object to bucket %s with key %s",
-                s3_bucket_name,
-                s3_key,
-            )
-
             s3_client = s3_credentials.get_boto3_session().client(
                 "s3",
                 **s3_client_parameters.get_params_override(),
@@ -89,6 +83,15 @@ def create_and_upload_transcript_batch(
                     transcript.to_transcript(),
                 ),
             )
+
+            # Print progress in 10 updates
+            if len(output) % (len(batch) / 10) == 0:
+                logger.info(
+                    "S3 Upload %s % done. Last object had key %s to bucket %s ",
+                    len(output)/len(batch),
+                    s3_key,
+                    s3_bucket_name,
+                )
 
         except Exception:
             logger.exception(
