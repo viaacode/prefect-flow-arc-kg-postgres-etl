@@ -1,6 +1,3 @@
-from enum import Enum
-
-from arc_alto_to_json import arc_alto_to_json
 from prefect import flow
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
@@ -9,19 +6,12 @@ from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 
 
-class RunMode(Enum):
-    All = "All"
-    LoadDbOnly = "Load Database only"
-    ProcessAltoOnly = "Process Alto XML only"
-
-
 @flow(
     name="prefect-flow-arc-kg-postgres-etl",
     task_runner=ConcurrentTaskRunner(),
     on_completion=[save_last_run_config],
 )
 def main_flow(
-    run_mode: RunMode = RunMode.All,
     triplydb_block_name: str = "triplydb",
     triplydb_owner: str = "meemoo",
     triplydb_dataset: str = "knowledge-graph",
@@ -33,9 +23,6 @@ def main_flow(
     skip_view: bool = False,
     skip_cleanup: bool = False,
     db_block_name: str = "local",  # "hetarchief-tst",
-    s3_endpoint: str = "https://assets-int.hetarchief.be",
-    s3_bucket_name: str = "hetarchief",
-    s3_block_name: str = "arc-object-store",
     record_limit: int = None,
     batch_size: int = 100,
     full_sync: bool = False,
@@ -51,41 +38,28 @@ def main_flow(
 
     # Figure out start time
     last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None
-    load_db = None
-    if run_mode in (RunMode.All, RunMode.LoadDbOnly):
-        # Run javascript
-        sync_service_script: str = "index.js"
 
-        load_db = run_javascript.with_options(
-            name=f"Sync KG to services with {sync_service_script}",
-        ).submit(
-            script_path=base_path + script_path + sync_service_script,
-            base_path=base_path,
-            triplydb=triply_creds,
-            triplydb_owner=triplydb_owner,
-            triplydb_dataset=triplydb_dataset,
-            triplydb_destination_dataset=triplydb_destination_dataset,
-            triplydb_destination_graph=triplydb_destination_graph,
-            skip_squash=skip_squash,
-            skip_view=skip_view,
-            skip_cleanup=skip_cleanup,
-            postgres=postgres_creds,
-            record_limit=record_limit,
-            batch_size=batch_size,
-            since=last_modified_date,
-        )
+    # Run javascript
+    sync_service_script: str = "index.js"
 
-    if run_mode in (RunMode.All, RunMode.ProcessAltoOnly):
-        arc_alto_to_json(
-            s3_block_name=s3_block_name,
-            s3_bucket_name=s3_bucket_name,
-            s3_endpoint=s3_endpoint,
-            db_block_name=db_block_name,
-            full_sync=full_sync,
-            batch_size=batch_size,
-            wait_for=load_db,
-        )
-
+    run_javascript.with_options(
+        name=f"Sync KG to services with {sync_service_script}",
+    ).submit(
+        script_path=base_path + script_path + sync_service_script,
+        base_path=base_path,
+        triplydb=triply_creds,
+        triplydb_owner=triplydb_owner,
+        triplydb_dataset=triplydb_dataset,
+        triplydb_destination_dataset=triplydb_destination_dataset,
+        triplydb_destination_graph=triplydb_destination_graph,
+        skip_squash=skip_squash,
+        skip_view=skip_view,
+        skip_cleanup=skip_cleanup,
+        postgres=postgres_creds,
+        record_limit=record_limit,
+        batch_size=batch_size,
+        since=last_modified_date,
+    )
 
 if __name__ == "__main__":
     main_flow(
