@@ -26,7 +26,8 @@ def get_url_list(
     SELECT representation_id, premis_stored_at
     FROM graph.file f
     JOIN graph.includes i ON i.file_id = f.id
-    WHERE f.ebucore_has_mime_type IN ('application/xml', 'text/plain') AND schema_name LIKE '%alto%'
+    WHERE f.ebucore_has_mime_type IN ('application/xml', 'text/plain') 
+    AND schema_name LIKE '%alto%'
     """
 
     if since is not None:
@@ -51,6 +52,7 @@ def get_url_list(
 @task(tags=["etl-alto"])
 def create_and_upload_transcript_batch(
     batch: list[str, str],
+    postgres_credentials: DatabaseCredentials,
     s3_bucket_name: str,
     s3_credentials: AwsCredentials,
     s3_client_parameters: AwsClientParameters = AwsClientParameters(),
@@ -87,7 +89,8 @@ def create_and_upload_transcript_batch(
                     transcript.to_transcript(),
                 ),
             )
-        except Exception as e:
+
+        except Exception:
             logger.exception(
                 "Failed to process Alto XML at %s to bucket %s with key %s.",
                 url,
@@ -95,10 +98,12 @@ def create_and_upload_transcript_batch(
                 s3_key,
             )
             # raise e
-    return output
+    insert_schema_transcript_batch(output, postgres_credentials=postgres_credentials)
+
+    # return output
 
 
-@task
+# @task
 def insert_schema_transcript_batch(
     batch: list[str, str, str],
     postgres_credentials: DatabaseCredentials,
@@ -115,7 +120,7 @@ def insert_schema_transcript_batch(
         # connection_factory=LoggingConnection,
     )
     cur = conn.cursor()
-    logger.info(f"Updating {len(batch)} transcripts in 'graph.representation'")
+    logger.info("Updating %s transcripts in 'graph.representation'.", len(batch))
     # insert transcript into table
     update_query = """
         UPDATE graph.representation 
@@ -136,7 +141,7 @@ def insert_schema_transcript_batch(
     )
 
     # insert url into table
-    logger.info(f"Inserting {len(batch)} URLs into 'graph.schema_transcript_url'.")
+    logger.info("Inserting %s URLs into 'graph.schema_transcript_url'.", len(batch))
     insert_query = """
         INSERT INTO graph.schema_transcript_url (representation_id, schema_transcript_url) 
         VALUES %s 
@@ -187,8 +192,9 @@ def arc_alto_to_json(
     for i in range(0, len(url_list), batch_size):
         batch = url_list[i : i + batch_size]
         # representation_id, url
-        transcript = create_and_upload_transcript_batch.submit(
+        create_and_upload_transcript_batch.submit(
             batch,
+            postgres_credentials=postgres_creds,
             s3_bucket_name=s3_bucket_name,
             s3_credentials=s3_credentials,
             s3_client_parameters=s3_client_parameters,
@@ -196,8 +202,8 @@ def arc_alto_to_json(
 
         # if not transcript.wait().is_failed():
         # representation_id, s3_key, alto_json
-        insert_schema_transcript_batch.submit(
-            transcript,
-            postgres_credentials=postgres_creds,
-            wait_for=transcript,
-        )
+        # insert_schema_transcript_batch.submit(
+        #     transcript,
+        #     postgres_credentials=postgres_creds,
+        #     wait_for=transcript,
+        # )
