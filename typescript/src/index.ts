@@ -115,7 +115,7 @@ async function processRecord(
 // Main function to parse and process the gzipped TriG file from a URL
 async function processGraph(graph: Graph) {
     // Retrieve total number of triples
-    const {totalNumberOfTriples} = await graph.getInfo()
+    const { numberOfStatements } = await graph.getInfo()
     // Retrieve the graph as a stream of RDFjs objects
     const quadStream = await graph.toStream('rdf-js')
     // Wrap stream processing in a promise so we can use a simple async/await
@@ -159,7 +159,7 @@ async function processGraph(graph: Graph) {
 
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
-                                logInfo(`Maximum batch size of ${BATCH_SIZE} reached for ${currentTableName}; processing (${Math.round((tripleCount/totalNumberOfTriples)*100)}% of graph). `)
+                                logInfo(`Maximum batch size of ${BATCH_SIZE} reached for ${currentTableName}; processing (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph). `)
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
@@ -295,7 +295,7 @@ async function main() {
         logInfo('--- Step 1: Construct view ---')
         start = performance.now()
 
-        const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset )
+        const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset)
 
         logInfo(`Deleting destination graph ${destination.graph}.`)
 
