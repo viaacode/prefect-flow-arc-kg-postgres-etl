@@ -156,7 +156,7 @@ async function processGraph(graph: Graph) {
 
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
-                                logDebug(`Maximum batch size reached for ${currentTableName}; processing.`)
+                                logDebug(`Maximum batch size of ${BATCH_SIZE} reached for ${currentTableName}; processing.`)
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
