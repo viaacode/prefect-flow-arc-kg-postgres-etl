@@ -114,12 +114,15 @@ async function processRecord(
 
 // Main function to parse and process the gzipped TriG file from a URL
 async function processGraph(graph: Graph) {
+    // Retrieve total number of triples
+    const { numberOfStatements } = await graph.getInfo()
     // Retrieve the graph as a stream of RDFjs objects
     const quadStream = await graph.toStream('rdf-js')
     // Wrap stream processing in a promise so we can use a simple async/await
     return new Promise<void>((resolve, reject) => {
         // Init counter for records
         let recordCount = 0
+        let tripleCount = 0
 
         // Init the batch cache
         const batches: { [tableName: string]: Record<string, string>[] } = {}
@@ -156,7 +159,7 @@ async function processGraph(graph: Graph) {
 
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
-                                logDebug(`Maximum batch size reached for ${currentTableName}; processing.`)
+                                logInfo(`Maximum batch size of ${BATCH_SIZE} reached for ${currentTableName}; processing (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph). `)
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
@@ -198,6 +201,7 @@ async function processGraph(graph: Graph) {
                         logWarning(`Possible unexpected additional value for ${columnName}: ${object}`, { language, currentTableName, currentSubject })
                     }
                 }
+                tripleCount++
             })
             // When the stream has ended
             .on('end', async () => {
@@ -291,7 +295,7 @@ async function main() {
         logInfo('--- Step 1: Construct view ---')
         start = performance.now()
 
-        const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset )
+        const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset)
 
         logInfo(`Deleting destination graph ${destination.graph}.`)
 
@@ -344,6 +348,8 @@ async function main() {
 
 
     // Upsert tables in the right order
+    const tables = tableIndex.overallOrder()
+    logInfo(`Upserting tables in order ${tables.join(', ')}.`)
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
         // upsert records from temp table into table; truncate tables if full sync
@@ -394,12 +400,12 @@ main().catch(async err => {
 // Disaster handling
 process.on('SIGTERM', signal => {
     logWarning(`Process ${process.pid} received a SIGTERM signal`, signal)
-    process.exit(0)
+    process.exit(1)
 })
 
 process.on('SIGINT', signal => {
     logWarning(`Process ${process.pid} has been interrupted`, signal)
-    process.exit(0)
+    process.exit(1)
 })
 
 process.on('uncaughtException', err => {

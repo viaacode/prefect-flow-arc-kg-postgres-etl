@@ -197,7 +197,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
 
     const { columns, tempTable, tableInfo } = tableNode
 
-    logInfo(`Start batch insert using COPY for ${tableInfo} using ${tempTable}`)
+    logInfo(`Start batch insert of ${batch.length} records using COPY for ${tableInfo} using ${tempTable}`)
 
     const columnList = columns.map(c => c.name).join(',')
     const copyQuery = `COPY ${tempTable} (${columnList}) FROM STDIN WITH (FORMAT csv)`
