@@ -160,7 +160,7 @@ async function processGraph(graph: Graph) {
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
                                 const memory = process.memoryUsage()
-                                logInfo(`Maximum batch size of ${BATCH_SIZE} (cur. batch: ${batches[currentTableName].length};${batches.length} batches) reached for ${currentTableName}; processing (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph; memory: ${memory.heapUsed}/${memory.heapTotal}). `)
+                                logInfo(`Maximum batch size of ${BATCH_SIZE} (cur. batch: ${batches[currentTableName].length};${Object.keys(batches).length} batches) reached for ${currentTableName}; processing (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph; memory: ${memory.heapUsed}/${memory.heapTotal}). `)
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
