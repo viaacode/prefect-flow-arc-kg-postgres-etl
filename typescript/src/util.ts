@@ -1,21 +1,24 @@
+import { LOGGING } from './configuration.js'
+
 export function logInfo(message: any, ...optionalParams: any[]) {
-    logPrefect('INFO', message, optionalParams)
+        logPrefect('INFO', message, optionalParams)
 }
 
 export function logError(message: any, ...optionalParams: any[]) {
-    logPrefect('ERROR', message, optionalParams)
+        logPrefect('ERROR', message, optionalParams)
 }
 
 export function logDebug(message: any, ...optionalParams: any[]) {
-    logPrefect('DEBUG', message, optionalParams)
+        logPrefect('DEBUG', message, optionalParams)
 }
 
 export function logWarning(message: any, ...optionalParams: any[]) {
-    logPrefect('WARNING', message, optionalParams)
+        logPrefect('WARNING', message, optionalParams)
 }
 
 export function logPrefect(level: "INFO" | "ERROR" | "DEBUG" | "WARNING", message: any, ...optionalParams: any[]) {
-    console.log(JSON.stringify({ PREFECT: { level, message, optionalParams } }))
+    if (LOGGING)
+        console.log(JSON.stringify({ PREFECT: { level, message, optionalParams } }))
 }
 
 export function getErrorMessage(e: unknown): string | undefined{

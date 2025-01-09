@@ -197,7 +197,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
 
     const { columns, tempTable, tableInfo } = tableNode
 
-    logInfo(`Start batch insert of ${batch.length} records using COPY for ${tableInfo} using ${tempTable}`)
+    logDebug(`Start batch insert of ${batch.length} records using COPY for ${tableInfo} using ${tempTable}`)
 
     const columnList = columns.map(c => c.name).join(',')
     const copyQuery = `COPY ${tempTable} (${columnList}) FROM STDIN WITH (FORMAT csv)`
@@ -237,7 +237,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
         batchCount++
-        logInfo(`Batch #${batchCount} for ${tableInfo} inserted!`)
+        logDebug(`Batch #${batchCount} for ${tableInfo} inserted!`)
     } catch (err) {
         await client.query('ROLLBACK')
         //TODO: fix error caused by logging
