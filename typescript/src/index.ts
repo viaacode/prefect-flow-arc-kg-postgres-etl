@@ -181,12 +181,6 @@ async function processGraph(graph: Graph) {
                     // Increment the number of processed records
                     recordCount++
                     
-                    const progress = Math.round((tripleCount / numberOfStatements) * 100)
-                    if (progress % 5 === 0) {
-                        const memory = process.memoryUsage()
-                        logInfo(`Processed (${progress}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase).`)
-                    }
-                    
 
                     currentSubject = subject
                     currentTableName = null
@@ -210,6 +204,12 @@ async function processGraph(graph: Graph) {
                     }
                 }
                 tripleCount++
+
+                const progress = (tripleCount / numberOfStatements) * 100
+                if (progress % 10 === 0) {
+                    const memory = process.memoryUsage()
+                    logInfo(`Processed (${Math.round(progress)}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase).`)
+                }
             })
             // When the stream has ended
             .on('end', async () => {
