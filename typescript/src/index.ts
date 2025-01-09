@@ -182,7 +182,7 @@ async function processGraph(graph: Graph) {
                     recordCount++
                     
                     const progress = Math.round((tripleCount / numberOfStatements) * 100)
-                    if (progress % 20) {
+                    if (progress % 5 === 0) {
                         const memory = process.memoryUsage()
                         logInfo(`Processed (${progress}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase).`)
                     }
