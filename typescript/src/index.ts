@@ -114,6 +114,8 @@ async function processRecord(
 
 // Main function to parse and process the gzipped TriG file from a URL
 async function processGraph(graph: Graph) {
+    // Take start memory
+    const startMemory = process.memoryUsage()
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
     // Retrieve the graph as a stream of RDFjs objects
@@ -159,8 +161,6 @@ async function processGraph(graph: Graph) {
 
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
-                                const memory = process.memoryUsage()
-                                logInfo(`Maximum batch size of ${BATCH_SIZE} (cur. batch: ${batches[currentTableName].length};${Object.keys(batches).length} batches) reached for ${currentTableName}; processing (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph; memory: ${memory.heapUsed}/${memory.heapTotal}). `)
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
@@ -180,6 +180,13 @@ async function processGraph(graph: Graph) {
 
                     // Increment the number of processed records
                     recordCount++
+                    
+                    const progress = Math.round((tripleCount / numberOfStatements) * 100)
+                    if (progress % 5 === 0) {
+                        const memory = process.memoryUsage()
+                        logInfo(`Processed (${progress}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase).`)
+                    }
+                    
 
                     currentSubject = subject
                     currentTableName = null
