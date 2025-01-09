@@ -26,7 +26,7 @@ def main_flow(
     record_limit: int = None,
     batch_size: int = 100,
     full_sync: bool = False,
-    logging: bool = True
+    logging_level: str = os.environ.get('PREFECT_LOGGING_LEVEL')
 ):
     """Flow to query the TriplyDB dataset and update the graphql database.
     Blocks:
@@ -60,7 +60,7 @@ def main_flow(
         record_limit=record_limit,
         batch_size=batch_size,
         since=last_modified_date,
-        logging=logging
+        logging_level=logging_level
     )
 
 if __name__ == "__main__":

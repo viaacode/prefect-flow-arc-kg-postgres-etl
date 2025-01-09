@@ -161,8 +161,6 @@ async function processGraph(graph: Graph) {
 
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
-                                const memory = process.memoryUsage()
-                                logWarning(`Maximum batch size of ${BATCH_SIZE} (cur. batch: ${batches[currentTableName].length};${Object.keys(batches).length} batches) reached for ${currentTableName}; processing (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase). `)
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
@@ -182,6 +180,13 @@ async function processGraph(graph: Graph) {
 
                     // Increment the number of processed records
                     recordCount++
+                    
+                    const progress = Math.round((tripleCount / numberOfStatements) * 100)
+                    if (progress % 10) {
+                        const memory = process.memoryUsage()
+                        logInfo(`Processed (${Math.round((tripleCount / numberOfStatements) * 100)}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase).`)
+                    }
+                    
 
                     currentSubject = subject
                     currentTableName = null
