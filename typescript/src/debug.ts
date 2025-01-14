@@ -1,13 +1,15 @@
 import memwatch from '@airbnb/node-memwatch'
-import { logDebug } from './util.js'
+import { logDebug, logInfo } from './util.js'
 import { DEBUG_MODE } from './configuration.js'
-let heapDiff = new memwatch.HeapDiff();
+let heapDiff: memwatch.HeapDiff
 
 if (DEBUG_MODE) {
+    logInfo('Debug mode is on.')
+    heapDiff = new memwatch.HeapDiff();
     setInterval(logHeap, 5*60*1000)
 }
 
 function logHeap() {
-    logDebug(JSON.stringify(heapDiff.end()));
+    logDebug('Heap difference',heapDiff.end());
     heapDiff = new memwatch.HeapDiff();
 }

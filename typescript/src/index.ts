@@ -22,10 +22,18 @@ import { logInfo, logError, logDebug, getErrorMessage, msToTime, logWarning } fr
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy } from './database.js'
 import { performance } from 'perf_hooks'
 
 const tableIndex = new DepGraph<TableNode>()
+
+const stats = {
+    recordCount: 0,
+    tripleCount: 0,
+    batchCount:0,
+    unprocessedBatches: 0,
+    numberOfStatements: 0
+}
 
 async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
     try {
@@ -91,7 +99,11 @@ async function processBatch(tableName: string, batch: Array<Record<string, strin
     // Get table information from the table index, or create a temp table if not exists
     const tableNode = tableIndex.hasNode(tableName) ? tableIndex.getNodeData(tableName) : await createTableNode(tableName)
     // Copy the batch to database
+    stats.unprocessedBatches++
+    stats.batchCount++
     await batchInsertUsingCopy(tableNode, batch)
+    stats.unprocessedBatches--
+    logDebug(`Batch #${stats.batchCount} (${batch.length} records; ${stats.tripleCount} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable}!`)
 }
 
 // Process each record and add it to the appropriate batch
@@ -101,7 +113,6 @@ async function processRecord(
     tableName: string,
     batches: { [tableName: string]: Array<Record<string, string>> }
 ): Promise<Record<string, string>[] | undefined> {
-    logDebug(`Process record for ${subject}: ${JSON.stringify(record)}`)
     // If parts are missing, do nothing
     if (!record || !tableName || !subject) return
     // Init batch for table if it does not exist yet
@@ -117,14 +128,12 @@ async function processRecord(
 async function processGraph(graph: Graph) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
+    logInfo(`Start processing graph of ${numberOfStatements} statements.`)
+    stats.numberOfStatements = numberOfStatements
     // Retrieve the graph as a stream of RDFjs objects
     const quadStream = await graph.toStream('rdf-js')
     // Wrap stream processing in a promise so we can use a simple async/await
     return new Promise<void>((resolve, reject) => {
-        // Init counter for records
-        let recordCount = 0
-        let tripleCount = 0
-
         // Init the batch cache
         const batches: { [tableName: string]: Record<string, string>[] } = {}
 
@@ -164,8 +173,6 @@ async function processGraph(graph: Graph) {
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
                             }
-
-                            logDebug(`Record ${recordCount} (${currentSubject}) processed`)
                         } finally {
                             // Resume the stream after the async function is done, also when failed.
                             quadStream.resume()
@@ -173,12 +180,12 @@ async function processGraph(graph: Graph) {
                     }
 
                     // If a set record limit is reached, stop the RDF stream
-                    if (RECORD_LIMIT && recordCount > RECORD_LIMIT) {
+                    if (RECORD_LIMIT && stats.recordCount > RECORD_LIMIT) {
                         return quadStream.destroy()
                     }
 
                     // Increment the number of processed records
-                    recordCount++
+                    stats.recordCount++
                     
 
                     currentSubject = subject
@@ -202,11 +209,11 @@ async function processGraph(graph: Graph) {
                         logWarning(`Possible unexpected additional value for ${columnName}: ${object}`, { language, currentTableName, currentSubject })
                     }
                 }
-                tripleCount++
+                stats.tripleCount++
 
-                const progress = (tripleCount / numberOfStatements) * 100
+                const progress = (stats.tripleCount / numberOfStatements) * 100
                 if (progress % 10 === 0) {
-                    logInfo(`Processed ${tripleCount} of ${numberOfStatements} statements (${Math.round(progress)}% of graph).`)
+                    logInfo(`Processed ${stats.recordCount} records (${stats.tripleCount} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
                 }
             })
             // When the stream has ended
@@ -223,7 +230,7 @@ async function processGraph(graph: Graph) {
                     }
                 }
 
-                logInfo(`Stream ended: ${recordCount} records processed (${tripleCount} of ${numberOfStatements} statements; ${batchCount}/${Math.ceil(recordCount / BATCH_SIZE) + tableIndex.size()} batches).`)
+                logInfo(`Stream ended: ${stats.recordCount} records processed (${stats.tripleCount} of ${numberOfStatements} statements; ${stats.batchCount}/${Math.ceil(stats.recordCount / BATCH_SIZE) + tableIndex.size()} batches).`)
                 // stream has been completely processed, resolve the promise.
                 resolve()
             })
@@ -399,27 +406,27 @@ main().catch(async err => {
     }
     process.exit(1)
 }).finally(async () => {
-    logDebug(`Unprocessed batches: ${unprocessedBatches}`)
+    logDebug(`Unprocessed batches: ${stats.unprocessedBatches}`)
     await closeConnectionPool()
 })
 
 // Disaster handling
 process.on('SIGTERM', signal => {
-    logWarning(`Process ${process.pid} received a SIGTERM signal`, signal)
+    logWarning(`Process ${process.pid} received a SIGTERM signal`, signal, stats)
     process.exit(1)
 })
 
 process.on('SIGINT', signal => {
-    logWarning(`Process ${process.pid} has been interrupted`, signal)
+    logWarning(`Process ${process.pid} has been interrupted`, signal, stats)
     process.exit(1)
 })
 
 process.on('uncaughtException', err => {
-    logError(`Uncaught Exception: ${err.message}`, err)
+    logError(`Uncaught Exception: ${err.message}`, err, stats)
     process.exit(1)
 })
 
 process.on('unhandledRejection', (reason, promise) => {
-    logError(`Unhandled rejection at ${promise}`, reason)
+    logError(`Unhandled rejection at ${promise}`, reason, stats)
     process.exit(1)
 })

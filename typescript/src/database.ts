@@ -10,9 +10,6 @@ import pg from 'pg'
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
 
-export let unprocessedBatches = 0
-export let batchCount = 0
-
 // Helper function to create a table dynamically based on the columns
 export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> {
     const client = await pool.connect()
@@ -20,13 +17,13 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
     const { schema, name } = tableInfo
     const tempTableInfo = new TableInfo(schema, `temp_${name}`)
 
-    logInfo(`Creating temp table ${tempTableInfo} from ${tableInfo} if not exists.`)
     const query = `
         DROP TABLE IF EXISTS ${tempTableInfo};
         CREATE TABLE ${tempTableInfo} (LIKE ${tableInfo} INCLUDING ALL EXCLUDING CONSTRAINTS);
     `
     try {
         await client.query(query)
+        logDebug(`Created new temp table ${tempTableInfo} from ${tableInfo}.`)
         return tempTableInfo
     } catch (err) {
         const msg = getErrorMessage(err)
@@ -40,12 +37,12 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
 
 export async function dropTable(tableInfo: TableInfo) {
     const client = await pool.connect()
-    logInfo(`Dropping table ${tableInfo} if exists.`)
     const query = `
         DROP TABLE IF EXISTS ${tableInfo};
     `
     try {
         await client.query(query)
+        logDebug(`Dropped table ${tableInfo} if exists.`)
         return tableInfo
     } catch (err) {
         const msg = getErrorMessage(err)
@@ -65,7 +62,6 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnInfo[
         FROM information_schema.columns
         WHERE table_name = $1 AND table_schema = $2
     `
-    logDebug(query)
     try {
         const { name, schema } = tableInfo
         const result = await client.query(query, [name, schema])
@@ -96,7 +92,6 @@ export async function getDependentTables(tableInfo: TableInfo): Promise<TableInf
             AND tc.table_schema=$2
             AND tc.table_name=$1;
     `
-    logDebug(query)
     try {
         const { name, schema } = tableInfo
         const result = await client.query(query, [name, schema])
@@ -117,7 +112,6 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
         SELECT COLUMN_NAME from information_schema.key_column_usage 
         WHERE table_name = $1 AND table_schema = $2 AND constraint_name LIKE '%pkey'
     `
-    logDebug(query)
     try {
         const { name, schema } = tableInfo
         const result = await client.query(query, [name, schema])
@@ -149,6 +143,7 @@ export async function processDeletes() {
     } catch (err) {
         await client.query('ROLLBACK')
         logError(`Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier":`, err)
+        throw err
     } finally {
         client.release()
     }
@@ -193,16 +188,11 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
 export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Record<string, string>>) {
     if (!batch.length) return
 
-    unprocessedBatches++
-
     const { columns, tempTable, tableInfo } = tableNode
-
-    logDebug(`Start batch insert of ${batch.length} records using COPY for ${tableInfo} using ${tempTable}`)
 
     const columnList = columns.map(c => c.name).join(',')
     const copyQuery = `COPY ${tempTable} (${columnList}) FROM STDIN WITH (FORMAT csv)`
 
-    logDebug(copyQuery)
     const client = await pool.connect()
     try {
         await client.query('BEGIN')
@@ -236,8 +226,6 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         sourceStream.end()
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
-        batchCount++
-        logDebug(`Batch #${batchCount} for ${tableInfo} inserted!`)
     } catch (err) {
         await client.query('ROLLBACK')
         //TODO: fix error caused by logging
@@ -259,7 +247,6 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         throw err
     } finally {
         client.release()
-        unprocessedBatches--
     }
 }
 
