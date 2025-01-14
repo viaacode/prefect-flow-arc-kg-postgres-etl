@@ -235,7 +235,7 @@ async function processGraph(graph: Graph) {
                 resolve()
             })
             .on('error', (err: Error) => {
-                logError('Error during parsing or processing:', err)
+                logError('Error during parsing or processing:', err, stats)
                 reject(err)
             })
     })
@@ -397,7 +397,7 @@ async function main() {
 
 main().catch(async err => {
     const msg = getErrorMessage(err)
-    logError(msg)
+    logError(msg, err, stats)
     if (!SKIP_CLEANUP) {
         logInfo('--- Graph and table cleanup because of error --')
         await cleanup()
@@ -422,7 +422,7 @@ process.on('SIGINT', signal => {
 })
 
 process.on('uncaughtException', err => {
-    logError(`Uncaught Exception: ${err.message}`, err, stats)
+    logError(`Uncaught Exception: ${err.message}`, err.stack, stats)
     process.exit(1)
 })
 
