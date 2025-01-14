@@ -23,6 +23,7 @@ def main_flow(
     skip_view: bool = False,
     skip_cleanup: bool = False,
     db_block_name: str = "local",  # "hetarchief-tst",
+    db_ssl: bool = True,
     record_limit: int = None,
     batch_size: int = 100,
     full_sync: bool = False,
@@ -62,7 +63,8 @@ def main_flow(
         batch_size=batch_size,
         since=last_modified_date,
         debug_mode=debug_mode,
-        logging_level=logging_level
+        logging_level=logging_level,
+        postgres_ssl=db_ssl,
     )
 
 if __name__ == "__main__":
