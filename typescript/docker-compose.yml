@@ -1,0 +1,8 @@
+services:
+
+  # ubuntu server
+  load_db_test:
+    build: .
+    image: load_db_test
+    #restart: always
+    network_mode: bridge

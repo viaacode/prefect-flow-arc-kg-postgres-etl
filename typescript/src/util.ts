@@ -1,4 +1,4 @@
-import { LOGGING_LEVEL } from './configuration.js'
+import { DEBUG_MODE, LOGGING_LEVEL } from './configuration.js'
 
 export function logInfo(message: any, ...optionalParams: any[]) {
     logPrefect('INFO', message, optionalParams)
@@ -9,7 +9,7 @@ export function logError(message: any, ...optionalParams: any[]) {
 }
 
 export function logDebug(message: any, ...optionalParams: any[]) {
-    if (LOGGING_LEVEL === 'DEBUG')
+    if (LOGGING_LEVEL === 'DEBUG' || DEBUG_MODE)
         logPrefect('DEBUG', message, optionalParams)
 }
 
@@ -20,7 +20,7 @@ export function logWarning(message: any, ...optionalParams: any[]) {
 
 export function logPrefect(level: "INFO" | "ERROR" | "DEBUG" | "WARNING", message: any, ...optionalParams: any[]) {
     if (LOGGING_LEVEL)
-        console.log(JSON.stringify({ PREFECT: { level, message, optionalParams } }))
+        process.stdout.write(JSON.stringify({ PREFECT: { time: new Date().toISOString(),level, message, ...optionalParams } }) + '\n')
 }
 
 export function getErrorMessage(e: unknown): string | undefined{
