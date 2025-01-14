@@ -19,6 +19,7 @@ import {
     SKIP_CLEANUP
 } from './configuration.js'
 import { logInfo, logError, logDebug, getErrorMessage, msToTime, logWarning } from './util.js'
+import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy, batchCount, unprocessedBatches } from './database.js'
@@ -114,8 +115,6 @@ async function processRecord(
 
 // Main function to parse and process the gzipped TriG file from a URL
 async function processGraph(graph: Graph) {
-    // Take start memory
-    const startMemory = process.memoryUsage()
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
     // Retrieve the graph as a stream of RDFjs objects
@@ -207,8 +206,7 @@ async function processGraph(graph: Graph) {
 
                 const progress = (tripleCount / numberOfStatements) * 100
                 if (progress % 10 === 0) {
-                    const memory = process.memoryUsage()
-                    logInfo(`Processed (${Math.round(progress)}% of graph; ${Math.round((memory.heapUsed - startMemory.heapUsed)/1000000)}mb memory increase).`)
+                    logInfo(`Processed ${tripleCount} of ${numberOfStatements} statements (${Math.round(progress)}% of graph).`)
                 }
             })
             // When the stream has ended
@@ -225,7 +223,7 @@ async function processGraph(graph: Graph) {
                     }
                 }
 
-                logInfo(`Processing completed: ${recordCount} records (${batchCount}/${Math.ceil(recordCount / BATCH_SIZE) + tableIndex.size()} batches).`)
+                logInfo(`Stream ended: ${recordCount} records processed (${tripleCount} of ${numberOfStatements} statements; ${batchCount}/${Math.ceil(recordCount / BATCH_SIZE) + tableIndex.size()} batches).`)
                 // stream has been completely processed, resolve the promise.
                 resolve()
             })

@@ -1,0 +1,23 @@
+services:
+
+  # ubuntu server
+  load_db_test:
+    build: .
+    #restart: always
+    environment:
+      - TRIPLYDB_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bmtub3duIiwiaXNzIjoiaHR0cHM6Ly9hcGkubWVlbW9vLnRyaXBseS5jYyIsImp0aSI6ImIwNzcyYzdkLTU2MzgtNDIzZS05Zjk3LTQxMjhiOWYwZDM1NSIsInVpZCI6IjY0ODA2YjFmNzIzZTRlYTIyZjllNzIyZCIsImlhdCI6MTczNjQwOTUxM30.i-3gJCvA12_KtnsHse3WPuR2yge4MV9u8P4v-vI1ibs
+      - TRIPLYDB_OWNER=meemoo
+      - TRIPLYDB_DATASET=knowledge-graph
+      - TRIPLYDB_DESTINATION_DATASET=hetarchief
+      - TRIPLYDB_DESTINATION_GRAPH=hetarchief
+      - POSTGRES_USERNAME=hetarchief
+      - POSTGRES_HOST=localhost
+      - POSTGRES_DATABASE=hetarchief
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_PORT=5555
+      - SKIP_VIEW=True
+      - SKIP_CLEANUP=True
+      - SKIP_SQUASH=True
+      - LOGGING_LEVEL=INFO
+      - BATCH_SIZE=1000
+    network_mode: bridge
