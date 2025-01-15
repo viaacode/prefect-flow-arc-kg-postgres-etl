@@ -18,7 +18,7 @@ import {
     SKIP_VIEW,
     SKIP_CLEANUP
 } from './configuration.js'
-import { logInfo, logError, logDebug, getErrorMessage, msToTime, logWarning } from './util.js'
+import { logInfo, logError, logDebug, msToTime, logWarning, stats, getProgress } from './util.js'
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
@@ -26,14 +26,6 @@ import { closeConnectionPool, createTempTable, getTableColumns, getDependentTabl
 import { performance } from 'perf_hooks'
 
 const tableIndex = new DepGraph<TableNode>()
-
-export const stats = {
-    recordCount: 0,
-    tripleCount: 0,
-    batchCount:0,
-    unprocessedBatches: 0,
-    numberOfStatements: 0
-}
 
 async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
     try {
@@ -174,7 +166,10 @@ async function processGraph(graph: Graph) {
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
                             }
-                        } finally {
+                        } catch (err) {
+                            logError('Error while processing record or batch', err)
+                        }
+                        finally {
                             // Resume the stream after the async function is done, also when failed.
                             quadStream.resume()
                         }
@@ -212,7 +207,7 @@ async function processGraph(graph: Graph) {
                 }
                 stats.tripleCount++
 
-                const progress = (stats.tripleCount / numberOfStatements) * 100
+                const progress = getProgress()
                 if (progress % 10 === 0) {
                     logInfo(`Processed ${stats.recordCount} records (${stats.tripleCount} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
                 }
@@ -236,7 +231,7 @@ async function processGraph(graph: Graph) {
                 resolve()
             })
             .on('error', (err: Error) => {
-                logError('Error during parsing or processing:', err, stats)
+                logError('Error during parsing or processing:', err)
                 reject(err)
             })
     })
@@ -397,8 +392,7 @@ async function main() {
 }
 
 main().catch(async err => {
-    const msg = getErrorMessage(err)
-    logError(msg, err, stats)
+    logError('Error in main function', err)
     if (!SKIP_CLEANUP) {
         logInfo('--- Graph and table cleanup because of error --')
         await cleanup()
@@ -407,27 +401,27 @@ main().catch(async err => {
     }
     process.exit(1)
 }).finally(async () => {
-    logDebug(`Unprocessed batches: ${stats.unprocessedBatches}`)
+    logDebug('Closing connection pool')
     await closeConnectionPool()
 })
 
 // Disaster handling
 process.on('SIGTERM', signal => {
-    logWarning(`Process ${process.pid} received a SIGTERM signal`, signal, stats)
+    logWarning(`Process ${process.pid} received a SIGTERM signal`, signal)
     process.exit(1)
 })
 
 process.on('SIGINT', signal => {
-    logWarning(`Process ${process.pid} has been interrupted`, signal, stats)
+    logWarning(`Process ${process.pid} has been interrupted`, signal)
     process.exit(1)
 })
 
 process.on('uncaughtException', err => {
-    logError(`Uncaught Exception: ${err.message}`, err.stack, stats)
+    logError('Uncaught Exception', err, err.stack)
     process.exit(1)
 })
 
 process.on('unhandledRejection', (reason, promise) => {
-    logError(`Unhandled rejection at ${promise}`, reason, stats)
+    logError(`Unhandled rejection at ${promise}`, reason)
     process.exit(1)
 })
