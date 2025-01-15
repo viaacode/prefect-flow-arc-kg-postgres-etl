@@ -11,8 +11,8 @@ import pg from 'pg'
 const pool = new pg.Pool(dbConfig)
 
 pool.on("error", (err: Error) => {
-    logError(`Error received on db pool`, err, err.stack);
-});
+    logError('Error received on db pool', err, err.stack)
+})
 
 
 // Helper function to create a table dynamically based on the columns

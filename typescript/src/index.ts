@@ -183,7 +183,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
 
                     // Increment the number of processed records
                     stats.recordCount++
-                    
+
 
                     currentSubject = subject
                     currentTableName = null

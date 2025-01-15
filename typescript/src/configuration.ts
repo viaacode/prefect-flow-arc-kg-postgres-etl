@@ -32,7 +32,7 @@ export const dbConfig = {
     password: process.env.POSTGRES_PASSWORD ?? 'password',
     ssl: process.env.POSTGRES_SSL === 'True' ? {
         rejectUnauthorized: false
-    }: false
+    } : false
 }
 
 export const DEBUG_MODE = process.env.DEBUG_MODE === 'True'
