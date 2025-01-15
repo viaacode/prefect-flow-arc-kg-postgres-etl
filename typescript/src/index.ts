@@ -27,7 +27,7 @@ import { performance } from 'perf_hooks'
 
 const tableIndex = new DepGraph<TableNode>()
 
-const stats = {
+export const stats = {
     recordCount: 0,
     tripleCount: 0,
     batchCount:0,
@@ -101,9 +101,10 @@ async function processBatch(tableName: string, batch: Array<Record<string, strin
     // Copy the batch to database
     stats.unprocessedBatches++
     stats.batchCount++
+    const start = performance.now()
     await batchInsertUsingCopy(tableNode, batch)
     stats.unprocessedBatches--
-    logDebug(`Batch #${stats.batchCount} (${batch.length} records; ${stats.tripleCount} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable}!`)
+    logDebug(`Batch #${stats.batchCount} (${batch.length} records; ${stats.tripleCount} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 }
 
 // Process each record and add it to the appropriate batch

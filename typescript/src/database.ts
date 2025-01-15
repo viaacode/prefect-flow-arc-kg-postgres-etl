@@ -6,9 +6,15 @@ import { stringify as stringifySync } from 'csv-stringify/sync'
 import { pipeline } from 'node:stream/promises'
 import { dbConfig } from './configuration.js'
 import pg from 'pg'
+import { stats } from './index.js'
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
+
+pool.on("error", (err: Error) => {
+    logError(`Error received on db pool: ${err.message}`, err.stack, stats);
+});
+
 
 // Helper function to create a table dynamically based on the columns
 export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> {
@@ -27,7 +33,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
         return tempTableInfo
     } catch (err) {
         const msg = getErrorMessage(err)
-        logError(`Error creating table ${tempTableInfo}:`, msg)
+        logError(`Error creating table ${tempTableInfo}.`, msg)
         throw err
     }
     finally {
@@ -46,7 +52,7 @@ export async function dropTable(tableInfo: TableInfo) {
         return tableInfo
     } catch (err) {
         const msg = getErrorMessage(err)
-        logError(`Error dropping table ${tableInfo}:`, msg)
+        logError(`Error dropping table ${tableInfo}.`, msg)
         throw err
     }
     finally {
@@ -68,7 +74,7 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnInfo[
         return result.rows
     } catch (err) {
         const msg = getErrorMessage(err)
-        logError(`Error retrieving columns for table ${tableInfo}:`, msg)
+        logError(`Error retrieving columns for table ${tableInfo}.`, msg)
         throw err
     } finally {
         client.release()

@@ -31,7 +31,8 @@ export const dbConfig = {
     password: process.env.POSTGRES_PASSWORD ?? 'password',
     ssl: process.env.POSTGRES_SSL === 'True' ? {
         rejectUnauthorized: false
-    }: false
+    }: false,
+    idleTimeoutMillis: 60 * 1000 // clients can be idle for 1 minute
 }
 
 export const DEBUG_MODE = process.env.DEBUG_MODE === 'True'
