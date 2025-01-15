@@ -6,6 +6,7 @@ from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 import os
 
+
 @flow(
     name="prefect-flow-arc-kg-postgres-etl",
     task_runner=ConcurrentTaskRunner(),
@@ -25,10 +26,11 @@ def main_flow(
     db_block_name: str = "local",  # "hetarchief-tst",
     db_ssl: bool = True,
     record_limit: int = None,
+    record_offset: int = 0,
     batch_size: int = 100,
     full_sync: bool = False,
     debug_mode: bool = False,
-    logging_level: str = os.environ.get('PREFECT_LOGGING_LEVEL')
+    logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
 ):
     """Flow to query the TriplyDB dataset and update the graphql database.
     Blocks:
@@ -60,12 +62,14 @@ def main_flow(
         skip_cleanup=skip_cleanup,
         postgres=postgres_creds,
         record_limit=record_limit,
+        record_offset=record_offset,
         batch_size=batch_size,
         since=last_modified_date,
         debug_mode=debug_mode,
         logging_level=logging_level,
         postgres_ssl=db_ssl,
     )
+
 
 if __name__ == "__main__":
     main_flow(

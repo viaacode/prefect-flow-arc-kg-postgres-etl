@@ -32,7 +32,8 @@ export function logWarning(message: any, ...optionalParams: any[]) {
 
 export function logPrefect(level: "INFO" | "ERROR" | "DEBUG" | "WARNING", message: any, ...optionalParams: any[]) {
     if (LOGGING_LEVEL)
-        process.stdout.write(JSON.stringify({ PREFECT: { time: new Date().toISOString(), level, message, stats, context: optionalParams } }) + '\n')
+        console.log(JSON.stringify({ PREFECT: { time: new Date().toISOString(), level, message, stats, context: optionalParams } }))
+        //process.stdout.write(JSON.stringify({ PREFECT: { time: new Date().toISOString(), level, message, stats, context: optionalParams } }) + '\n')
 }
 
 export function getErrorMessage(e: unknown): string | undefined {

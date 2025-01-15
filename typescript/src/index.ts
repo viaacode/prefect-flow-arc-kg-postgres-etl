@@ -16,7 +16,8 @@ import {
     SKIP_SQUASH,
     TABLE_PRED,
     SKIP_VIEW,
-    SKIP_CLEANUP
+    SKIP_CLEANUP,
+    RECORD_OFFSET
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats, getProgress } from './util.js'
 import './debug.js'
@@ -118,7 +119,7 @@ async function processRecord(
 }
 
 // Main function to parse and process the gzipped TriG file from a URL
-async function processGraph(graph: Graph) {
+async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?: number | null) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
     logInfo(`Start processing graph of ${numberOfStatements} statements.`)
@@ -153,7 +154,7 @@ async function processGraph(graph: Graph) {
                 // If the subject changes, create a new record
                 if (subject !== currentSubject) {
                     // Process the current record if there is one
-                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null) {
+                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && recordOffset <= stats.recordCount) {
                         try {
                             // Pause the stream so it does not prevent async processRecord function from executing
                             quadStream.pause()
@@ -176,7 +177,7 @@ async function processGraph(graph: Graph) {
                     }
 
                     // If a set record limit is reached, stop the RDF stream
-                    if (RECORD_LIMIT && stats.recordCount > RECORD_LIMIT) {
+                    if (recordLimit && stats.recordCount > recordLimit) {
                         return quadStream.destroy()
                     }
 
@@ -209,7 +210,7 @@ async function processGraph(graph: Graph) {
 
                 const progress = getProgress()
                 if (progress % 10 === 0) {
-                    logInfo(`Processed ${stats.recordCount} records (${stats.tripleCount} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
+                    logInfo(`Processed ${stats.recordCount} records (record offset: ${recordOffset}; ${stats.tripleCount} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
                 }
             })
             // When the stream has ended
@@ -341,7 +342,7 @@ async function main() {
     // Get destination graph and process
     const graph = await destination.dataset.getGraph(destination.graph)
 
-    await processGraph(graph)
+    await processGraph(graph, RECORD_OFFSET, RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
     logInfo('--- Step 3: upsert tables --')
