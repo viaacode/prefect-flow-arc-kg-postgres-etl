@@ -10,6 +10,7 @@ export const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
 // ENV variables
 export const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '100', 10)
 export const RECORD_LIMIT = process.env.RECORD_LIMIT ? parseInt(process.env.RECORD_LIMIT, 10) : null
+export const RECORD_OFFSET = process.env.RECORD_OFFSET ? parseInt(process.env.RECORD_OFFSET, 10) : 0
 export const SINCE = process.env.SINCE ? new Date(process.env.SINCE).toISOString() : undefined
 export const SKIP_SQUASH = process.env.SKIP_SQUASH === 'True'
 export const SKIP_VIEW = process.env.SKIP_VIEW === 'True'
@@ -31,8 +32,7 @@ export const dbConfig = {
     password: process.env.POSTGRES_PASSWORD ?? 'password',
     ssl: process.env.POSTGRES_SSL === 'True' ? {
         rejectUnauthorized: false
-    }: false,
-    idleTimeoutMillis: 60 * 1000 // clients can be idle for 1 minute
+    } : false
 }
 
 export const DEBUG_MODE = process.env.DEBUG_MODE === 'True'

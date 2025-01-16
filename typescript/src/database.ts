@@ -1,19 +1,18 @@
 import { TableInfo, ColumnInfo, TableNode } from './types.js'
-import { logInfo, getErrorMessage, logError, logDebug, isValidDate } from './util.js'
+import { logInfo, logError, logDebug, isValidDate, stats } from './util.js'
 import { from } from 'pg-copy-streams'
 import { stringify } from 'csv-stringify'
 import { stringify as stringifySync } from 'csv-stringify/sync'
 import { pipeline } from 'node:stream/promises'
 import { dbConfig } from './configuration.js'
 import pg from 'pg'
-import { stats } from './index.js'
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
 
 pool.on("error", (err: Error) => {
-    logError(`Error received on db pool: ${err.message}`, err.stack, stats);
-});
+    logError('Error received on db pool', err, err.stack)
+})
 
 
 // Helper function to create a table dynamically based on the columns
@@ -32,8 +31,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
         logDebug(`Created new temp table ${tempTableInfo} from ${tableInfo}.`)
         return tempTableInfo
     } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error creating table ${tempTableInfo}.`, msg)
+        logError(`Error creating table ${tempTableInfo}`, err)
         throw err
     }
     finally {
@@ -51,8 +49,7 @@ export async function dropTable(tableInfo: TableInfo) {
         logDebug(`Dropped table ${tableInfo} if exists.`)
         return tableInfo
     } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error dropping table ${tableInfo}.`, msg)
+        logError(`Error dropping table ${tableInfo}`, err)
         throw err
     }
     finally {
@@ -73,8 +70,7 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnInfo[
         const result = await client.query(query, [name, schema])
         return result.rows
     } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error retrieving columns for table ${tableInfo}.`, msg)
+        logError(`Error retrieving columns for table ${tableInfo}`, err)
         throw err
     } finally {
         client.release()
@@ -103,8 +99,7 @@ export async function getDependentTables(tableInfo: TableInfo): Promise<TableInf
         const result = await client.query(query, [name, schema])
         return result.rows
     } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error retrieving dependent tables for table ${tableInfo}:`, msg)
+        logError(`Error retrieving dependent tables for table ${tableInfo}`, err)
         throw err
     } finally {
         client.release()
@@ -123,8 +118,7 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
         const result = await client.query(query, [name, schema])
         return result.rows.map((row: { column_name: string }) => row.column_name)
     } catch (err) {
-        const msg = getErrorMessage(err)
-        logError(`Error retrieving columns for table ${tableInfo}:`, msg)
+        logError(`Error retrieving columns for table ${tableInfo}`, err)
         throw err
     } finally {
         client.release()
@@ -148,7 +142,7 @@ export async function processDeletes() {
         logInfo(`Deleted ${result} records from table graph."intellectual_entity" and graph."mh_fragment_identifier"`)
     } catch (err) {
         await client.query('ROLLBACK')
-        logError(`Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier":`, err)
+        logError('Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier"', err)
         throw err
     } finally {
         client.release()
@@ -182,8 +176,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
         logInfo(`Records for table ${tableInfo} upserted!`)
     } catch (err) {
         await client.query('ROLLBACK')
-        const msg = getErrorMessage(err)
-        logError(`Error during upsert from '${tempTable}' to '${tableInfo}':`, msg)
+        logError(`Error during upsert from '${tempTable}' to '${tableInfo}'`, err)
         throw err
     } finally {
         client.release()
@@ -234,9 +227,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         await client.query('COMMIT')
     } catch (err) {
         await client.query('ROLLBACK')
-        //TODO: fix error caused by logging
-        const msg = getErrorMessage(err)
-        logError(`Error during bulk insert for table ${tableInfo}:`, msg)
+        logError(`Error during bulk insert for table ${tableInfo}`, err)
         const result = stringifySync(
             batch.map(record => columns.map(col => record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])) ? null : record[col.name])),
             {
@@ -248,8 +239,9 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
                 }
             }
         )
-        logError(`Erroreous batch (CSV):`, result)
-        logError(`Erroreous batch (JSON):`,`${JSON.stringify(batch)}`)
+        logError(`Erroreous batch (CSV)`, result)
+        logError(`Erroreous batch (JSON)`, JSON.stringify(batch))
+        stats.batchRollbacks++
         throw err
     } finally {
         client.release()
