@@ -1,16 +1,7 @@
 import { DEBUG_MODE, LOGGING_LEVEL } from './configuration.js'
+import { Stats } from './stats.js'
 
-export const stats = {
-    recordCount: 0,
-    tripleCount: 0,
-    batchCount: 0,
-    unprocessedBatches: 0,
-    numberOfStatements: 0
-}
-
-export function getProgress() {
-    return stats.numberOfStatements > 0 ? (stats.tripleCount / stats.numberOfStatements) * 100 : -1
-}
+export const stats = new Stats()
 
 export function logInfo(message: any, ...optionalParams: any[]) {
     logPrefect('INFO', message, optionalParams)

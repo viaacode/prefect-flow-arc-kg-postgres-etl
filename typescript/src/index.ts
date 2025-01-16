@@ -19,7 +19,7 @@ import {
     SKIP_CLEANUP,
     RECORD_OFFSET
 } from './configuration.js'
-import { logInfo, logError, logDebug, msToTime, logWarning, stats, getProgress } from './util.js'
+import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
@@ -92,12 +92,9 @@ async function processBatch(tableName: string, batch: Array<Record<string, strin
     // Get table information from the table index, or create a temp table if not exists
     const tableNode = tableIndex.hasNode(tableName) ? tableIndex.getNodeData(tableName) : await createTableNode(tableName)
     // Copy the batch to database
-    stats.unprocessedBatches++
-    stats.batchCount++
     const start = performance.now()
     await batchInsertUsingCopy(tableNode, batch)
-    stats.unprocessedBatches--
-    logDebug(`Batch #${stats.batchCount} (${batch.length} records; ${stats.tripleCount} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
+    logDebug(`Batch #${stats.batchIndex} (${batch.length} records; ${stats.statementIndex} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 }
 
 // Process each record and add it to the appropriate batch
@@ -154,7 +151,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                 // If the subject changes, create a new record
                 if (subject !== currentSubject) {
                     // Process the current record if there is one
-                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && recordOffset <= stats.recordCount) {
+                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && recordOffset <= stats.recordIndex) {
                         try {
                             // Pause the stream so it does not prevent async processRecord function from executing
                             quadStream.pause()
@@ -166,6 +163,8 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                                 await processBatch(currentTableName, batch)
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
+                                // Freeze the current recordIndex in recordIndex
+                                stats.processedRecordIndex = stats.recordIndex
                             }
                         } catch (err) {
                             logError('Error while processing record or batch', err)
@@ -176,18 +175,17 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                         }
                     }
 
+                    currentSubject = subject
+                    currentTableName = null
+                    currentRecord = {}
+
                     // If a set record limit is reached, stop the RDF stream
-                    if (recordLimit && stats.recordCount > recordLimit) {
+                    if (recordLimit && stats.recordIndex > recordLimit) {
                         return quadStream.destroy()
                     }
 
                     // Increment the number of processed records
-                    stats.recordCount++
-
-
-                    currentSubject = subject
-                    currentTableName = null
-                    currentRecord = {}
+                    stats.recordIndex++
                 }
 
                 // Check for the record type
@@ -206,11 +204,11 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                         logWarning(`Possible unexpected additional value for ${columnName}: ${object}`, { language, currentTableName, currentSubject })
                     }
                 }
-                stats.tripleCount++
+                stats.statementIndex++
 
-                const progress = getProgress()
+                const progress = stats.getProgress()
                 if (progress % 10 === 0) {
-                    logInfo(`Processed ${stats.recordCount} records (record offset: ${recordOffset}; ${stats.tripleCount} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
+                    logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${stats.statementIndex} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
                 }
             })
             // When the stream has ended
@@ -227,7 +225,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                     }
                 }
 
-                logInfo(`Stream ended: ${stats.recordCount} records processed (${stats.tripleCount} of ${numberOfStatements} statements; ${stats.batchCount}/${Math.ceil(stats.recordCount / BATCH_SIZE) + tableIndex.size()} batches).`)
+                logInfo(`Stream ended: ${stats.recordIndex} records processed (${stats.statementIndex} of ${numberOfStatements} statements; ${stats.batchIndex}/${Math.ceil(stats.recordIndex / BATCH_SIZE) + tableIndex.size()} batches).`)
                 // stream has been completely processed, resolve the promise.
                 resolve()
             })

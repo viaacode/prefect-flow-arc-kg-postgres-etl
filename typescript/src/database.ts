@@ -1,5 +1,5 @@
 import { TableInfo, ColumnInfo, TableNode } from './types.js'
-import { logInfo, logError, logDebug, isValidDate } from './util.js'
+import { logInfo, logError, logDebug, isValidDate, stats } from './util.js'
 import { from } from 'pg-copy-streams'
 import { stringify } from 'csv-stringify'
 import { stringify as stringifySync } from 'csv-stringify/sync'
@@ -241,6 +241,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         )
         logError(`Erroreous batch (CSV)`, result)
         logError(`Erroreous batch (JSON)`, JSON.stringify(batch))
+        stats.batchRollbacks++
         throw err
     } finally {
         client.release()
