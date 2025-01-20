@@ -17,7 +17,7 @@ export function logDebug(message: any, ...optionalParams: any[]) {
 }
 
 export function logWarning(message: any, ...optionalParams: any[]) {
-    if (LOGGING_LEVEL === 'WARNING' || LOGGING_LEVEL === 'DEBUG')
+    if (LOGGING_LEVEL === 'WARNING')
         logPrefect('WARNING', message, optionalParams)
 }
 

@@ -225,6 +225,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         sourceStream.end()
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
+        stats.processedBatches++
     } catch (err) {
         await client.query('ROLLBACK')
         logError(`Error during bulk insert for table ${tableInfo}`, err)
@@ -241,7 +242,7 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         )
         logError(`Erroreous batch (CSV)`, result)
         logError(`Erroreous batch (JSON)`, JSON.stringify(batch))
-        stats.batchRollbacks++
+        stats.rolledbackBatches++
         throw err
     } finally {
         client.release()
