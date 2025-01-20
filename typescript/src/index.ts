@@ -17,7 +17,8 @@ import {
     TABLE_PRED,
     SKIP_VIEW,
     SKIP_CLEANUP,
-    RECORD_OFFSET
+    RECORD_OFFSET,
+    LOAD_RETRIES
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
@@ -94,7 +95,7 @@ async function processBatch(tableName: string, batch: Array<Record<string, strin
     // Copy the batch to database
     const start = performance.now()
     await batchInsertUsingCopy(tableNode, batch)
-    logDebug(`Batch #${stats.batchIndex} (${batch.length} records; ${stats.statementIndex} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
+    logDebug(`Batch #${stats.processedBatches} (${batch.length} records; ${stats.statementIndex} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 }
 
 // Process each record and add it to the appropriate batch
@@ -116,6 +117,7 @@ async function processRecord(
 }
 
 // Main function to parse and process the gzipped TriG file from a URL
+let retries_left = LOAD_RETRIES
 async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?: number | null) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
@@ -134,6 +136,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
         let currentTableName: string | null = null
 
         // Process the stream
+        const startGraph = performance.now()
         quadStream
             .on('data', async (quad: Quad) => {
                 // Deconstruct the RDF terms to simple JS variables
@@ -151,19 +154,28 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                 // If the subject changes, create a new record
                 if (subject !== currentSubject) {
                     // Process the current record if there is one
-                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && recordOffset <= stats.recordIndex) {
+                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && stats.recordIndex >= recordOffset) {
                         try {
                             // Pause the stream so it does not prevent async processRecord function from executing
                             quadStream.pause()
                             // Add the current record to the table batch
                             const batch = await processRecord(currentSubject, currentRecord, currentTableName, batches)
 
+                            const progress = stats.getProgress()
+                            if (progress % 5 === 0) {
+                                const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
+                                logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
+                            }
+
                             // If the maximum batch size is reached for this table, process it
                             if (batch && batch.length >= BATCH_SIZE) {
+                                // Attempt to process batch
                                 await processBatch(currentTableName, batch)
+
                                 // empty table batch when it's processed
                                 batches[currentTableName] = []
-                                // Freeze the current recordIndex in recordIndex
+
+                                // Freeze the current recordIndex in processedRecordIndex
                                 stats.processedRecordIndex = stats.recordIndex
                             }
                         } catch (err) {
@@ -205,11 +217,6 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                     }
                 }
                 stats.statementIndex++
-
-                const progress = stats.getProgress()
-                if (progress % 10 === 0) {
-                    logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${stats.statementIndex} of ${numberOfStatements} statements; ${Math.round(progress)}% of graph).`)
-                }
             })
             // When the stream has ended
             .on('end', async () => {
@@ -225,13 +232,22 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                     }
                 }
 
-                logInfo(`Stream ended: ${stats.recordIndex} records processed (${stats.statementIndex} of ${numberOfStatements} statements; ${stats.batchIndex}/${Math.ceil(stats.recordIndex / BATCH_SIZE) + tableIndex.size()} batches).`)
+                logInfo(`Stream ended: ${stats.recordIndex} records processed.`)
                 // stream has been completely processed, resolve the promise.
                 resolve()
             })
-            .on('error', (err: Error) => {
-                logError('Error during parsing or processing:', err)
-                reject(err)
+            .on('error', async (err: Error) => {
+                logError('Error during parsing or processing', err)
+
+                if (retries_left <= 0) {
+                    reject(err)
+                }
+                // Attempt retry
+                retries_left--
+                logInfo(`Attempting retry at record index ${stats.processedRecordIndex} (${retries_left} retries left)`,)
+                processGraph(graph, stats.processedRecordIndex)
+                    .then((value) => resolve(value))
+                    .catch(err => reject(err))
             })
     })
 }
@@ -334,7 +350,7 @@ async function main() {
     }
 
     // Parse and process the gzipped TriG file from the URL
-    logInfo('--- Step 2: load temporary tables and delete records --')
+    logInfo('--- Step 2: load temporary tables --')
     start = performance.now()
 
     // Get destination graph and process
@@ -406,12 +422,12 @@ main().catch(async err => {
 
 // Disaster handling
 process.on('SIGTERM', signal => {
-    logWarning(`Process ${process.pid} received a SIGTERM signal`, signal)
+    logError(`Process ${process.pid} received a SIGTERM signal`, signal)
     process.exit(1)
 })
 
 process.on('SIGINT', signal => {
-    logWarning(`Process ${process.pid} has been interrupted`, signal)
+    logError(`Process ${process.pid} has been interrupted`, signal)
     process.exit(1)
 })
 

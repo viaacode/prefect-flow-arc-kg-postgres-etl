@@ -193,7 +193,11 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
     const copyQuery = `COPY ${tempTable} (${columnList}) FROM STDIN WITH (FORMAT csv)`
 
     const client = await pool.connect()
+    client.on("error", (err: Error) => {
+        logError('Error received on db client', err, err.stack)
+    })
     try {
+        stats.unprocessedBatches++
         await client.query('BEGIN')
         const ingestStream = client.query(from(copyQuery))
 
@@ -225,6 +229,8 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         sourceStream.end()
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
+        stats.processedBatches++
+        stats.unprocessedBatches--
     } catch (err) {
         await client.query('ROLLBACK')
         logError(`Error during bulk insert for table ${tableInfo}`, err)
@@ -241,9 +247,10 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         )
         logError(`Erroreous batch (CSV)`, result)
         logError(`Erroreous batch (JSON)`, JSON.stringify(batch))
-        stats.batchRollbacks++
+        stats.rolledbackBatches++
         throw err
     } finally {
+        client.removeAllListeners('error')
         client.release()
     }
 }
