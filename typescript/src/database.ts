@@ -197,7 +197,6 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         logError('Error received on db client', err, err.stack)
     })
     try {
-        stats.unprocessedBatches++
         await client.query('BEGIN')
         const ingestStream = client.query(from(copyQuery))
 
@@ -245,8 +244,8 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
                 }
             }
         )
-        logError(`Erroreous batch (CSV)`, result)
-        logError(`Erroreous batch (JSON)`, JSON.stringify(batch))
+        logError(`Erroreous batch (CSV)`, err, result)
+        //logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
         stats.rolledbackBatches++
         throw err
     } finally {

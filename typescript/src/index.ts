@@ -1,6 +1,3 @@
-import { Quad } from 'rdf-js'
-import { fromRdf } from 'rdf-literal'
-import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import App from '@triply/triplydb'
 import { Account } from '@triply/triplydb/Account.js'
 import { AddQueryOptions } from '@triply/triplydb/commonAccountFunctions.js'
@@ -9,12 +6,11 @@ import { readdir, readFile } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
 import {
-    BATCH_SIZE, RECORD_LIMIT, QUERY_PATH, NAMESPACE,
-    XSD_DURATION, ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
+    BATCH_SIZE, RECORD_LIMIT, QUERY_PATH,
+    ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
     SINCE,
     GRAPH_BASE,
     SKIP_SQUASH,
-    TABLE_PRED,
     SKIP_VIEW,
     SKIP_CLEANUP,
     RECORD_OFFSET,
@@ -26,6 +22,7 @@ import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy } from './database.js'
 import { performance } from 'perf_hooks'
+import { RecordContructor } from './stream.js'
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -100,13 +97,12 @@ async function processBatch(tableName: string, batch: Array<Record<string, strin
 
 // Process each record and add it to the appropriate batch
 async function processRecord(
-    subject: string,
     record: Record<string, string>,
     tableName: string,
     batches: { [tableName: string]: Array<Record<string, string>> }
 ): Promise<Record<string, string>[] | undefined> {
     // If parts are missing, do nothing
-    if (!record || !tableName || !subject) return
+    if (!record || !tableName) return
     // Init batch for table if it does not exist yet
     if (!batches[tableName]) {
         batches[tableName] = []
@@ -125,106 +121,65 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
     stats.numberOfStatements = numberOfStatements
     // Retrieve the graph as a stream of RDFjs objects
     const quadStream = await graph.toStream('rdf-js')
+
     // Wrap stream processing in a promise so we can use a simple async/await
     return new Promise<void>((resolve, reject) => {
+
         // Init the batch cache
         const batches: { [tableName: string]: Record<string, string>[] } = {}
 
-        // Init variables that track the current subject, record and table
-        let currentRecord: Record<string, string> = {}
-        let currentSubject: string | null = null
-        let currentTableName: string | null = null
-
+        // Init record Stream
+        const recordStream = quadStream.pipe(new RecordContructor())
         // Process the stream
         const startGraph = performance.now()
-        quadStream
-            .on('data', async (quad: Quad) => {
-                // Deconstruct the RDF terms to simple JS variables
-                const subject = quad.subject.value
-                const predicate = quad.predicate.value
-                let object = quad.object.value
-                let language
-                // Convert literal to primitive
-                if (quad.object.termType === "Literal") {
-                    language = quad.object.language
-                    // Turn literals to JS primitives, but convert duration to seconds first
-                    object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
-                }
+        recordStream
+            .on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
+            .on('data', async (record: Record<string, string>) => {
+                try {
+                    // Pause the stream so it does not prevent async processRecord function from executing
+                    recordStream.pause()
+                    // Add the current record to the table batch
+                    const currentTableName = record['tableName']
+                    // If the property can't be deleted fail with an error.
+                    if (!delete record['tableName']) { throw new Error() }
 
-                // If the subject changes, create a new record
-                if (subject !== currentSubject) {
-                    // Process the current record if there is one
-                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && stats.recordIndex >= recordOffset) {
-                        try {
-                            // Pause the stream so it does not prevent async processRecord function from executing
-                            quadStream.pause()
-                            // Add the current record to the table batch
-                            const batch = await processRecord(currentSubject, currentRecord, currentTableName, batches)
+                    const batch = await processRecord(record, currentTableName, batches)
 
-                            const progress = stats.getProgress()
-                            if (progress % 5 === 0) {
-                                const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
-                                logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
-                            }
-
-                            // If the maximum batch size is reached for this table, process it
-                            if (batch && batch.length >= BATCH_SIZE) {
-                                // Attempt to process batch
-                                await processBatch(currentTableName, batch)
-
-                                // empty table batch when it's processed
-                                batches[currentTableName] = []
-
-                                // Freeze the current recordIndex in processedRecordIndex
-                                stats.processedRecordIndex = stats.recordIndex
-                            }
-                        } catch (err) {
-                            logError('Error while processing record or batch', err)
-                        }
-                        finally {
-                            // Resume the stream after the async function is done, also when failed.
-                            quadStream.resume()
-                        }
+                    const progress = stats.getProgress()
+                    if (progress % 5 === 0) {
+                        const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
+                        logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                     }
 
-                    currentSubject = subject
-                    currentTableName = null
-                    currentRecord = {}
+                    // If the maximum batch size is reached for this table, process it
+                    if (batch && batch.length >= BATCH_SIZE) {
+                        // Attempt to process batch
+                        await processBatch(currentTableName, batch)
 
-                    // If a set record limit is reached, stop the RDF stream
-                    if (recordLimit && stats.recordIndex > recordLimit) {
-                        return quadStream.destroy()
+                        // empty table batch when it's processed
+                        batches[currentTableName] = []
+
+                        // Freeze the current recordIndex in processedRecordIndex
+                        stats.processedRecordIndex = stats.recordIndex
                     }
-
-                    // Increment the number of processed records
-                    stats.recordIndex++
+                } catch (err) {
+                    logError('Error while processing record or batch', err)
+                }
+                finally {
+                    // Resume the stream after the async function is done, also when failed.
+                    recordStream.resume()
                 }
 
-                // Check for the record type
-                if (predicate === TABLE_PRED) {
-                    currentTableName = object
+                // If a set record limit is reached, stop the RDF stream
+                if (recordLimit && stats.recordIndex > recordLimit) {
+                    quadStream.destroy()
+                    return recordStream.destroy()
                 }
-                // Handle predicates within the known namespace
-                else if (predicate.startsWith(NAMESPACE)) {
-                    const columnName = predicate.replace(NAMESPACE, '')
 
-                    // Pick first value and ignore other values. 
-                    // Workaround for languages: if the label is nl, override the existing value
-                    if (currentRecord[columnName] === undefined || language === 'nl') {
-                        currentRecord[columnName] = object
-                    } else {
-                        logWarning(`Possible unexpected additional value for ${columnName}: ${object}`, { language, currentTableName, currentSubject })
-                    }
-                }
-                stats.statementIndex++
+                // Increment the number of processed records
+                stats.recordIndex++
             })
-            // When the stream has ended
             .on('end', async () => {
-                // Process the last record
-                if (currentSubject && currentRecord && currentTableName) {
-                    await processRecord(currentSubject, currentRecord, currentTableName, batches)
-                }
-
                 // Insert any remaining batches
                 for (const tableName in batches) {
                     if (batches[tableName].length) {
@@ -236,7 +191,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                 // stream has been completely processed, resolve the promise.
                 resolve()
             })
-            .on('error', async (err: Error) => {
+            .on('error', (err: Error) => {
                 logError('Error during parsing or processing', err)
 
                 if (retries_left <= 0) {
@@ -245,9 +200,9 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                 // Attempt retry
                 retries_left--
                 logInfo(`Attempting retry at record index ${stats.processedRecordIndex} (${retries_left} retries left)`,)
-                processGraph(graph, stats.processedRecordIndex)
-                    .then((value) => resolve(value))
-                    .catch(err => reject(err))
+                // attempt(graph, stats.statementIndex)
+                //     .then((value) => resolve(value))
+                //     .catch(err => reject(err))
             })
     })
 }
