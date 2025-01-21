@@ -14,4 +14,14 @@ export class Stats {
     public getAvgNumberOfStatements(): number {
         return this.statementIndex / this.recordIndex
     }
+
+    public reset() {
+        this.recordIndex = 0
+        this.processedRecordIndex = 0
+        this.statementIndex = 0
+        this.processedBatches = 0
+        this.unprocessedBatches = 0
+        this.rolledbackBatches = 0
+        this.numberOfStatements = 0
+    }
 }

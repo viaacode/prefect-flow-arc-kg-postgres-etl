@@ -113,7 +113,6 @@ async function processRecord(
 }
 
 // Main function to parse and process the gzipped TriG file from a URL
-let retries_left = LOAD_RETRIES
 async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?: number | null) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
@@ -135,39 +134,41 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
         recordStream
             .on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
             .on('data', async (record: Record<string, string>) => {
-                try {
-                    // Pause the stream so it does not prevent async processRecord function from executing
-                    recordStream.pause()
-                    // Add the current record to the table batch
-                    const currentTableName = record['tableName']
-                    // If the property can't be deleted fail with an error.
-                    if (!delete record['tableName']) { throw new Error() }
+                if (stats.recordIndex >= recordOffset) {
+                    try {
+                        // Pause the stream so it does not prevent async processRecord function from executing
+                        recordStream.pause()
+                        // Add the current record to the table batch
+                        const currentTableName = record['tableName']
+                        // If the property can't be deleted fail with an error.
+                        if (!delete record['tableName']) { throw new Error() }
 
-                    const batch = await processRecord(record, currentTableName, batches)
+                        const batch = await processRecord(record, currentTableName, batches)
 
-                    const progress = stats.getProgress()
-                    if (progress % 5 === 0) {
-                        const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
-                        logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
+                        const progress = stats.getProgress()
+                        if (progress % 5 === 0) {
+                            const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
+                            logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
+                        }
+
+                        // If the maximum batch size is reached for this table, process it
+                        if (batch && batch.length >= BATCH_SIZE) {
+                            // Attempt to process batch
+                            await processBatch(currentTableName, batch)
+
+                            // empty table batch when it's processed
+                            batches[currentTableName] = []
+
+                            // Freeze the current recordIndex in processedRecordIndex
+                            stats.processedRecordIndex = stats.recordIndex
+                        }
+                    } catch (err) {
+                        logError('Error while processing record or batch', err)
                     }
-
-                    // If the maximum batch size is reached for this table, process it
-                    if (batch && batch.length >= BATCH_SIZE) {
-                        // Attempt to process batch
-                        await processBatch(currentTableName, batch)
-
-                        // empty table batch when it's processed
-                        batches[currentTableName] = []
-
-                        // Freeze the current recordIndex in processedRecordIndex
-                        stats.processedRecordIndex = stats.recordIndex
+                    finally {
+                        // Resume the stream after the async function is done, also when failed.
+                        recordStream.resume()
                     }
-                } catch (err) {
-                    logError('Error while processing record or batch', err)
-                }
-                finally {
-                    // Resume the stream after the async function is done, also when failed.
-                    recordStream.resume()
                 }
 
                 // If a set record limit is reached, stop the RDF stream
@@ -178,6 +179,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
 
                 // Increment the number of processed records
                 stats.recordIndex++
+                stats.statementIndex = recordStream.quadIndex
             })
             .on('end', async () => {
                 // Insert any remaining batches
@@ -193,16 +195,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
             })
             .on('error', (err: Error) => {
                 logError('Error during parsing or processing', err)
-
-                if (retries_left <= 0) {
-                    reject(err)
-                }
-                // Attempt retry
-                retries_left--
-                logInfo(`Attempting retry at record index ${stats.processedRecordIndex} (${retries_left} retries left)`,)
-                // attempt(graph, stats.statementIndex)
-                //     .then((value) => resolve(value))
-                //     .catch(err => reject(err))
+                reject(err)
             })
     })
 }
