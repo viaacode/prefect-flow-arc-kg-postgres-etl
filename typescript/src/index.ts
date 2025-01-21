@@ -13,8 +13,7 @@ import {
     SKIP_SQUASH,
     SKIP_VIEW,
     SKIP_CLEANUP,
-    RECORD_OFFSET,
-    LOAD_RETRIES
+    RECORD_OFFSET
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
@@ -92,6 +91,9 @@ async function processBatch(tableName: string, batch: Array<Record<string, strin
     // Copy the batch to database
     const start = performance.now()
     await batchInsertUsingCopy(tableNode, batch)
+    // Freeze the current recordIndex in processedRecordIndex
+    stats.processedRecordIndex = stats.recordIndex
+
     logDebug(`Batch #${stats.processedBatches} (${batch.length} records; ${stats.statementIndex} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 }
 
@@ -158,9 +160,6 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
 
                             // empty table batch when it's processed
                             batches[currentTableName] = []
-
-                            // Freeze the current recordIndex in processedRecordIndex
-                            stats.processedRecordIndex = stats.recordIndex
                         }
                     } catch (err) {
                         logError('Error while processing record or batch', err)
