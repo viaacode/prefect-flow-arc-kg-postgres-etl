@@ -17,8 +17,6 @@ import {
     TABLE_PRED,
     SKIP_VIEW,
     SKIP_CLEANUP,
-    RECORD_OFFSET,
-    LOAD_RETRIES
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
@@ -26,6 +24,10 @@ import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy } from './database.js'
 import { performance } from 'perf_hooks'
+import { createGunzip } from 'zlib'
+import { createReadStream } from 'fs'
+import { rm } from 'fs/promises'
+import { StreamParser } from 'n3'
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -116,15 +118,18 @@ async function processRecord(
     return batches[tableName]
 }
 
-// Main function to parse and process the gzipped TriG file from a URL
-let retries_left = LOAD_RETRIES
-async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?: number | null) {
+async function processGraph(graph: Graph, recordLimit?: number | null) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
-    logInfo(`Start processing graph of ${numberOfStatements} statements.`)
     stats.numberOfStatements = numberOfStatements
     // Retrieve the graph as a stream of RDFjs objects
-    const quadStream = await graph.toStream('rdf-js')
+    logInfo(`Downloading graph of ${numberOfStatements} statements.`)
+    const startDownload = performance.now()
+    //await rm("graph.ttl.gz", { force: true })
+    //await graph.toFile("graph.ttl.gz", { compressed: true })
+    logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
+
+    const quadStream = createReadStream("graph.ttl.gz").pipe(createGunzip()).pipe(new StreamParser())
     // Wrap stream processing in a promise so we can use a simple async/await
     return new Promise<void>((resolve, reject) => {
         // Init the batch cache
@@ -154,7 +159,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                 // If the subject changes, create a new record
                 if (subject !== currentSubject) {
                     // Process the current record if there is one
-                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null && stats.recordIndex >= recordOffset) {
+                    if (currentSubject !== null && Object.keys(currentRecord).length > 0 && currentTableName !== null) {
                         try {
                             // Pause the stream so it does not prevent async processRecord function from executing
                             quadStream.pause()
@@ -164,7 +169,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
                             const progress = stats.getProgress()
                             if (progress % 5 === 0) {
                                 const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
-                                logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
+                                logInfo(`Processed ${stats.recordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                             }
 
                             // If the maximum batch size is reached for this table, process it
@@ -238,16 +243,7 @@ async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?
             })
             .on('error', async (err: Error) => {
                 logError('Error during parsing or processing', err)
-
-                if (retries_left <= 0) {
-                    reject(err)
-                }
-                // Attempt retry
-                retries_left--
-                logInfo(`Attempting retry at record index ${stats.processedRecordIndex} (${retries_left} retries left)`,)
-                processGraph(graph, stats.processedRecordIndex)
-                    .then((value) => resolve(value))
-                    .catch(err => reject(err))
+                reject(err)
             })
     })
 }
@@ -356,7 +352,7 @@ async function main() {
     // Get destination graph and process
     const graph = await destination.dataset.getGraph(destination.graph)
 
-    await processGraph(graph, RECORD_OFFSET, RECORD_LIMIT)
+    await processGraph(graph, RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
     logInfo('--- Step 3: upsert tables --')
