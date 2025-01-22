@@ -1,8 +1,29 @@
 import { Quad } from 'rdf-js'
-import { Transform, TransformCallback } from 'stream'
+import { Readable, Transform, TransformCallback } from 'stream'
 import { BATCH_SIZE, NAMESPACE, TABLE_PRED, XSD_DURATION } from './configuration.js'
 import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import { fromRdf } from 'rdf-literal'
+import { Options, stringify } from 'csv-stringify'
+import { ColumnInfo } from './types.js'
+import { isValidDate } from './util.js'
+import { stringify as stringifySync } from 'csv-stringify/sync'
+
+const csvOptions: Options = {
+    delimiter: ",",
+    cast: {
+        boolean: (value) => value ? 'true' : 'false',
+        date: (value) => {
+            // Postgres does not support year 0; convert to year 1
+            if (value.getUTCFullYear() < 1)
+                value.setUTCFullYear(1)
+            return value.toISOString()
+        },
+    },
+}
+
+function prepareRecord(record: Record<string, string>, columns: ColumnInfo[]){
+    return columns.map(col => record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])) ? null : record[col.name])
+}
 
 export class InsertRecord {
     public tableName: string | null = null
@@ -21,11 +42,11 @@ export class Batch {
         return this._tableName
     }
 
-    public get records() : Record<string, string>[] {
+    public get records(): Record<string, string>[] {
         return this._records
     }
 
-    public add(record:InsertRecord) {
+    public add(record: InsertRecord) {
         this._records.push(record.values)
     }
 
@@ -35,6 +56,26 @@ export class Batch {
 
     public toString() {
         return JSON.stringify(this)
+    }
+
+    public toCSV(columns: ColumnInfo[]) {
+        return stringifySync(
+            this.records.map(record => prepareRecord(record, columns)),
+            csvOptions
+        )
+    }
+
+    public toCSVStream(columns: ColumnInfo[]): Readable {
+        // Initialize the stringifier
+        const sourceStream = stringify(csvOptions)
+
+        // Convert batch to CSV format
+        for (const record of this._records) {
+            const values =  prepareRecord(record, columns)
+            sourceStream.write(values)
+        }
+        sourceStream.end()
+        return sourceStream
     }
 
 }
@@ -144,7 +185,7 @@ export class RecordBatcher extends Transform {
 
     _transform(record: InsertRecord, _encoding: string, cb: Function) {
 
-         // If parts are missing, do nothing
+        // If parts are missing, do nothing
         if (!record.values || !record.tableName) return
         // Init batch for table if it does not exist yet
         if (!this.batches[record.tableName]) {

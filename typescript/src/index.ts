@@ -122,7 +122,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
                 // Copy the batch to database
                 const start = performance.now()
-                await batchInsertUsingCopy(tableNode, batch.records)
+                await batchInsertUsingCopy(tableNode, batch)
                 logDebug(`Batch #${batcher.batchIndex} (${batch.length} records; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 
                 // Update stats
@@ -130,8 +130,8 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 stats.statementIndex = recordConstructor.statementIndex
                 stats.processedRecordIndex = recordConstructor.recordIndex
 
-                const progress = stats.numberOfStatements > 0 ? (stats.statementIndex / stats.numberOfStatements) * 100 : -1
-                if (progress % 5 === 0) {
+                const progress = stats.progress
+                if (recordConstructor.statementIndex % Math.floor(numberOfStatements / 100) === 0) {
                     const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
                     logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                 }
@@ -159,7 +159,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
             batcher, // Turn into batches
             BatchConsumer())
 
-        logInfo(`Load pipeline completed ended: ${stats.recordIndex} records processed.`)
+        logInfo(`Load pipeline completed ended: ${recordConstructor.recordIndex} records processed.`)
         // stream has been completely processed, resolve the promise.
     } catch (err) {
         logError('Error during parsing or processing', err)

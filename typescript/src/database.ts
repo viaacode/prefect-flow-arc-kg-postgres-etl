@@ -1,11 +1,12 @@
 import { TableInfo, ColumnInfo, TableNode } from './types.js'
-import { logInfo, logError, logDebug, isValidDate, stats } from './util.js'
+import { logInfo, logError, logDebug, stats } from './util.js'
 import { from } from 'pg-copy-streams'
-import { stringify } from 'csv-stringify'
-import { stringify as stringifySync } from 'csv-stringify/sync'
+
+
 import { pipeline } from 'node:stream/promises'
 import { dbConfig } from './configuration.js'
 import pg from 'pg'
+import { Batch } from './stream.js'
 
 // PostgreSQL connection pool
 const pool = new pg.Pool(dbConfig)
@@ -184,7 +185,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
 
 }
 
-export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Record<string, string>>) {
+export async function batchInsertUsingCopy(tableNode: TableNode, batch: Batch) {
     if (!batch.length) return
 
     const { columns, tempTable, tableInfo } = tableNode
@@ -199,50 +200,14 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
     try {
         await client.query('BEGIN')
         const ingestStream = client.query(from(copyQuery))
-
-        // Initialize the stringifier
-        const sourceStream = stringify({
-            delimiter: ",",
-            cast: {
-                boolean: (value) => value ? 'true' : 'false',
-                date: (value) => {
-                    // Postgres does not support year 0; convert to year 1
-                    if (value.getUTCFullYear() < 1)
-                        value.setUTCFullYear(1)
-                    return value.toISOString()
-                },
-            },
-        })
-
-        // Convert batch to CSV format
-        for (const record of batch) {
-            const values = columns.map(col => {
-                // Make sure value exists and that dates are valid dates
-                if (record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])))
-                    return null
-
-                return record[col.name]
-            })
-            sourceStream.write(values)
-        }
-        sourceStream.end()
+        const sourceStream = batch.toCSVStream(columns)
+        
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
     } catch (err) {
         await client.query('ROLLBACK')
         logError(`Error during bulk insert for table ${tableInfo}`, err)
-        const result = stringifySync(
-            batch.map(record => columns.map(col => record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])) ? null : record[col.name])),
-            {
-                cast: {
-                    boolean: (value) => value ? 'true' : 'false',
-                    date: (value) => {
-                        return value.toISOString()
-                    },
-                }
-            }
-        )
-        logError(`Erroreous batch (CSV)`, err, result)
+        logError(`Erroreous batch (CSV)`, err, batch.toCSV(columns))
         //logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
         stats.rolledbackBatches++
         throw err
