@@ -14,7 +14,7 @@ import {
     SKIP_VIEW,
     SKIP_CLEANUP,
 } from './configuration.js'
-import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
+import { logInfo, logError, logDebug, msToTime, logWarning, stats, getErrorMessage } from './util.js'
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
@@ -134,14 +134,14 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                     const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
                     logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                 }
-
-            } catch (err) {
-                logError('Error while processing record or batch', err)
+                done()
+            } catch (err:any) {
+                logError('Error while processing batch', err)
+                done(err)
             }
             finally {
                 // Resume the stream after the async function is done, also when failed.
                 fileStream.resume()
-                done()
             }
 
         }
