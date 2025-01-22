@@ -198,12 +198,14 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Batch) {
         logError('Error received on db client', err, err.stack)
     })
     try {
+        stats.unprocessedBatches++
         await client.query('BEGIN')
         const ingestStream = client.query(from(copyQuery))
         const sourceStream = batch.toCSVStream(columns)
         
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
+        stats.unprocessedBatches--
     } catch (err) {
         await client.query('ROLLBACK')
         logError(`Error during bulk insert for table ${tableInfo}`, err)
