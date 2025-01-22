@@ -6,14 +6,13 @@ import { readdir, readFile } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
 import {
-    BATCH_SIZE, RECORD_LIMIT, QUERY_PATH,
+    RECORD_LIMIT, QUERY_PATH,
     ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
     SINCE,
     GRAPH_BASE,
     SKIP_SQUASH,
     SKIP_VIEW,
     SKIP_CLEANUP,
-    RECORD_OFFSET
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
@@ -21,7 +20,13 @@ import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy } from './database.js'
 import { performance } from 'perf_hooks'
-import { RecordContructor } from './stream.js'
+import { Batch, RecordBatcher, RecordContructor } from './stream.js'
+import { createGunzip } from 'zlib'
+import { createReadStream } from 'fs'
+import { rm } from 'fs/promises'
+import { StreamParser } from 'n3'
+import { Writable } from 'stream'
+import { pipeline } from 'stream/promises'
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -84,119 +89,82 @@ async function createTableNode(tableName: string): Promise<TableNode> {
     return tableNode
 }
 
-
-async function processBatch(tableName: string, batch: Array<Record<string, string>>) {
-    // Get table information from the table index, or create a temp table if not exists
-    const tableNode = tableIndex.hasNode(tableName) ? tableIndex.getNodeData(tableName) : await createTableNode(tableName)
-    // Copy the batch to database
-    const start = performance.now()
-    await batchInsertUsingCopy(tableNode, batch)
-    // Freeze the current recordIndex in processedRecordIndex
-    stats.processedRecordIndex = stats.recordIndex
-
-    logDebug(`Batch #${stats.processedBatches} (${batch.length} records; ${stats.statementIndex} of ${stats.numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
-}
-
-// Process each record and add it to the appropriate batch
-async function processRecord(
-    record: Record<string, string>,
-    tableName: string,
-    batches: { [tableName: string]: Array<Record<string, string>> }
-): Promise<Record<string, string>[] | undefined> {
-    // If parts are missing, do nothing
-    if (!record || !tableName) return
-    // Init batch for table if it does not exist yet
-    if (!batches[tableName]) {
-        batches[tableName] = []
-    }
-    // Add records to table batch
-    batches[tableName].push(record)
-    return batches[tableName]
-}
-
-// Main function to parse and process the gzipped TriG file from a URL
-async function processGraph(graph: Graph, recordOffset: number = 0, recordLimit?: number | null) {
+async function processGraph(graph: Graph, recordLimit?: number) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
-    logInfo(`Start processing graph of ${numberOfStatements} statements.`)
     stats.numberOfStatements = numberOfStatements
     // Retrieve the graph as a stream of RDFjs objects
-    const quadStream = await graph.toStream('rdf-js')
+    //const quadStream = await graph.toStream('rdf-js')
+    
+    logInfo(`Downloading graph of ${numberOfStatements} statements.`)
+    const startDownload = performance.now()
+    await rm("graph.ttl.gz", { force: true })
+    await graph.toFile("graph.ttl.gz", { compressed: true })
+    logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
 
-    // Wrap stream processing in a promise so we can use a simple async/await
-    return new Promise<void>((resolve, reject) => {
+    const fileStream = createReadStream("graph.ttl.gz")
 
-        // Init the batch cache
-        const batches: { [tableName: string]: Record<string, string>[] } = {}
+    // Process the stream
+    const startGraph = performance.now()
 
-        // Init record Stream
-        const recordStream = quadStream.pipe(new RecordContructor())
-        // Process the stream
-        const startGraph = performance.now()
-        recordStream
-            .on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
-            .on('data', async (record: Record<string, string>) => {
-                if (stats.recordIndex >= recordOffset) {
-                    try {
-                        // Pause the stream so it does not prevent async processRecord function from executing
-                        recordStream.pause()
-                        // Add the current record to the table batch
-                        const currentTableName = record['tableName']
-                        // If the property can't be deleted fail with an error.
-                        if (!delete record['tableName']) { throw new Error() }
+    // Init components
+    const recordConstructor = new RecordContructor(0,recordLimit).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
+    const batcher = new RecordBatcher()
 
-                        const batch = await processRecord(record, currentTableName, batches)
+    function BatchConsumer(): Writable {
+        const writer = new Writable({ objectMode: true })
+        writer._write = async (batch: Batch, _encoding, done) => {
+            try {
+                // Pause the stream so it does not prevent async processRecord function from executing
+                fileStream.pause()
+                
+                // Get table information from the table index, or create a temp table if not exists
+                const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
+                // Copy the batch to database
+                const start = performance.now()
+                await batchInsertUsingCopy(tableNode, batch.records)
+                logDebug(`Batch #${batcher.batchIndex} (${batch.length} records; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 
-                        const progress = stats.getProgress()
-                        if (progress % 5 === 0) {
-                            const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
-                            logInfo(`Processed ${stats.recordIndex} records (record offset: ${recordOffset}; ${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
-                        }
+                // Update stats
+                stats.processedBatches = batcher.batchIndex
+                stats.statementIndex = recordConstructor.statementIndex
+                stats.processedRecordIndex = recordConstructor.recordIndex
 
-                        // If the maximum batch size is reached for this table, process it
-                        if (batch && batch.length >= BATCH_SIZE) {
-                            // Attempt to process batch
-                            await processBatch(currentTableName, batch)
-
-                            // empty table batch when it's processed
-                            batches[currentTableName] = []
-                        }
-                    } catch (err) {
-                        logError('Error while processing record or batch', err)
-                    }
-                    finally {
-                        // Resume the stream after the async function is done, also when failed.
-                        recordStream.resume()
-                    }
+                const progress = stats.numberOfStatements > 0 ? (stats.statementIndex / stats.numberOfStatements) * 100 : -1
+                if (progress % 5 === 0) {
+                    const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
+                    logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                 }
 
-                // If a set record limit is reached, stop the RDF stream
-                if (recordLimit && stats.recordIndex > recordLimit) {
-                    quadStream.destroy()
-                    return recordStream.destroy()
-                }
+            } catch (err) {
+                logError('Error while processing record or batch', err)
+            }
+            finally {
+                // Resume the stream after the async function is done, also when failed.
+                fileStream.resume()
+                done()
+            }
 
-                // Increment the number of processed records
-                stats.recordIndex++
-                stats.statementIndex = recordStream.quadIndex
-            })
-            .on('end', async () => {
-                // Insert any remaining batches
-                for (const tableName in batches) {
-                    if (batches[tableName].length) {
-                        await processBatch(tableName, batches[tableName])
-                    }
-                }
+        }
+        return writer
+    }
 
-                logInfo(`Stream ended: ${stats.recordIndex} records processed.`)
-                // stream has been completely processed, resolve the promise.
-                resolve()
-            })
-            .on('error', (err: Error) => {
-                logError('Error during parsing or processing', err)
-                reject(err)
-            })
-    })
+    // Init record Stream
+    try {
+        await pipeline(
+            fileStream,
+            createGunzip(), // Unzip
+            new StreamParser(), // Turn into quads
+            recordConstructor, // Turn into records
+            batcher, // Turn into batches
+            BatchConsumer())
+
+        logInfo(`Load pipeline completed ended: ${stats.recordIndex} records processed.`)
+        // stream has been completely processed, resolve the promise.
+    } catch (err) {
+        logError('Error during parsing or processing', err)
+        throw err
+    }
 }
 
 async function cleanup() {
@@ -303,7 +271,7 @@ async function main() {
     // Get destination graph and process
     const graph = await destination.dataset.getGraph(destination.graph)
 
-    await processGraph(graph, RECORD_OFFSET, RECORD_LIMIT)
+    await processGraph(graph, RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
     logInfo('--- Step 3: upsert tables --')

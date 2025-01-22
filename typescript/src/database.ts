@@ -228,8 +228,6 @@ export async function batchInsertUsingCopy(tableNode: TableNode, batch: Array<Re
         sourceStream.end()
         await pipeline(sourceStream, ingestStream)
         await client.query('COMMIT')
-        stats.processedBatches++
-        stats.unprocessedBatches--
     } catch (err) {
         await client.query('ROLLBACK')
         logError(`Error during bulk insert for table ${tableInfo}`, err)
