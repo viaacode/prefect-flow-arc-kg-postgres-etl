@@ -98,7 +98,6 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
-    await rm("graph.ttl.gz", { force: true })
     await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
 
@@ -130,8 +129,8 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 stats.statementIndex = recordConstructor.statementIndex
                 stats.processedRecordIndex = recordConstructor.recordIndex
 
-                const progress = stats.progress
-                if (recordConstructor.statementIndex % Math.floor(numberOfStatements / 100) === 0) {
+                if (batcher.batchIndex % 50 === 0) {
+                    const progress = stats.progress
                     const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
                     logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                 }
@@ -160,7 +159,8 @@ async function processGraph(graph: Graph, recordLimit?: number) {
             BatchConsumer())
 
         logInfo(`Load pipeline completed ended: ${recordConstructor.recordIndex} records processed.`)
-        // stream has been completely processed, resolve the promise.
+        // stream has been completely processed, remove the local copy.
+        await rm("graph.ttl.gz", { force: true })
     } catch (err) {
         logError('Error during parsing or processing', err)
         throw err
