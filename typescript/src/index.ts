@@ -14,11 +14,11 @@ import {
     SKIP_VIEW,
     SKIP_CLEANUP,
 } from './configuration.js'
-import { logInfo, logError, logDebug, msToTime, logWarning, stats, getErrorMessage } from './util.js'
+import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert } from './database.js'
 import { performance } from 'perf_hooks'
 import { Batch, RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -98,7 +98,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
-    await graph.toFile("graph.ttl.gz", { compressed: true })
+    //await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
 
     const fileStream = createReadStream("graph.ttl.gz")
@@ -107,7 +107,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     const startGraph = performance.now()
 
     // Init components
-    const recordConstructor = new RecordContructor(0,recordLimit).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
+    const recordConstructor = new RecordContructor({limit: recordLimit}).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
     const batcher = new RecordBatcher()
 
     function BatchConsumer(): Writable {
@@ -121,7 +121,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
                 // Copy the batch to database
                 const start = performance.now()
-                await batchInsertUsingCopy(tableNode, batch)
+                await batchInsert(tableNode, batch)
                 logDebug(`Batch #${batcher.batchIndex} (${batch.length} records; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 
                 // Update stats

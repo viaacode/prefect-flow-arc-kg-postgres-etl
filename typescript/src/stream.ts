@@ -1,29 +1,8 @@
-import { Quad } from 'rdf-js'
-import { Readable, Transform, TransformCallback } from 'stream'
+import { Literal, Quad } from 'rdf-js'
+import { Transform, TransformCallback } from 'stream'
 import { BATCH_SIZE, NAMESPACE, TABLE_PRED, XSD_DURATION } from './configuration.js'
 import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import { fromRdf } from 'rdf-literal'
-import { Options, stringify } from 'csv-stringify'
-import { ColumnInfo } from './types.js'
-import { isValidDate } from './util.js'
-import { stringify as stringifySync } from 'csv-stringify/sync'
-
-const csvOptions: Options = {
-    delimiter: ",",
-    cast: {
-        boolean: (value) => value ? 'true' : 'false',
-        date: (value) => {
-            // Postgres does not support year 0; convert to year 1
-            if (value.getUTCFullYear() < 1)
-                value.setUTCFullYear(1)
-            return value.toISOString()
-        },
-    },
-}
-
-function prepareRecord(record: Record<string, string>, columns: ColumnInfo[]){
-    return columns.map(col => record[col.name] === undefined || (col.datatype === 'date' && !isValidDate(record[col.name])) ? null : record[col.name])
-}
 
 export class InsertRecord {
     public tableName: string | null = null
@@ -58,26 +37,6 @@ export class Batch {
         return JSON.stringify(this)
     }
 
-    public toCSV(columns: ColumnInfo[]) {
-        return stringifySync(
-            this.records.map(record => prepareRecord(record, columns)),
-            csvOptions
-        )
-    }
-
-    public toCSVStream(columns: ColumnInfo[]): Readable {
-        // Initialize the stringifier
-        const sourceStream = stringify(csvOptions)
-
-        // Convert batch to CSV format
-        for (const record of this._records) {
-            const values =  prepareRecord(record, columns)
-            sourceStream.write(values)
-        }
-        sourceStream.end()
-        return sourceStream
-    }
-
 }
 
 export class RecordContructor extends Transform {
@@ -91,10 +50,10 @@ export class RecordContructor extends Transform {
     private _offset: number
     private _limit?: number
 
-    constructor(offset: number = 0, limit?: number) {
+    constructor(options: { offset?: number, limit?: number }) {
         super({ objectMode: true })
-        this._offset = offset
-        this._limit = limit
+        this._offset = options.offset || 0
+        this._limit = options.limit
     }
 
     public get statementIndex() {
@@ -102,6 +61,21 @@ export class RecordContructor extends Transform {
     }
     public get recordIndex() {
         return this._recordIndex
+    }
+
+    private _parseValue(literal: Literal) {
+        if (literal.datatype.value === XSD_DURATION)
+            return toSeconds(parseDuration(literal.value))
+
+        const value = fromRdf(literal)
+
+        if (value instanceof Date) {
+            if (value.getUTCFullYear() < 1) {
+                value.setUTCFullYear(1)
+            }
+        }
+
+        return value
     }
 
     _transform(quad: Quad, _encoding: string, cb: Function) {
@@ -124,7 +98,7 @@ export class RecordContructor extends Transform {
         if (quad.object.termType === "Literal") {
             language = quad.object.language
             // Turn literals to JS primitives, but convert duration to seconds first
-            object = quad.object.datatype.value === XSD_DURATION ? toSeconds(parseDuration(object)) : fromRdf(quad.object)
+            object = this._parseValue(quad.object)
         }
 
         // If the subject changes, create a new record

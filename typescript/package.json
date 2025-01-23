@@ -14,15 +14,12 @@
     "@triply/triplydb": "^8.2.9",
     "@types/airbnb__node-memwatch": "^2.0.4",
     "@types/n3": "^1.21.1",
-    "@types/pg": "^8.11.10",
-    "@types/pg-copy-streams": "^1.2.5",
     "@types/rdf-js": "^4.0.1",
     "csv": "^6.3.10",
     "dependency-graph": "^1.0.0",
     "iso8601-duration": "^2.1.2",
     "n3": "^1.23.1",
-    "pg": "^8.13.0",
-    "pg-copy-streams": "^6.0.6",
+    "pg-promise": "^11.10.2",
     "rdf-literal": "2.0.0",
     "typescript": "^5.6.2"
   }
