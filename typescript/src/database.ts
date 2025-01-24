@@ -133,12 +133,12 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
 
     // Build query
     const insertQuery = `
-        INSERT INTO $<tableInfo>
-        SELECT * FROM $<tempTable>
+        INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
+        SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<pkList>) DO UPDATE
         SET $<columnList>;
         `
-    const truncateQuery = `TRUNCATE $<tableInfo> CASCADE`
+    const truncateQuery = `TRUNCATE $<schema:name>.$<name:name> CASCADE`
     logDebug(insertQuery)
     try {
         await db.tx('process-upserts', async t => {
