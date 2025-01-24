@@ -98,6 +98,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
+    await rm("graph.ttl.gz")
     await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
 
@@ -159,11 +160,12 @@ async function processGraph(graph: Graph, recordLimit?: number) {
             BatchConsumer())
 
         logInfo(`Load pipeline completed ended: ${recordConstructor.recordIndex} records processed.`)
-        // stream has been completely processed, remove the local copy.
-        await rm("graph.ttl.gz", { force: true })
     } catch (err) {
         logError('Error during parsing or processing', err)
         throw err
+    } finally {
+        // stream has been completely processed or error, remove the local copy.
+        await rm("graph.ttl.gz", { force: true })
     }
 }
 
