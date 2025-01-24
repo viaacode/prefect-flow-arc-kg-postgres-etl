@@ -135,7 +135,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
     const insertQuery = pgp.as.format(`
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
-        ON CONFLICT ($<primaryKeys:name>) DO UPDATE `, { tableInfo, tempTable, primaryKeys })
+        ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `, { tableInfo, tempTable, primaryKeys })
         + cs.assignColumns({ from: 'EXCLUDED', skip: primaryKeys })
 
     logDebug(insertQuery)
