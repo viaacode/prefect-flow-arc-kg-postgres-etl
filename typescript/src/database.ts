@@ -129,15 +129,15 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
 
     // Get the actual columns from the database
     const columnList = columns.map(c => `${c.name} = EXCLUDED.${c.name}`).join(',')
-    const pkList = primaryKeys.join(',')
 
     // Build query
     const insertQuery = `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
-        ON CONFLICT ($<pkList>) DO UPDATE
-        SET $<columnList>;
+        ON CONFLICT ($<primaryKeys:name>) DO UPDATE
+        SET $<columnList:raw>;
         `
+        
     const truncateQuery = `TRUNCATE $<schema:name>.$<name:name> CASCADE`
     logDebug(insertQuery)
     try {
@@ -147,7 +147,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
                 await t.none(truncateQuery, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
-            await t.none(insertQuery, { tableInfo, tempTable, columnList, pkList })
+            await t.none(insertQuery, { tableInfo, tempTable, columnList, primaryKeys })
         })
         logInfo(`Records for table ${tableInfo} upserted!`)
     } catch (err) {
