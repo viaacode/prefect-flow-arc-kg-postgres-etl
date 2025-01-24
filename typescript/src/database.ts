@@ -9,7 +9,7 @@ const pgp = pgplib({
     // Initialization Options
     capSQL: true, // capitalize all generated SQL
     error(err, e) {
-        logError('Database error received', err, err.stack, e)  
+        logError('Database error received', err, err.stack, e)
     }
 })
 
@@ -127,19 +127,19 @@ export async function processDeletes() {
 export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
-    // Get the actual columns from the database
-    const columnList = columns.map(c => `${c.name} = EXCLUDED.${c.name}`).join(',')
+    // TODO: cleanup with assignColumns
+    const { ColumnSet } = pgp.helpers
+    const cs = new ColumnSet(columns.map(c => c.name))
 
     // Build query
-    const insertQuery = `
+    const insertQuery = pgp.as.format(`
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
-        ON CONFLICT ($<primaryKeys:name>) DO UPDATE
-        SET $<columnList:raw>;
-        `
-        
-    const truncateQuery = `TRUNCATE $<schema:name>.$<name:name> CASCADE`
+        ON CONFLICT ($<primaryKeys:name>) DO UPDATE`, { tableInfo, tempTable, primaryKeys })
+        + cs.assignColumns({ from: 'EXCLUDED', skip: primaryKeys })
+
     logDebug(insertQuery)
+    const truncateQuery = `TRUNCATE $<schema:name>.$<name:name> CASCADE`
     try {
         await db.tx('process-upserts', async t => {
             // Truncate table first if desired
@@ -147,7 +147,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
                 await t.none(truncateQuery, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
-            await t.none(insertQuery, { tableInfo, tempTable, columnList, primaryKeys })
+            await t.none(insertQuery)
         })
         logInfo(`Records for table ${tableInfo} upserted!`)
     } catch (err) {
