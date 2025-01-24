@@ -18,7 +18,7 @@ import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsertUsingCopy } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert } from './database.js'
 import { performance } from 'perf_hooks'
 import { Batch, RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -107,7 +107,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     const startGraph = performance.now()
 
     // Init components
-    const recordConstructor = new RecordContructor(0,recordLimit).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
+    const recordConstructor = new RecordContructor({limit: recordLimit}).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
     const batcher = new RecordBatcher()
 
     function BatchConsumer(): Writable {
@@ -121,7 +121,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
                 // Copy the batch to database
                 const start = performance.now()
-                await batchInsertUsingCopy(tableNode, batch)
+                await batchInsert(tableNode, batch)
                 logDebug(`Batch #${batcher.batchIndex} (${batch.length} records; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
 
                 // Update stats
@@ -134,14 +134,14 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                     const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
                     logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                 }
-
-            } catch (err) {
-                logError('Error while processing record or batch', err)
+                done()
+            } catch (err:any) {
+                logError('Error while processing batch', err)
+                done(err)
             }
             finally {
                 // Resume the stream after the async function is done, also when failed.
                 fileStream.resume()
-                done()
             }
 
         }
