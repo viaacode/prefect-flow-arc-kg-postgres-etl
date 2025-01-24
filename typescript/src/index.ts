@@ -98,7 +98,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
-    await rm("graph.ttl.gz")
+    await rm("graph.ttl.gz", { force: true })
     await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
 
