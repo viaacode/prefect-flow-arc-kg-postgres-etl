@@ -38,7 +38,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
 
 export async function dropTable(tableInfo: TableInfo) {
     try {
-        await db.none('DROP TABLE IF EXISTS $<tableName>;', { tableName: tableInfo.toString() })
+        await db.none('DROP TABLE IF EXISTS $<schema:name>.$<name:name>;', tableInfo)
         logDebug(`Dropped table ${tableInfo} if exists.`)
         return tableInfo
     } catch (err) {
