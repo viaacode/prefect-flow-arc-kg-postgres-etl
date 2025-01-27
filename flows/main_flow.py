@@ -25,6 +25,8 @@ def main_flow(
     skip_cleanup: bool = False,
     db_block_name: str = "local",  # "hetarchief-tst",
     db_ssl: bool = True,
+    db_pool_min: int = 0,
+    db_pool_max: int = 5,
     record_limit: int = None,
     batch_size: int = 100,
     full_sync: bool = False,
@@ -66,6 +68,8 @@ def main_flow(
         debug_mode=debug_mode,
         logging_level=logging_level,
         postgres_ssl=db_ssl,
+        postgres_pool_min=db_pool_min,
+        postgres_pool_max=db_pool_max,
     )
 
 

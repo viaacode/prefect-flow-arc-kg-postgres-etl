@@ -33,7 +33,8 @@ export const dbConfig = {
     ssl: process.env.POSTGRES_SSL === 'True' ? {
         rejectUnauthorized: false
     } : false,
-    idleTimeoutMillis: 200000,
+    max: parseInt(process.env.POSTGRES_POOL_MAX ?? '5', 10),
+    min: parseInt(process.env.POSTGRES_POOL_MIN ?? '0', 10),
 }
 
 export const DEBUG_MODE = process.env.DEBUG_MODE === 'True'
