@@ -4,7 +4,7 @@ import { dbConfig } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
 
 // PostgreSQL connection pool
-const pgp = pgplib({
+export const pgp = pgplib({
     // Initialization Options
     capSQL: true, // capitalize all generated SQL
     error(err, e) {
@@ -87,7 +87,7 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnSet> 
     try {
         const columns = await db.many(qTemplates.getTableColumns, tableInfo)
 
-        return new ColumnSet(columns.map(c => ({
+        return new pgp.helpers.ColumnSet(columns.map(c => ({
             name: c.name,
             init: (col: any) => {
                 // Drop invalid date value

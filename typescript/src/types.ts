@@ -31,41 +31,6 @@ export class TableInfo {
     }
 }
 
-// export class ColumnInfo {
-//     private _column: Column
-//     private _datatype: String
-
-//     /**
-//      *
-//      */
-//     constructor(name: string, datatype: string) {
-//         this._column = new Column({
-//             name,
-//             init: (col: any) => {
-//                 // Drop invalid date value
-//                 if (col.exists && col.cast === 'date' && !isValidDate(col.value)) {
-//                     return null
-//                 }
-//                 return col.value
-//             },
-//             cast: datatype
-//         })
-//         this._datatype = datatype
-//     }
-
-//     public get name(): String {
-//         return this._column.name
-//     }
-
-//     public get column(): Column {
-//         return this._column
-//     }
-
-//     public get datatype() {
-//         return this._datatype
-//     }
-// }
-
 export class InsertRecord {
     public tableName: string | null = null
     public values: Record<string, string> = {}
