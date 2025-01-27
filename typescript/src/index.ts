@@ -17,10 +17,10 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
 import { DepGraph } from 'dependency-graph'
-import { TableNode, TableInfo, Destination, GraphInfo } from './types.js'
+import { TableNode, TableInfo, Destination, GraphInfo, Batch } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert } from './database.js'
 import { performance } from 'perf_hooks'
-import { Batch, RecordBatcher, RecordContructor } from './stream.js'
+import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
 import { createReadStream } from 'fs'
 import { rm } from 'fs/promises'
@@ -92,10 +92,9 @@ async function createTableNode(tableName: string): Promise<TableNode> {
 async function processGraph(graph: Graph, recordLimit?: number) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
-    stats.numberOfStatements = numberOfStatements
     // Retrieve the graph as a stream of RDFjs objects
     //const quadStream = await graph.toStream('rdf-js')
-    
+
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
     await rm("graph.ttl.gz", { force: true })
@@ -108,36 +107,41 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     const startGraph = performance.now()
 
     // Init components
-    const recordConstructor = new RecordContructor({limit: recordLimit}).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
+    const recordConstructor = new RecordContructor({ limit: recordLimit }).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
     const batcher = new RecordBatcher()
 
     function BatchConsumer(): Writable {
         const writer = new Writable({ objectMode: true })
+        stats.numberOfStatements = numberOfStatements
         writer._write = async (batch: Batch, _encoding, done) => {
             try {
                 // Pause the stream so it does not prevent async processRecord function from executing
                 fileStream.pause()
-                
+
                 // Get table information from the table index, or create a temp table if not exists
                 const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
                 // Copy the batch to database
                 const start = performance.now()
+                stats.unprocessedBatches++
+                logDebug(`Start insert of Batch #${batch.id} (${batch.length} records)`, { paused: fileStream.isPaused() })
                 await batchInsert(tableNode, batch)
-                logDebug(`Batch #${batcher.batchIndex} (${batch.length} records; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`)
+                logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
 
                 // Update stats
-                stats.processedBatches = batcher.batchIndex
+                stats.processedBatches++
+                stats.unprocessedBatches--
                 stats.statementIndex = recordConstructor.statementIndex
                 stats.processedRecordIndex = recordConstructor.recordIndex
 
-                if (batcher.batchIndex % 50 === 0) {
+                if (stats.processedBatches % 100 === 0) {
                     const progress = stats.progress
                     const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
                     logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
                 }
                 done()
-            } catch (err:any) {
+            } catch (err: any) {
                 logError('Error while processing batch', err)
+                stats.failedBatches++
                 done(err)
             }
             finally {
