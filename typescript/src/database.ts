@@ -17,7 +17,7 @@ const db = pgp(dbConfig)
 
 const qTemplates = {
     dropTable: 'DROP TABLE IF EXISTS $<schema:name>.$<name:name>;',
-    createTempTable: 'CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS);',
+    createTempTable: 'CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS EXCLUDING INDEXES );',
     getTableColumns: `
         SELECT column_name AS name, data_type AS datatype
         FROM information_schema.columns
@@ -48,7 +48,8 @@ const qTemplates = {
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `,
-    truncateTable: `TRUNCATE $<schema:name>.$<name:name> CASCADE`,
+    truncateTable: 'TRUNCATE $<schema:name>.$<name:name> CASCADE',
+    renameTable:'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;'
 }
 
 // Helper function to create a table dynamically based on the columns
