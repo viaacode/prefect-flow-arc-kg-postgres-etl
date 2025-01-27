@@ -13,6 +13,7 @@ import {
     SKIP_SQUASH,
     SKIP_VIEW,
     SKIP_CLEANUP,
+    DEBUG_MODE,
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import './debug.js'
@@ -27,6 +28,7 @@ import { rm } from 'fs/promises'
 import { StreamParser } from 'n3'
 import { Writable } from 'stream'
 import { pipeline } from 'stream/promises'
+import memwatch from '@airbnb/node-memwatch'
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -97,9 +99,8 @@ async function processGraph(graph: Graph, recordLimit?: number) {
 
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
-    await rm("graph.ttl.gz", { force: true })
     await graph.toFile("graph.ttl.gz", { compressed: true })
-    logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream.`)
+    logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream (Debug mode is ${DEBUG_MODE}).`)
 
     const fileStream = createReadStream("graph.ttl.gz")
 
@@ -137,6 +138,11 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                     const progress = stats.progress
                     const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
                     logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
+                    if (DEBUG_MODE) {
+                        logInfo('Debug mode is on.')
+                        logHeap()
+                    }
+                
                 }
                 done()
             } catch (err: any) {
@@ -170,6 +176,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     } finally {
         // stream has been completely processed or error, remove the local copy.
         await rm("graph.ttl.gz", { force: true })
+
     }
 }
 
@@ -325,6 +332,12 @@ async function main() {
     }
 
     logInfo('--- Sync done. --')
+}
+
+let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff();
+function logHeap() {
+    logDebug('Heap difference',heapDiff.end());
+    heapDiff = new memwatch.HeapDiff();
 }
 
 main().catch(async err => {
