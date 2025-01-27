@@ -49,7 +49,9 @@ const qTemplates = {
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `,
     truncateTable: 'TRUNCATE $<schema:name>.$<name:name> CASCADE',
-    renameTable:'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;'
+    renameTable:'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;',
+    disableConstraints: 'ALTER TABLE $<schema:name>.$<from:name> DISABLE TRIGGER ALL;',
+    enableConstraints: 'ALTER TABLE $<schema:name>.$<from:name> ENABLE TRIGGER ALL;',
 }
 
 // Helper function to create a table dynamically based on the columns
@@ -82,6 +84,37 @@ export async function dropTable(tableInfo: TableInfo) {
         throw err
     }
 }
+
+export async function enableConstraints(tableInfo: TableInfo) {
+    try {
+        await db.none(qTemplates.enableConstraints, tableInfo)
+        logDebug(`Enable constraints on table ${tableInfo}.`)
+        return tableInfo
+    } catch (err) {
+        logError(`Error enabling constraints on table ${tableInfo}`, err)
+        throw err
+    }
+}
+
+export async function disableConstraints(tableInfo: TableInfo, truncate: boolean = false) {
+    try {
+        await db.tx('disable-constraints', async t => {
+            // Truncate table first if desired
+            if (truncate) {
+                await t.none(qTemplates.truncateTable, tableInfo)
+                logInfo(`Truncated table ${tableInfo} before disabling constraints.`)
+            }
+            await t.none(qTemplates.enableConstraints, tableInfo)
+        })
+        
+        logDebug(`Enable constraints on table ${tableInfo}.`)
+        return tableInfo
+    } catch (err) {
+        logError(`Error enabling constraints on table ${tableInfo}`, err)
+        throw err
+    }
+}
+
 
 // Helper function to retrieve column names for a specific table
 export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnSet> {
@@ -141,7 +174,7 @@ export async function processDeletes() {
     }
 }
 
-export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
+export async function upsertTable(tableNode: TableNode) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
     // Build query
@@ -151,11 +184,6 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
     logDebug(insertQuery)
     try {
         await db.tx('process-upserts', async t => {
-            // Truncate table first if desired
-            if (truncate) {
-                await t.none(qTemplates.truncateTable, tableInfo)
-                logInfo(`Truncated table ${tableInfo} before upsert.`)
-            }
             await t.none(insertQuery)
         })
         logInfo(`Records for table ${tableInfo} upserted!`)
@@ -165,16 +193,14 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
     }
 }
 
-export async function batchInsert(tableNode: TableNode, batch: Batch) {
+export async function batchInsert(tableInfo: TableInfo, columns:ColumnSet, batch: Batch) {
     if (!batch.length) return
-
-    const { columns, tempTable, tableInfo } = tableNode
 
     try {
         const { insert } = pgp.helpers
 
         // generating a multi-row insert query:
-        const query = insert(batch.records, columns, { schema: tempTable.schema, table: tempTable.name })
+        const query = insert(batch.records, columns, { schema: tableInfo.schema, table: tableInfo.name })
 
         // executing the query:
         await db.none(query)

@@ -18,7 +18,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo, Batch } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert, enableConstraints, disableConstraints } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -78,7 +78,8 @@ async function createTableNode(tableName: string): Promise<TableNode> {
     const tableInfo = new TableInfo(tableName)
     const tableNode = {
         tableInfo,
-        tempTable: await createTempTable(tableInfo),
+        // If full sync, both temp and table are the same
+        tempTable: SINCE ? await createTempTable(tableInfo) : tableInfo,
         // Get the actual columns from the database
         columns: await getTableColumns(tableInfo),
         // Get dependent tables from the database
@@ -86,6 +87,12 @@ async function createTableNode(tableName: string): Promise<TableNode> {
         // Get primary keys
         primaryKeys: await getTablePrimaryKeys(tableInfo)
     }
+
+    // If full sync, disable constraints and truncate table
+    if (!SINCE) {
+        await disableConstraints(tableInfo, true)
+    }
+
     tableIndex.addNode(tableName, tableNode)
     return tableNode
 }
@@ -124,7 +131,9 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 const start = performance.now()
                 stats.unprocessedBatches++
                 logDebug(`Start insert of Batch #${batch.id} (${batch.length} records)`, { paused: fileStream.isPaused() })
-                await batchInsert(tableNode, batch)
+                // When full sync, insert in table directly
+                const tableInfo = SINCE ? tableNode.tempTable : tableNode.tableInfo
+                await batchInsert(tableInfo, tableNode.columns, batch)
                 logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
 
                 // Update stats
@@ -141,7 +150,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                         logInfo('Debug mode is on.')
                         logHeap()
                     }
-                
+
                 }
                 done()
             } catch (err: any) {
@@ -277,7 +286,7 @@ async function main() {
     }
 
     // Parse and process the gzipped TriG file from the URL
-    logInfo('--- Step 2: load temporary tables --')
+    logInfo('--- Step 2: load (temporary) tables --')
     start = performance.now()
 
     // Get destination graph and process
@@ -286,38 +295,40 @@ async function main() {
     await processGraph(graph, RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
-    logInfo('--- Step 3: upsert tables --')
-    start = performance.now()
-
-    // Resolve dependencies to table graph
-    tableIndex.entryNodes().forEach(tableName => {
-        const node = tableIndex.getNodeData(tableName)
-        node.dependencies.forEach(dependency => {
-            tableIndex.addDependency(tableName, `${dependency.schema}.${dependency.name}`)
-        })
-    })
-
-
-    // Upsert tables in the right order
-    const tables = tableIndex.overallOrder()
-    logInfo(`Upserting tables in order ${tables.join(', ')}.`)
-    for (const tableName of tableIndex.overallOrder()) {
-        const tableNode = tableIndex.getNodeData(tableName)
-        // upsert records from temp table into table; truncate tables if full sync
-        await upsertTable(tableNode, !SINCE)
-        // drop temp table when done
-        await dropTable(tableNode.tempTable)
-    }
-    logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
-
-
     if (SINCE) {
+        logInfo('--- Step 3: upsert tables --')
+        start = performance.now()
+
+        // Resolve dependencies to table graph
+        tableIndex.entryNodes().forEach(tableName => {
+            const node = tableIndex.getNodeData(tableName)
+            node.dependencies.forEach(dependency => {
+                tableIndex.addDependency(tableName, `${dependency.schema}.${dependency.name}`)
+            })
+        })
+
+        // Upsert tables in the right order
+        const tables = tableIndex.overallOrder()
+        logInfo(`Upserting tables in order ${tables.join(', ')}.`)
+        for (const tableName of tableIndex.overallOrder()) {
+            const tableNode = tableIndex.getNodeData(tableName)
+            // upsert records from temp table into table; truncate tables if full sync
+            await upsertTable(tableNode)
+            // drop temp table when done
+            await dropTable(tableNode.tempTable)
+        }
+        logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
+
         logInfo('--- Step 4: Perform deletes --')
         start = performance.now()
         await processDeletes()
         logInfo(`Deletes completed (${msToTime(performance.now() - start)}).`)
     } else {
-        logInfo('--- Skipping deletes because full sync ---')
+        logInfo('--- Skipping upsert and deletes because full sync. Re-enabling constraints for all tables ---')
+        tableIndex.entryNodes().forEach(async tableName => {
+            const node = tableIndex.getNodeData(tableName)
+            await enableConstraints(node.tableInfo)
+        })
     }
 
     if (!SKIP_CLEANUP) {
@@ -333,10 +344,10 @@ async function main() {
     logInfo('--- Sync done. --')
 }
 
-let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff();
+let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff()
 function logHeap() {
-    logDebug('Heap difference',heapDiff.end());
-    heapDiff = new memwatch.HeapDiff();
+    logDebug('Heap difference', heapDiff.end())
+    heapDiff = new memwatch.HeapDiff()
 }
 
 main().catch(async err => {
