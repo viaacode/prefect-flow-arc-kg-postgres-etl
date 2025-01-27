@@ -25,7 +25,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
     try {
         await db.task(async t => {
             await t.none('DROP TABLE IF EXISTS $<schema:name>.$<name:name>;', tempTableInfo)
-            await t.none('CREATE TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS);', { tempTableInfo, tableInfo })
+            await t.none('CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS);', { tempTableInfo, tableInfo })
         })
 
         logDebug(`Created new temp table ${tempTableInfo} from ${tableInfo}.`)
