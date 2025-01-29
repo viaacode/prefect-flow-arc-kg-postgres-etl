@@ -3,41 +3,7 @@ import { Transform, TransformCallback } from 'stream'
 import { BATCH_SIZE, NAMESPACE, TABLE_PRED, XSD_DURATION } from './configuration.js'
 import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import { fromRdf } from 'rdf-literal'
-
-export class InsertRecord {
-    public tableName: string | null = null
-    public values: Record<string, string> = {}
-}
-
-export class Batch {
-    private _tableName: string
-    private _records: Record<string, string>[] = []
-
-    constructor(tableName: string) {
-        this._tableName = tableName
-    }
-
-    public get tableName(): string {
-        return this._tableName
-    }
-
-    public get records(): Record<string, string>[] {
-        return this._records
-    }
-
-    public add(record: InsertRecord) {
-        this._records.push(record.values)
-    }
-
-    public get length(): number {
-        return this._records.length
-    }
-
-    public toString() {
-        return JSON.stringify(this)
-    }
-
-}
+import { Batch, InsertRecord } from './types.js'
 
 export class RecordContructor extends Transform {
 
@@ -146,12 +112,7 @@ export class RecordContructor extends Transform {
 
 export class RecordBatcher extends Transform {
 
-    private _batchIndex: number = 0
     private batches: { [tableName: string]: Batch } = {}
-
-    public get batchIndex() {
-        return this._batchIndex
-    }
 
     constructor() {
         super({ objectMode: true })
@@ -172,7 +133,6 @@ export class RecordBatcher extends Transform {
         const batch = this.batches[record.tableName]
         if (batch && batch.length >= BATCH_SIZE) {
             this.push(batch)
-            this._batchIndex++
             this.batches[record.tableName] = new Batch(record.tableName)
         }
         cb()

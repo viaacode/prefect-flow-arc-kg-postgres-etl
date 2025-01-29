@@ -1,11 +1,10 @@
-import { TableInfo, ColumnInfo, TableNode } from './types.js'
-import { logInfo, logError, logDebug, stats, isValidDate } from './util.js'
+import { TableInfo, TableNode, Batch } from './types.js'
+import { logInfo, logError, logDebug, isValidDate } from './util.js'
 import { dbConfig } from './configuration.js'
-import pgplib from 'pg-promise'
-import { Batch } from './stream.js'
+import pgplib, { ColumnSet } from 'pg-promise'
 
 // PostgreSQL connection pool
-const pgp = pgplib({
+export const pgp = pgplib({
     // Initialization Options
     capSQL: true, // capitalize all generated SQL
     error(err, e) {
@@ -16,6 +15,43 @@ const pgp = pgplib({
 // Creating a new database instance from the connection details:
 const db = pgp(dbConfig)
 
+const qTemplates = {
+    dropTable: 'DROP TABLE IF EXISTS $<schema:name>.$<name:name>;',
+    createTempTable: 'CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS EXCLUDING INDEXES );',
+    getTableColumns: `
+        SELECT column_name AS name, data_type AS datatype
+        FROM information_schema.columns
+        WHERE table_name = $<name> AND table_schema = $<schema>`,
+    getDependentTables: `
+        SELECT DISTINCT
+            ccu.table_schema AS schema,
+            ccu.table_name AS name
+        FROM information_schema.table_constraints AS tc 
+        JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+            AND tc.table_schema=$<schema>
+            AND tc.table_name=$<name>;`,
+    getTablePrimaryKeys: `
+        SELECT COLUMN_NAME from information_schema.key_column_usage 
+        WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'`,
+    deleteIntellectualEntitiesByFragment: `
+        DELETE graph."intellectual_entity"
+        FROM graph."intellectual_entity" x
+        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
+        WHERE y.is_deleted;`,
+    deleteFragments: 'DELETE graph."mh_fragment_identifier" WHERE is_deleted;',
+    upsertTable: `
+        INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
+        SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
+        ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `,
+    truncateTable: 'TRUNCATE $<schema:name>.$<name:name> CASCADE',
+    renameTable:'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;'
+}
+
 // Helper function to create a table dynamically based on the columns
 export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> {
     // Construct temp table name
@@ -24,8 +60,8 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
 
     try {
         await db.task(async t => {
-            await t.none('DROP TABLE IF EXISTS $<schema:name>.$<name:name>;', tempTableInfo)
-            await t.none('CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS);', { tempTableInfo, tableInfo })
+            await t.none(qTemplates.dropTable, tempTableInfo)
+            await t.none(qTemplates.createTempTable, { tempTableInfo, tableInfo })
         })
 
         logDebug(`Created new temp table ${tempTableInfo} from ${tableInfo}.`)
@@ -38,7 +74,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
 
 export async function dropTable(tableInfo: TableInfo) {
     try {
-        await db.none('DROP TABLE IF EXISTS $<schema:name>.$<name:name>;', tableInfo)
+        await db.none(qTemplates.dropTable, tableInfo)
         logDebug(`Dropped table ${tableInfo} if exists.`)
         return tableInfo
     } catch (err) {
@@ -48,14 +84,22 @@ export async function dropTable(tableInfo: TableInfo) {
 }
 
 // Helper function to retrieve column names for a specific table
-export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnInfo[]> {
-    const query = `
-        SELECT column_name AS name, data_type AS datatype
-        FROM information_schema.columns
-        WHERE table_name = $<name> AND table_schema = $<schema>
-    `
+export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnSet> {
     try {
-        return await db.many(query, tableInfo)
+        const columns = await db.many(qTemplates.getTableColumns, tableInfo)
+
+        return new pgp.helpers.ColumnSet(columns.map(c => ({
+            name: c.name,
+            init: (col: any) => {
+                // Drop invalid date value
+                if (col.exists && col.cast === 'date' && !isValidDate(col.value)) {
+                    return null
+                }
+                return col.value
+            },
+            cast: c.datatype
+        })))
+
     } catch (err) {
         logError(`Error retrieving columns for table ${tableInfo}`, err)
         throw err
@@ -64,22 +108,8 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnInfo[
 
 // Helper function to retrieve primary keys for a specific table
 export async function getDependentTables(tableInfo: TableInfo): Promise<TableInfo[]> {
-    const query = `
-        SELECT DISTINCT
-            ccu.table_schema AS schema,
-            ccu.table_name AS name
-        FROM information_schema.table_constraints AS tc 
-        JOIN information_schema.key_column_usage AS kcu
-            ON tc.constraint_name = kcu.constraint_name
-            AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-            ON ccu.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_schema=$<schema>
-            AND tc.table_name=$<name>;
-    `
     try {
-        return await db.manyOrNone(query, tableInfo)
+        return await db.manyOrNone(qTemplates.getDependentTables, tableInfo)
     } catch (err) {
         logError(`Error retrieving dependent tables for table ${tableInfo}`, err)
         throw err
@@ -88,13 +118,8 @@ export async function getDependentTables(tableInfo: TableInfo): Promise<TableInf
 
 // Helper function to retrieve primary keys for a specific table
 export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[]> {
-
-    const query = `
-        SELECT COLUMN_NAME from information_schema.key_column_usage 
-        WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'
-    `
     try {
-        const result = await db.many(query, tableInfo)
+        const result = await db.many(qTemplates.getTablePrimaryKeys, tableInfo)
         return result.map((row: { column_name: string }) => row.column_name)
     } catch (err) {
         logError(`Error retrieving columns for table ${tableInfo}`, err)
@@ -104,18 +129,10 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
 
 // Helper function to delete a batch of records
 export async function processDeletes() {
-
-    const query = `
-        DELETE graph."intellectual_entity"
-        FROM graph."intellectual_entity" x
-        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
-        WHERE y.is_deleted;
-    `
-
     try {
         const result = await db.tx('process-deletes', async t => {
-            await t.none(query)
-            return await t.none('DELETE graph."mh_fragment_identifier" WHERE is_deleted;')
+            await t.none(qTemplates.deleteIntellectualEntitiesByFragment)
+            return await t.none(qTemplates.deleteFragments)
         })
         logInfo(`Deleted ${result} records from table graph."intellectual_entity" and graph."mh_fragment_identifier"`)
     } catch (err) {
@@ -127,24 +144,16 @@ export async function processDeletes() {
 export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
-    // TODO: cleanup with assignColumns
-    const { ColumnSet } = pgp.helpers
-    const cs = new ColumnSet(columns.map(c => c.name))
-
     // Build query
-    const insertQuery = pgp.as.format(`
-        INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
-        SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
-        ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `, { tableInfo, tempTable, primaryKeys })
-        + cs.assignColumns({ from: 'EXCLUDED', skip: primaryKeys })
+    const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
+        + columns.assignColumns({ from: 'EXCLUDED', skip: primaryKeys })
 
     logDebug(insertQuery)
-    const truncateQuery = `TRUNCATE $<schema:name>.$<name:name> CASCADE`
     try {
         await db.tx('process-upserts', async t => {
             // Truncate table first if desired
             if (truncate) {
-                await t.none(truncateQuery, tableInfo)
+                await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
             await t.none(insertQuery)
@@ -162,68 +171,19 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
     const { columns, tempTable, tableInfo } = tableNode
 
     try {
-        stats.unprocessedBatches++
-        const { ColumnSet, insert } = pgp.helpers
-        const cs = new ColumnSet(columns.map(c => ({
-            name: c.name, init: (col: any) => {
-                // Drop invalid date value
-                if (col.exists && c.datatype === 'date' && !isValidDate(col.value)) {
-                    return null
-                }
-                return col.value
-            }
-        })), {
-            table: { schema: tempTable.schema, table: tempTable.name },
-        })
+        const { insert } = pgp.helpers
 
         // generating a multi-row insert query:
-        const query = insert(batch.records, cs)
+        const query = insert(batch.records, columns, { schema: tempTable.schema, table: tempTable.name })
 
         // executing the query:
         await db.none(query)
-
-        stats.unprocessedBatches--
     } catch (err) {
         logError(`Error during bulk insert for table ${tableInfo}`, err)
         logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
-        stats.rolledbackBatches++
         throw err
     }
 }
-
-// export async function batchInsertUsingCopy(tableNode: TableNode, batch: Batch) {
-//     if (!batch.length) return
-
-//     const { columns, tempTable, tableInfo } = tableNode
-
-//     const columnList = columns.map(c => c.name).join(',')
-//     const copyQuery = `COPY ${tempTable} (${columnList}) FROM STDIN WITH (FORMAT csv)`
-
-//     const client = await pool.connect()
-//     client.on("error", (err: Error) => {
-//         logError('Error received on db client', err, err.stack)
-//     })
-//     try {
-//         stats.unprocessedBatches++
-//         await client.query('BEGIN')
-//         const ingestStream = client.query(from(copyQuery))
-//         const sourceStream = batch.toCSVStream(columns)
-
-//         await pipeline(sourceStream, ingestStream)
-//         await client.query('COMMIT')
-//         stats.unprocessedBatches--
-//     } catch (err) {
-//         await client.query('ROLLBACK')
-//         logError(`Error during bulk insert for table ${tableInfo}`, err)
-//         logError(`Erroreous batch (CSV)`, err, batch.toCSV(columns))
-//         //logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
-//         stats.rolledbackBatches++
-//         throw err
-//     } finally {
-//         client.removeAllListeners('error')
-//         client.release()
-//     }
-// }
 
 export async function closeConnectionPool() {
     return await db.$pool.end() // shuts down the connection pool associated with the Database object
