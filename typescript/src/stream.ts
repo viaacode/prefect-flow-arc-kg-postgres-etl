@@ -12,21 +12,17 @@ export class RecordContructor extends Transform {
     private currentSubject: string | null = null
 
     private _statementIndex = 0
-    private _recordIndex = 0
     private _offset: number
     private _limit?: number
 
     constructor(options: { offset?: number, limit?: number }) {
-        super({ objectMode: true })
+        super({ objectMode: true, highWaterMark: 64 })
         this._offset = options.offset || 0
         this._limit = options.limit
     }
 
     public get statementIndex() {
         return this._statementIndex
-    }
-    public get recordIndex() {
-        return this._recordIndex
     }
 
     private _parseValue(literal: Literal) {
@@ -51,8 +47,9 @@ export class RecordContructor extends Transform {
         }
 
         // If a set record limit is reached, stop the RDF stream
-        if (this._limit && this.recordIndex > this._limit) {
+        if (this._limit && InsertRecord.index > this._limit) {
             this.destroy()
+            return cb()
         }
 
         // Deconstruct the RDF terms to simple JS variables
@@ -72,11 +69,10 @@ export class RecordContructor extends Transform {
             // Process the current record if there is one
             if (this.currentSubject !== null && Object.keys(this.currentRecord).length > 0) {
                 this.push(this.currentRecord)
-                this._recordIndex++
             }
 
             this.currentSubject = subject
-            this.currentRecord = new InsertRecord
+            this.currentRecord = new InsertRecord()
         }
 
         // Check for the record type
@@ -99,12 +95,10 @@ export class RecordContructor extends Transform {
         return cb()
     }
 
-    _flush(cb: Function) {
+    _flush(cb: TransformCallback) {
         if (this.currentSubject && this.currentRecord) {
             this.push(this.currentRecord)
-            this._recordIndex++
         }
-
         cb()
     }
 
@@ -118,10 +112,12 @@ export class RecordBatcher extends Transform {
         super({ objectMode: true })
     }
 
-    _transform(record: InsertRecord, _encoding: string, cb: Function) {
+    _transform(record: InsertRecord, _encoding: string, cb: TransformCallback) {
 
         // If parts are missing, do nothing
-        if (!record.values || !record.tableName) return
+        if (!record.values || !record.tableName) {
+            return cb(new Error(`Invalid record: ${record}`))
+        }
         // Init batch for table if it does not exist yet
         if (!this.batches[record.tableName]) {
             this.batches[record.tableName] = new Batch(record.tableName)
