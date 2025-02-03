@@ -39,11 +39,10 @@ const qTemplates = {
         SELECT COLUMN_NAME from information_schema.key_column_usage 
         WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'`,
     deleteIntellectualEntitiesByFragment: `
-        DELETE graph."intellectual_entity"
-        FROM graph."intellectual_entity" x
-        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
-        WHERE y.is_deleted;`,
-    deleteFragments: 'DELETE graph."mh_fragment_identifier" WHERE is_deleted;',
+        DELETE FROM graph."intellectual_entity" x
+        USING graph."mh_fragment_identifier" y
+        WHERE y.intellectual_entity_id = x.id AND y.is_deleted;`,
+    deleteFragments: 'DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;',
     upsertTable: `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
@@ -92,12 +91,15 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnSet> 
             name: c.name,
             init: (col: any) => {
                 // Drop invalid date value
-                if (col.exists && col.cast === 'date' && !isValidDate(col.value)) {
+                if (col.exists && c.datatype === 'date' && !isValidDate(col.value)) {
                     return null
+                }
+                // Set null values in boolean fields to false
+                if (c.datatype === 'boolean' && !col.exists) {
+                    return false
                 }
                 return col.value
             },
-            cast: c.datatype
         })))
 
     } catch (err) {
@@ -131,10 +133,12 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
 export async function processDeletes() {
     try {
         const result = await db.tx('process-deletes', async t => {
-            await t.none(qTemplates.deleteIntellectualEntitiesByFragment)
-            return await t.none(qTemplates.deleteFragments)
+            return {
+                entities: await t.result(qTemplates.deleteIntellectualEntitiesByFragment, false),
+                fragments: await t.result(qTemplates.deleteFragments, false)
+            }
         })
-        logInfo(`Deleted ${result} records from table graph."intellectual_entity" and graph."mh_fragment_identifier"`)
+        logInfo(`Deleted ${result.entities.rowCount} records from table graph."intellectual_entity" and ${result.fragments.rowCount} records from graph."mh_fragment_identifier"`)
     } catch (err) {
         logError('Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier"', err)
         throw err

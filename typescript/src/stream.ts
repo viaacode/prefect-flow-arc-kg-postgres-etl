@@ -8,7 +8,7 @@ import { Batch, InsertRecord } from './types.js'
 export class RecordContructor extends Transform {
 
     // Init variables that track the current subject, record and table
-    private currentRecord: InsertRecord = new InsertRecord
+    private currentRecord: InsertRecord = new InsertRecord()
     private currentSubject: string | null = null
 
     private _statementIndex = 0
