@@ -2,7 +2,7 @@ import App from '@triply/triplydb'
 import { Account } from '@triply/triplydb/Account.js'
 import { AddQueryOptions } from '@triply/triplydb/commonAccountFunctions.js'
 import Graph from '@triply/triplydb/Graph.js'
-import { readdir, readFile } from 'fs/promises'
+import { readdir, readFile, } from 'fs/promises'
 import { join, extname, parse } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
 import {
@@ -17,7 +17,7 @@ import {
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
-import { TableNode, TableInfo, Destination, GraphInfo, Batch } from './types.js'
+import { TableNode, TableInfo, Destination, GraphInfo, Batch, InsertRecord } from './types.js'
 import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
@@ -43,7 +43,7 @@ async function addQuery(account: Account, queryName: string, params: AddQueryOpt
 }
 
 async function addJobQueries(account: Account, source: Dataset) {
-    const files = (await readdir(QUERY_PATH))
+    const files = (await readdir(join(process.cwd(), QUERY_PATH)))
         // Only use sparql files
         .filter(f => extname(f) === '.sparql')
 
@@ -131,7 +131,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 stats.processedBatches++
                 stats.unprocessedBatches--
                 stats.statementIndex = recordConstructor.statementIndex
-                stats.processedRecordIndex = recordConstructor.recordIndex
+                stats.processedRecordIndex = InsertRecord.index
 
                 if (stats.processedBatches % 100 === 0) {
                     const progress = stats.progress
@@ -168,7 +168,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
             batcher, // Turn into batches
             BatchConsumer())
 
-        logInfo(`Load pipeline completed ended: ${recordConstructor.recordIndex} records processed.`)
+        logInfo(`Load pipeline completed ended: ${InsertRecord.index} records processed.`)
     } catch (err) {
         logError('Error during parsing or processing', err)
         throw err
@@ -257,7 +257,7 @@ async function main() {
             logInfo(`Graph ${destination.graph} does not exist.\n`)
         }
 
-        logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph}.`)
+        logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph} ${SINCE ? `from ${SINCE}`: '(full sync)'}.`)
         await account.runPipeline({
             destination,
             onProgress: progress => logInfo(`Pipeline ${queries.map(q => q.slug)}: ${Math.round(progress.progress * 100)}% complete.`),
@@ -373,3 +373,4 @@ process.on('unhandledRejection', (reason, promise) => {
     logError(`Unhandled rejection at ${promise}`, reason)
     process.exit(1)
 })
+

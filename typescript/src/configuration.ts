@@ -1,5 +1,5 @@
 // Directory containing the .sparql files
-export const QUERY_PATH = '../queries'
+export const QUERY_PATH = './queries'
 
 // RDF constants
 export const NAMESPACE = 'urn:kg-to-postgres:'
@@ -9,7 +9,6 @@ export const XSD_DURATION = 'http://www.w3.org/2001/XMLSchema#duration'
 
 // ENV variables
 export const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '100', 10)
-// export const LOAD_RETRIES = process.env.LOAD_RETRIES ? parseInt(process.env.LOAD_RETRIES, 10) : 0
 export const RECORD_LIMIT = process.env.RECORD_LIMIT ? parseInt(process.env.RECORD_LIMIT, 10) : undefined
 export const SINCE = process.env.SINCE ? new Date(process.env.SINCE).toISOString() : undefined
 export const SKIP_SQUASH = process.env.SKIP_SQUASH === 'True'

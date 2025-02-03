@@ -25,7 +25,10 @@ PREFIX : <urn:kg-to-postgres:>
 
 
 CONSTRUCT {
-    ?fragment :is_deleted true
+    ?ie_fragment :tableName "graph.mh_fragment_identifier";
+        :intellectual_entity_id ?ie;
+        :mh_fragment_identifier ?mh_fragment_identifier;
+        :is_deleted true
 } WHERE {
     { 
         ?fragment a mh:Fragment;

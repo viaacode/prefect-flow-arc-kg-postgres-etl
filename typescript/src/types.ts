@@ -32,19 +32,37 @@ export class TableInfo {
 }
 
 export class InsertRecord {
+    private static _index: number = 0
+    private _id: number
     public tableName: string | null = null
     public values: Record<string, string> = {}
+
+    constructor() {
+        this._id = InsertRecord._index++
+    }
+
+    public get id(): number {
+        return this._id
+    }
+
+    public static get index() {
+        return InsertRecord._index
+    }
+
+    public toString() {
+        return JSON.stringify(this)
+    }
 }
 
 export class Batch {
     private _tableName: string
     private _records: Record<string, string>[] = []
-    private static _batchIndex: number = 0
+    private static _index: number = 0
     private _id: number
 
     constructor(tableName: string) {
         this._tableName = tableName
-        this._id = Batch._batchIndex++
+        this._id = Batch._index++
     }
 
     public get tableName(): string {
@@ -59,8 +77,8 @@ export class Batch {
         return this._id
     }
 
-    public static get batchIndex() {
-        return Batch._batchIndex
+    public static get index() {
+        return Batch._index
     }
 
     public add(record: InsertRecord) {
