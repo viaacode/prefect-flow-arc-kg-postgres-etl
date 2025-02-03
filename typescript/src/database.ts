@@ -134,11 +134,11 @@ export async function processDeletes() {
     try {
         const result = await db.tx('process-deletes', async t => {
             return {
-                entities: await t.result(qTemplates.deleteIntellectualEntitiesByFragment, false),
-                fragments: await t.result(qTemplates.deleteFragments, false)
+                entities: await t.result(qTemplates.deleteIntellectualEntitiesByFragment, null, r => r.rowCount),
+                fragments: await t.result(qTemplates.deleteFragments, null, r => r.rowCount)
             }
         })
-        logInfo(`Deleted ${result.entities.rowCount} records from table graph."intellectual_entity" and ${result.fragments.rowCount} records from graph."mh_fragment_identifier"`)
+        logInfo(`Deleted ${result.entities} records from table graph."intellectual_entity" and ${result.fragments} records from graph."mh_fragment_identifier"`)
     } catch (err) {
         logError('Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier"', err)
         throw err
@@ -154,15 +154,15 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
 
     logDebug(insertQuery)
     try {
-        const result = await db.tx('process-upserts', async t => {
+        const rowCount = await db.tx('process-upserts', async t => {
             // Truncate table first if desired
             if (truncate) {
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
-            return await t.result(insertQuery, false)
+            return await t.result(insertQuery, null, r => r.rowCount)
         })
-        logInfo(`Upserted ${result.rowCount} records for table ${tableInfo}!`)
+        logInfo(`Upserted ${rowCount} records for table ${tableInfo}!`)
     } catch (err) {
         logError(`Error during upsert from '${tempTable}' to '${tableInfo}'`, err)
         throw err
