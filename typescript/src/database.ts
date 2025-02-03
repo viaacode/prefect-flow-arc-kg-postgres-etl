@@ -21,7 +21,7 @@ const qTemplates = {
     getTableColumns: `
         SELECT column_name AS name, data_type AS datatype
         FROM information_schema.columns
-        WHERE table_name = $<name> AND table_schema = $<schema>`,
+        WHERE table_name = $<name> AND table_schema = $<schema> AND column_name NOT IN ('created_at','updated_at')`,
     getDependentTables: `
         SELECT DISTINCT
             ccu.table_schema AS schema,
@@ -150,19 +150,19 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
 
     // Build query
     const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
-        + columns.assignColumns({ from: 'EXCLUDED', skip: primaryKeys })
+        + columns.assignColumns({ from: 'EXCLUDED' })
 
     logDebug(insertQuery)
     try {
-        await db.tx('process-upserts', async t => {
+        const result = await db.tx('process-upserts', async t => {
             // Truncate table first if desired
             if (truncate) {
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
-            await t.none(insertQuery)
+            return await t.result(insertQuery, false)
         })
-        logInfo(`Records for table ${tableInfo} upserted!`)
+        logInfo(`Upserted ${result.rowCount} records for table ${tableInfo}!`)
     } catch (err) {
         logError(`Error during upsert from '${tempTable}' to '${tableInfo}'`, err)
         throw err
