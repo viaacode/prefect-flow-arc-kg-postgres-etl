@@ -135,10 +135,10 @@ export async function processDeletes() {
         const result = await db.tx('process-deletes', async t => {
             return {
                 entities: await t.result(qTemplates.deleteIntellectualEntitiesByFragment, null, r => r.rowCount),
-                fragments: await t.result(qTemplates.deleteFragments, null, r => r.rowCount)
+                //fragments: await t.result(qTemplates.deleteFragments, null, r => r.rowCount)
             }
         })
-        logInfo(`Deleted ${result.entities} records from table graph."intellectual_entity" and ${result.fragments} records from graph."mh_fragment_identifier"`)
+        logInfo(`Deleted ${result.entities} records from table graph."intellectual_entity"`)
     } catch (err) {
         logError('Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier"', err)
         throw err
