@@ -1,5 +1,5 @@
 import psycopg2
-from prefect import flow, task
+from prefect import flow, task, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
@@ -121,14 +121,11 @@ def main_flow(
 
 @task
 def delete_records_from_db(
-    indexes: list[str],
     db_credentials: DatabaseCredentials,
 ):
-
     logger = get_run_logger()
 
     try:
-
         # Compose SQL query to retrieve deleted documents
 
         # Connect to ES and Postgres
