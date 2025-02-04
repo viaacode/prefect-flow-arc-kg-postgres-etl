@@ -3,7 +3,7 @@ import { Account } from '@triply/triplydb/Account.js'
 import { AddQueryOptions } from '@triply/triplydb/commonAccountFunctions.js'
 import Graph from '@triply/triplydb/Graph.js'
 import { readdir, readFile, } from 'fs/promises'
-import { join, extname, parse } from 'path'
+import { join, extname, parse, dirname } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
 import {
     RECORD_LIMIT, QUERY_PATH,
@@ -28,6 +28,9 @@ import { StreamParser } from 'n3'
 import { Writable } from 'stream'
 import { pipeline } from 'stream/promises'
 import memwatch from '@airbnb/node-memwatch'
+import { fileURLToPath } from 'url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 const tableIndex = new DepGraph<TableNode>()
 
@@ -43,7 +46,7 @@ async function addQuery(account: Account, queryName: string, params: AddQueryOpt
 }
 
 async function addJobQueries(account: Account, source: Dataset) {
-    const files = (await readdir(join(process.cwd(), QUERY_PATH)))
+    const files = (await readdir(join(__dirname, QUERY_PATH)))
         // Only use sparql files
         .filter(f => extname(f) === '.sparql')
 

@@ -1,5 +1,5 @@
 // Directory containing the .sparql files
-export const QUERY_PATH = './queries'
+export const QUERY_PATH = '../queries'
 
 // RDF constants
 export const NAMESPACE = 'urn:kg-to-postgres:'
