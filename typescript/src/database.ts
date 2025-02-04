@@ -38,11 +38,6 @@ const qTemplates = {
     getTablePrimaryKeys: `
         SELECT COLUMN_NAME from information_schema.key_column_usage 
         WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'`,
-    deleteIntellectualEntitiesByFragment: `
-        DELETE FROM graph."intellectual_entity" x
-        USING graph."mh_fragment_identifier" y
-        WHERE y.intellectual_entity_id = x.id AND y.is_deleted;`,
-    deleteFragments: 'DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;',
     upsertTable: `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
@@ -125,22 +120,6 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
         return result.map((row: { column_name: string }) => row.column_name)
     } catch (err) {
         logError(`Error retrieving columns for table ${tableInfo}`, err)
-        throw err
-    }
-}
-
-// Helper function to delete a batch of records
-export async function processDeletes() {
-    try {
-        const result = await db.tx('process-deletes', async t => {
-            return {
-                entities: await t.result(qTemplates.deleteIntellectualEntitiesByFragment, null, r => r.rowCount),
-                //fragments: await t.result(qTemplates.deleteFragments, null, r => r.rowCount)
-            }
-        })
-        logInfo(`Deleted ${result.entities} records from table graph."intellectual_entity"`)
-    } catch (err) {
-        logError('Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier"', err)
         throw err
     }
 }

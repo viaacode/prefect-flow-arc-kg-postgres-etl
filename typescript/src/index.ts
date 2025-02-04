@@ -18,7 +18,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo, Batch, InsertRecord } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, processDeletes, batchInsert } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, batchInsert } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -310,18 +310,8 @@ async function main() {
     }
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
-
-    if (SINCE) {
-        logInfo('--- Step 4: Perform deletes --')
-        start = performance.now()
-        await processDeletes()
-        logInfo(`Deletes completed (${msToTime(performance.now() - start)}).`)
-    } else {
-        logInfo('--- Skipping deletes because full sync ---')
-    }
-
     if (!SKIP_CLEANUP) {
-        logInfo('--- Step 5: Graph cleanup --')
+        logInfo('--- Step 4: Graph cleanup --')
         start = performance.now()
         await cleanup()
 
