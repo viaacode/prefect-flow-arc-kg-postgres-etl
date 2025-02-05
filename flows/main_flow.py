@@ -21,20 +21,20 @@ def delete_records_from_db(
 ):
     logger = get_run_logger()
 
+     # Connect to ES and Postgres
+    logger.info("(Re)connecting to postgres")
+    db_conn = psycopg2.connect(
+        user=db_credentials.username,
+        password=db_credentials.password.get_secret_value(),
+        host=db_credentials.host,
+        port=db_credentials.port,
+        database=db_credentials.database,
+        cursor_factory=RealDictCursor,
+    )
+    db_conn.autocommit = False
+
     try:
         # Compose SQL query to retrieve deleted documents
-
-        # Connect to ES and Postgres
-        logger.info("(Re)connecting to postgres")
-        db_conn = psycopg2.connect(
-            user=db_credentials.username,
-            password=db_credentials.password.get_secret_value(),
-            host=db_credentials.host,
-            port=db_credentials.port,
-            database=db_credentials.database,
-            cursor_factory=RealDictCursor,
-            autocommit=False,
-        )
 
         # Create server-side cursor
         cursor = db_conn.cursor()
