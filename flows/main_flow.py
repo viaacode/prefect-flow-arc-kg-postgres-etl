@@ -21,7 +21,7 @@ def delete_records_from_db(
 ):
     logger = get_run_logger()
 
-     # Connect to ES and Postgres
+    # Connect to ES and Postgres
     logger.info("(Re)connecting to postgres")
     db_conn = psycopg2.connect(
         user=db_credentials.username,
