@@ -38,6 +38,65 @@ def run_indexer(
         },
     )
 
+@task
+def delete_records_from_db(
+    db_credentials: DatabaseCredentials,
+):
+    logger = get_run_logger()
+
+    try:
+        # Compose SQL query to retrieve deleted documents
+
+        # Connect to ES and Postgres
+        logger.info("(Re)connecting to postgres")
+        db_conn = psycopg2.connect(
+            user=db_credentials.username,
+            password=db_credentials.password.get_secret_value(),
+            host=db_credentials.host,
+            port=db_credentials.port,
+            database=db_credentials.database,
+            cursor_factory=RealDictCursor,
+            autocommit=False,
+        )
+
+        # Create server-side cursor
+        cursor = db_conn.cursor()
+
+        # Run query
+
+        # Delete the Intellectual Entities
+        logger.info("Deleting the Intellectual Entities from database")
+        cursor.execute(
+            """
+        DELETE FROM graph."intellectual_entity" x
+        USING graph."mh_fragment_identifier" y
+        WHERE y.intellectual_entity_id = x.id AND y.is_deleted;"""
+        )
+
+        # Delete the fragment entries in database
+        logger.info('Deleting the fragments from table graph."mh_fragment_identifier"')
+        cursor.execute(
+            """
+        DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;"""
+        )
+
+        # Commit your changes in the database
+        db_conn.commit()
+        logger.info("Database deletes succesful")
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(
+            "Error in transction Reverting all other operations of a transction ", error
+        )
+        db_conn.rollback()
+
+    finally:
+        # closing database connection.
+        if db_conn:
+            cursor.close()
+            db_conn.close()
+            logger.info("PostgreSQL connection is closed")
+
 
 @flow(
     name="prefect-flow-arc-kg-postgres-etl",
@@ -107,7 +166,7 @@ def main_flow(
         postgres_pool_max=db_pool_max,
     )
 
-    indexing = run_indexer.submit(
+    indexing = run_indexer(
         deployment=deployment_name_arc_indexer,
         db_block_name=db_block_name,
         db_table=db_index_table,
@@ -118,65 +177,6 @@ def main_flow(
 
     delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=indexing)
 
-
-@task
-def delete_records_from_db(
-    db_credentials: DatabaseCredentials,
-):
-    logger = get_run_logger()
-
-    try:
-        # Compose SQL query to retrieve deleted documents
-
-        # Connect to ES and Postgres
-        logger.info("(Re)connecting to postgres")
-        db_conn = psycopg2.connect(
-            user=db_credentials.username,
-            password=db_credentials.password.get_secret_value(),
-            host=db_credentials.host,
-            port=db_credentials.port,
-            database=db_credentials.database,
-            cursor_factory=RealDictCursor,
-            autocommit=False,
-        )
-
-        # Create server-side cursor
-        cursor = db_conn.cursor()
-
-        # Run query
-
-        # Delete the Intellectual Entities
-        logger.info("Deleting the Intellectual Entities from database")
-        cursor.execute(
-            """
-        DELETE FROM graph."intellectual_entity" x
-        USING graph."mh_fragment_identifier" y
-        WHERE y.intellectual_entity_id = x.id AND y.is_deleted;"""
-        )
-
-        # Delete the fragment entries in database
-        logger.info('Deleting the fragments from table graph."mh_fragment_identifier"')
-        cursor.execute(
-            """
-        DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;"""
-        )
-
-        # Commit your changes in the database
-        db_conn.commit()
-        logger.info("Database deletes succesful")
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        logger.error(
-            "Error in transction Reverting all other operations of a transction ", error
-        )
-        db_conn.rollback()
-
-    finally:
-        # closing database connection.
-        if db_conn:
-            cursor.close()
-            db_conn.close()
-            logger.info("PostgreSQL connection is closed")
 
 
 if __name__ == "__main__":
