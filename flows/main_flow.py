@@ -10,33 +10,10 @@ import os
 from psycopg2.extras import RealDictCursor
 
 
-@flow
-def run_indexer(
-    deployment: str,
-    db_block_name: str,
-    db_table: str,
-    es_block_name: str,
-    db_column_es_id: str = "id",
-    db_column_es_index: str = "index",
-    or_ids_to_run: list[str] = None,
-    full_sync: bool = False,
-    db_batch_size: int = 1000,
-    es_chunk_size: int = 500,
-):
-    return run_deployment(
-        name=deployment,
-        parameters={
-            db_block_name: db_block_name,
-            db_table: db_table,
-            es_block_name: es_block_name,
-            db_column_es_id: db_column_es_id,
-            db_column_es_index: db_column_es_index,
-            or_ids_to_run: or_ids_to_run,
-            full_sync: full_sync,
-            db_batch_size: db_batch_size,
-            es_chunk_size: es_chunk_size,
-        },
-    )
+@task(task_run_name="Run deployment {flow_name}/{deployment_name}")
+def run_deployment_task(flow_name: str, deployment_name: str, parameters: dict):
+    run_deployment(name=f"{flow_name}/{deployment_name}", parameters=parameters)
+
 
 @task
 def delete_records_from_db(
@@ -125,7 +102,8 @@ def main_flow(
     full_sync: bool = False,
     debug_mode: bool = False,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
-    deployment_name_arc_indexer: str = "prefect-flow-arc-indexer/prefect-flow-arc-indexer-int",
+    flow_name_indexer: str = "prefect-flow-arc-indexer",
+    deployment_name_indexer: str = "prefect-flow-arc-indexer-int",
 ):
     """Flow to query the TriplyDB dataset and update the graphql database.
     Blocks:
@@ -166,17 +144,19 @@ def main_flow(
         postgres_pool_max=db_pool_max,
     )
 
-    indexing = run_indexer(
-        deployment=deployment_name_arc_indexer,
-        db_block_name=db_block_name,
-        db_table=db_index_table,
-        es_block_name=es_block_name,
-        full_sync=full_sync,
+    indexing = run_deployment_task.submit(
+        flow_name=flow_name_indexer,
+        deployment_name=deployment_name_indexer,
+        parameters={
+            "db_block_name": db_block_name,
+            "db_table": db_index_table,
+            "es_block_name": es_block_name,
+            "full_sync": full_sync,
+        },
         wait_for=loading,
     )
 
     delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=indexing)
-
 
 
 if __name__ == "__main__":
