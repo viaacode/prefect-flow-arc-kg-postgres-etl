@@ -21,7 +21,7 @@ const qTemplates = {
     getTableColumns: `
         SELECT column_name AS name, data_type AS datatype
         FROM information_schema.columns
-        WHERE table_name = $<name> AND table_schema = $<schema>`,
+        WHERE table_name = $<name> AND table_schema = $<schema> AND column_name NOT IN ('created_at','updated_at')`,
     getDependentTables: `
         SELECT DISTINCT
             ccu.table_schema AS schema,
@@ -38,12 +38,6 @@ const qTemplates = {
     getTablePrimaryKeys: `
         SELECT COLUMN_NAME from information_schema.key_column_usage 
         WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'`,
-    deleteIntellectualEntitiesByFragment: `
-        DELETE graph."intellectual_entity"
-        FROM graph."intellectual_entity" x
-        INNER JOIN graph."mh_fragment_identifier" y ON x.id = y.intellectual_entity_id
-        WHERE y.is_deleted;`,
-    deleteFragments: 'DELETE graph."mh_fragment_identifier" WHERE is_deleted;',
     upsertTable: `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
@@ -92,12 +86,15 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnSet> 
             name: c.name,
             init: (col: any) => {
                 // Drop invalid date value
-                if (col.exists && col.cast === 'date' && !isValidDate(col.value)) {
+                if (col.exists && c.datatype === 'date' && !isValidDate(col.value)) {
                     return null
+                }
+                // Set null values in boolean fields to false
+                if (c.datatype === 'boolean' && !col.exists) {
+                    return false
                 }
                 return col.value
             },
-            cast: c.datatype
         })))
 
     } catch (err) {
@@ -127,38 +124,24 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
     }
 }
 
-// Helper function to delete a batch of records
-export async function processDeletes() {
-    try {
-        const result = await db.tx('process-deletes', async t => {
-            await t.none(qTemplates.deleteIntellectualEntitiesByFragment)
-            return await t.none(qTemplates.deleteFragments)
-        })
-        logInfo(`Deleted ${result} records from table graph."intellectual_entity" and graph."mh_fragment_identifier"`)
-    } catch (err) {
-        logError('Error during deletes for table graph."intellectual_entity" and graph."mh_fragment_identifier"', err)
-        throw err
-    }
-}
-
 export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
     // Build query
     const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
-        + columns.assignColumns({ from: 'EXCLUDED', skip: primaryKeys })
+        + columns.assignColumns({ from: 'EXCLUDED' })
 
     logDebug(insertQuery)
     try {
-        await db.tx('process-upserts', async t => {
+        const rowCount = await db.tx('process-upserts', async t => {
             // Truncate table first if desired
             if (truncate) {
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
-            await t.none(insertQuery)
+            return await t.result(insertQuery, null, r => r.rowCount)
         })
-        logInfo(`Records for table ${tableInfo} upserted!`)
+        logInfo(`Upserted ${rowCount} records for table ${tableInfo}!`)
     } catch (err) {
         logError(`Error during upsert from '${tempTable}' to '${tableInfo}'`, err)
         throw err
