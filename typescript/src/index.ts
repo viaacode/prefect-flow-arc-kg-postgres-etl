@@ -81,7 +81,7 @@ async function createTableNode(tableName: string): Promise<TableNode> {
     const tableInfo = new TableInfo(tableName)
     const tableNode = {
         tableInfo,
-        tempTable: await createTempTable(tableInfo),
+        tempTable: await createTempTable(tableInfo, !SINCE),
         // Get the actual columns from the database
         columns: await getTableColumns(tableInfo),
         // Get dependent tables from the database
@@ -308,8 +308,6 @@ async function main() {
         const tableNode = tableIndex.getNodeData(tableName)
         // upsert records from temp table into table; truncate tables if full sync
         await upsertTable(tableNode, !SINCE)
-        // drop temp table when done
-        await dropTable(tableNode.tempTable)
     }
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 

@@ -18,6 +18,7 @@ const db = pgp(dbConfig)
 const qTemplates = {
     dropTable: 'DROP TABLE IF EXISTS $<schema:name>.$<name:name>;',
     createTempTable: 'CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS EXCLUDING INDEXES );',
+    createFullTempTable: 'CREATE TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL );',
     getTableColumns: `
         SELECT column_name AS name, data_type AS datatype
         FROM information_schema.columns
@@ -43,19 +44,37 @@ const qTemplates = {
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `,
     truncateTable: 'TRUNCATE $<schema:name>.$<name:name> CASCADE',
-    renameTable:'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;'
+    renameTable: 'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;',
+    alterIndexes: `
+        UPDATE pg_index
+        SET indisready=$<enabled>
+        WHERE indrelid = (
+            SELECT oid
+            FROM pg_class
+            WHERE relname='$<name>'
+        );`,
+    disableConstraints: 'ALTER TABLE $<schema:name>.$<name:name> DISABLE TRIGGER ALL;',
+    enableConstraints: 'ALTER TABLE $<schema:name>.$<name:name> ENABLE TRIGGER ALL;',
+    reindex: 'REINDEX $<schema:name>.$<name:name>;'
+
 }
 
 // Helper function to create a table dynamically based on the columns
-export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> {
+export async function createTempTable(tableInfo: TableInfo, full: boolean = false): Promise<TableInfo> {
     // Construct temp table name
     const { schema, name } = tableInfo
     const tempTableInfo = new TableInfo(schema, `temp_${name}`)
 
     try {
-        await db.task(async t => {
-            await t.none(qTemplates.dropTable, tempTableInfo)
-            await t.none(qTemplates.createTempTable, { tempTableInfo, tableInfo })
+        await db.tx('create-temp-table', async t => {
+            if (full) {
+                await t.none(qTemplates.createFullTempTable, { tempTableInfo, tableInfo })
+                await t.none(qTemplates.disableConstraints)
+                await t.none(qTemplates.alterIndexes, { name: tempTableInfo.name, enabled: false })
+            } else {
+                await t.none(qTemplates.dropTable, tempTableInfo)
+                await t.none(qTemplates.createTempTable, { tempTableInfo, tableInfo })
+            }
         })
 
         logDebug(`Created new temp table ${tempTableInfo} from ${tableInfo}.`)
@@ -124,24 +143,31 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
     }
 }
 
-export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
+export async function upsertTable(tableNode: TableNode, full: boolean = false) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
-    // Build query
-    const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
-        + columns.assignColumns({ from: 'EXCLUDED' })
-
-    logDebug(insertQuery)
     try {
         const rowCount = await db.tx('process-upserts', async t => {
-            // Truncate table first if desired
-            if (truncate) {
-                await t.none(qTemplates.truncateTable, tableInfo)
-                logInfo(`Truncated table ${tableInfo} before upsert.`)
+            // Use upsert when not full sync table first if desired
+            if (!full) {
+                // Build query
+                const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
+                    + columns.assignColumns({ from: 'EXCLUDED' })
+
+                logDebug(insertQuery)
+                await t.result(insertQuery, null, r => r.rowCount)
+                logInfo(`Upserted ${rowCount} records for table ${tableInfo}!`)
+                return await t.none(qTemplates.dropTable, tempTable)
             }
-            return await t.result(insertQuery, null, r => r.rowCount)
+
+            await t.none(qTemplates.dropTable, tableInfo)
+            await t.none(qTemplates.alterIndexes, { name: tempTable.name, enabled: true })
+            await t.none(qTemplates.enableConstraints, tempTable)
+            await t.none(qTemplates.reindex, tableInfo)
+            await t.none(qTemplates.renameTable, { schema: tableInfo.schema, from: tempTable.name, to: tableInfo.name })
+            logInfo(`Replaced table ${tableInfo} by ${tempTable}.`)
         })
-        logInfo(`Upserted ${rowCount} records for table ${tableInfo}!`)
+
     } catch (err) {
         logError(`Error during upsert from '${tempTable}' to '${tableInfo}'`, err)
         throw err
