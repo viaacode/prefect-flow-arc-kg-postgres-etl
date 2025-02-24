@@ -2,6 +2,10 @@ import { TableInfo, TableNode, Batch } from './types.js'
 import { logInfo, logError, logDebug, isValidDate } from './util.js'
 import { dbConfig } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 // PostgreSQL connection pool
 export const pgp = pgplib({
@@ -12,51 +16,33 @@ export const pgp = pgplib({
     }
 })
 
+// Helper for linking to external query files:
+function sql(file: string) {
+    const fullPath = join(__dirname, '../queries/sql/', file)
+    return new pgp.QueryFile(fullPath, { minify: true })
+}
+
 // Creating a new database instance from the connection details:
 const db = pgp(dbConfig)
 
 const qTemplates = {
-    dropTable: 'DROP TABLE IF EXISTS $<schema:name>.$<name:name>;',
-    createTempTable: 'CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS EXCLUDING INDEXES );',
-    createFullTempTable: 'CREATE TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL );',
-    getTableColumns: `
-        SELECT column_name AS name, data_type AS datatype
-        FROM information_schema.columns
-        WHERE table_name = $<name> AND table_schema = $<schema> AND column_name NOT IN ('created_at','updated_at')`,
-    getDependentTables: `
-        SELECT DISTINCT
-            ccu.table_schema AS schema,
-            ccu.table_name AS name
-        FROM information_schema.table_constraints AS tc 
-        JOIN information_schema.key_column_usage AS kcu
-            ON tc.constraint_name = kcu.constraint_name
-            AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-            ON ccu.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_schema=$<schema>
-            AND tc.table_name=$<name>;`,
-    getTablePrimaryKeys: `
-        SELECT COLUMN_NAME from information_schema.key_column_usage 
-        WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'`,
+    dropTable: sql('drop_table.sql'),
+    createTempTable: sql('create_temp_table.sql'),
+    createFullTempTable: sql('create_full_temp_table.sql'),
+    getTableColumns: sql('get_table_columns.sql'),
+    getDependentTables: sql('get_dependent_tables.sql'),
+    getTablePrimaryKeys: sql('get_table_primary_keys.sql'),
     upsertTable: `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `,
-    truncateTable: 'TRUNCATE $<schema:name>.$<name:name> CASCADE',
-    renameTable: 'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;',
-    alterIndexes: `
-        UPDATE pg_index
-        SET indisready=$<enabled>
-        WHERE indrelid = (
-            SELECT oid
-            FROM pg_class
-            WHERE relname='$<name>'
-        );`,
-    disableConstraints: 'ALTER TABLE $<schema:name>.$<name:name> DISABLE TRIGGER ALL;',
-    enableConstraints: 'ALTER TABLE $<schema:name>.$<name:name> ENABLE TRIGGER ALL;',
-    reindex: 'REINDEX $<schema:name>.$<name:name>;'
-
+    truncateTable: sql('truncate_table.sql'),
+    renameTable: sql('rename_table.sql'),
+    alterIndexes: sql('alter_indexes.sql'),
+    disableConstraints: sql('disable_constraints.sql'),
+    enableConstraints: sql('enable_constraints.sql'),
+    reindex: sql('reindex_table.sql'),
+    add_clone_schema: sql('clone_schema.sql')
 }
 
 // Helper function to create a table dynamically based on the columns
@@ -67,12 +53,12 @@ export async function createTempTable(tableInfo: TableInfo, full: boolean = fals
 
     try {
         await db.tx('create-temp-table', async t => {
+            await t.none(qTemplates.dropTable, tempTableInfo)
             if (full) {
                 await t.none(qTemplates.createFullTempTable, { tempTableInfo, tableInfo })
-                await t.none(qTemplates.disableConstraints)
+                await t.none(qTemplates.disableConstraints, tempTableInfo)
                 await t.none(qTemplates.alterIndexes, { name: tempTableInfo.name, enabled: false })
             } else {
-                await t.none(qTemplates.dropTable, tempTableInfo)
                 await t.none(qTemplates.createTempTable, { tempTableInfo, tableInfo })
             }
         })
@@ -160,10 +146,11 @@ export async function upsertTable(tableNode: TableNode, full: boolean = false) {
                 return await t.none(qTemplates.dropTable, tempTable)
             }
 
+            await t.none(qTemplates.disableConstraints, tableInfo)
             await t.none(qTemplates.dropTable, tableInfo)
             await t.none(qTemplates.alterIndexes, { name: tempTable.name, enabled: true })
             await t.none(qTemplates.enableConstraints, tempTable)
-            await t.none(qTemplates.reindex, tableInfo)
+            await t.none(qTemplates.reindex, tempTable)
             await t.none(qTemplates.renameTable, { schema: tableInfo.schema, from: tempTable.name, to: tableInfo.name })
             logInfo(`Replaced table ${tableInfo} by ${tempTable}.`)
         })
