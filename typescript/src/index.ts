@@ -18,7 +18,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo, Batch, InsertRecord } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, batchInsert } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, batchInsert, prepareTable, finalizeTable, replaceSchema } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -77,11 +77,11 @@ async function addJobQueries(account: Account, source: Dataset) {
     return queries
 }
 
-async function createTableNode(tableName: string): Promise<TableNode> {
-    const tableInfo = new TableInfo(tableName)
+async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
     const tableNode = {
         tableInfo,
-        tempTable: await createTempTable(tableInfo, !SINCE),
+        // When load is incremental, create temp table. Else, prepare table in temp schema and use it directly
+        tempTable: SINCE ? await createTempTable(tableInfo) : await prepareTable(tableInfo),
         // Get the actual columns from the database
         columns: await getTableColumns(tableInfo),
         // Get dependent tables from the database
@@ -89,7 +89,7 @@ async function createTableNode(tableName: string): Promise<TableNode> {
         // Get primary keys
         primaryKeys: await getTablePrimaryKeys(tableInfo)
     }
-    tableIndex.addNode(tableName, tableNode)
+    tableIndex.addNode(tableInfo.toString(), tableNode)
     return tableNode
 }
 
@@ -122,7 +122,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 fileStream.pause()
 
                 // Get table information from the table index, or create a temp table if not exists
-                const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
+                const tableNode = tableIndex.hasNode(batch.tableInfo.toString()) ? tableIndex.getNodeData(batch.tableInfo.toString()) : await createTableNode(batch.tableInfo)
                 // Copy the batch to database
                 const start = performance.now()
                 stats.unprocessedBatches++
@@ -296,20 +296,31 @@ async function main() {
     tableIndex.entryNodes().forEach(tableName => {
         const node = tableIndex.getNodeData(tableName)
         node.dependencies.forEach(dependency => {
-            tableIndex.addDependency(tableName, `${dependency.schema}.${dependency.name}`)
+            console.log(tableName, ": ", dependency.toString())
+            tableIndex.addDependency(tableName, dependency.toString())
         })
     })
 
 
     // Upsert tables in the right order
     const tables = tableIndex.overallOrder()
-    logInfo(`Upserting tables in order ${tables.join(', ')}.`)
-    for (const tableName of tableIndex.overallOrder()) {
+    logInfo(`Updating tables in order ${tables.join(', ')}.`)
+    for (const [i, tableName] of tableIndex.overallOrder().entries()) {
         const tableNode = tableIndex.getNodeData(tableName)
-        // upsert records from temp table into table; truncate tables if full sync
-        await upsertTable(tableNode, !SINCE)
+        if (SINCE) {
+            // upsert records from temp table into table; truncate tables if full sync
+            await upsertTable(tableNode)
+        } else {
+            await finalizeTable(tableNode)
+            // replace schema when last node
+            if (i === tableIndex.size() -1) {
+                const {tableInfo, tempTable} = tableNode
+                await replaceSchema(tableInfo.schema,tempTable.schema)
+            }
+        }
     }
-    logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
+
+    logInfo(`Updating completed (${msToTime(performance.now() - start)}).`)
 
     if (!SKIP_CLEANUP) {
         logInfo('--- Step 4: Graph cleanup --')

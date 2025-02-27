@@ -55,18 +55,18 @@ export class InsertRecord {
 }
 
 export class Batch {
-    private _tableName: string
+    private _tableInfo: TableInfo
     private _records: Record<string, string>[] = []
     private static _index: number = 0
     private _id: number
 
     constructor(tableName: string) {
-        this._tableName = tableName
+        this._tableInfo = new TableInfo(tableName)
         this._id = Batch._index++
     }
 
-    public get tableName(): string {
-        return this._tableName
+    public get tableInfo(): TableInfo {
+        return this._tableInfo
     }
 
     public get records(): Record<string, string>[] {
