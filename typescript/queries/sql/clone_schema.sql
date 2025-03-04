@@ -1,0 +1,1 @@
+SELECT clone_schema($<from>,$<to>,'NODATA');

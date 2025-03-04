@@ -1,0 +1,1 @@
+ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<to:name>;

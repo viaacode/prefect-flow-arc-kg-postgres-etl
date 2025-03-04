@@ -1,0 +1,1 @@
+ALTER TABLE $<schema:name>.$<name:name> ENABLE TRIGGER ALL;

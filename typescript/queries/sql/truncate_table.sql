@@ -1,0 +1,1 @@
+TRUNCATE $<schema:name>.$<name:name> CASCADE

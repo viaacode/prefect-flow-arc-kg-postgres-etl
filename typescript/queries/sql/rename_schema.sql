@@ -1,0 +1,1 @@
+ALTER SCHEMA $<from:name> RENAME TO $<to:name>;

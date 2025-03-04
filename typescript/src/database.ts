@@ -46,6 +46,7 @@ const qTemplates = {
     cloneSchema: sql('clone_schema.sql'),
     renameSchema: sql('rename_schema.sql'),
     dropSchema: sql('drop_schema.sql'),
+    copyTableData: sql('copy_table_data.sql'),
 }
 
 /**
@@ -59,7 +60,12 @@ await db.none(qTemplates.addCloneSchemaFunction)
 export async function createTempSchema(schema: string) {
     const tempSchema = `temp_${schema}`
     try {
-        const result = await db.one(qTemplates.cloneSchema, { from: schema, to: tempSchema })
+        const result = await db.tx('clone-schema', async t => {
+            // drop temp schema if there is one
+            await t.none(qTemplates.dropSchema, { name: tempSchema })
+            // clone current schema to temp schema
+            return await t.one(qTemplates.cloneSchema, { from: schema, to: tempSchema })
+        })
         if (result)
             logInfo(`Created new temp schema ${tempSchema} from ${schema}.`)
         else
@@ -76,7 +82,8 @@ export async function replaceSchema(schema: string, tempSchema: string) {
     try {
         await db.tx('replace-schema', async t => {
             // drop old schema
-            await t.none(qTemplates.dropSchema, {name: schema})
+            await t.none(qTemplates.dropSchema, { name: schema })
+            //await t.none('set session_replication_role to default;')
             // rename new schema
             await t.none(qTemplates.renameSchema, { from: tempSchema, to: schema })
         })
@@ -116,6 +123,7 @@ export async function finalizeTable(tableNode: TableNode): Promise<TableInfo> {
     const { tempTable } = tableNode
     try {
         await db.tx('finalize-table', async t => {
+            await t.none(qTemplates.copyTableData, { from: new TableInfo("graph", "schema_transcript_url"), to: new TableInfo("temp_graph", "schema_transcript_url") })
             await t.none(qTemplates.alterIndexes, { enabled: true, name: tempTable.name, schema: tempTable.schema })
             await t.none(qTemplates.enableConstraints, tempTable)
             await t.none(qTemplates.reindex, tempTable)

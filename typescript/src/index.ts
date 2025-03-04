@@ -46,13 +46,14 @@ async function addQuery(account: Account, queryName: string, params: AddQueryOpt
 }
 
 async function addJobQueries(account: Account, source: Dataset) {
-    const files = (await readdir(join(__dirname, QUERY_PATH)))
+    const queryDir = join(__dirname, QUERY_PATH)
+    const files = (await readdir(queryDir))
         // Only use sparql files
         .filter(f => extname(f) === '.sparql')
 
     const queries = []
     for (const file of files) {
-        const filePath = join(QUERY_PATH, file)
+        const filePath = join(queryDir, file)
         const queryString = await readFile(filePath, 'utf8')
         const queryName = parse(filePath).name
 
@@ -296,7 +297,6 @@ async function main() {
     tableIndex.entryNodes().forEach(tableName => {
         const node = tableIndex.getNodeData(tableName)
         node.dependencies.forEach(dependency => {
-            console.log(tableName, ": ", dependency.toString())
             tableIndex.addDependency(tableName, dependency.toString())
         })
     })
