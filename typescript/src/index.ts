@@ -46,13 +46,14 @@ async function addQuery(account: Account, queryName: string, params: AddQueryOpt
 }
 
 async function addJobQueries(account: Account, source: Dataset) {
-    const files = (await readdir(join(__dirname, QUERY_PATH)))
+    const queryDir = join(__dirname, QUERY_PATH)
+    const files = (await readdir(queryDir))
         // Only use sparql files
         .filter(f => extname(f) === '.sparql')
 
     const queries = []
     for (const file of files) {
-        const filePath = join(QUERY_PATH, file)
+        const filePath = join(queryDir, file)
         const queryString = await readFile(filePath, 'utf8')
         const queryName = parse(filePath).name
 
@@ -77,8 +78,7 @@ async function addJobQueries(account: Account, source: Dataset) {
     return queries
 }
 
-async function createTableNode(tableName: string): Promise<TableNode> {
-    const tableInfo = new TableInfo(tableName)
+async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
     const tableNode = {
         tableInfo,
         tempTable: await createTempTable(tableInfo),
@@ -89,7 +89,7 @@ async function createTableNode(tableName: string): Promise<TableNode> {
         // Get primary keys
         primaryKeys: await getTablePrimaryKeys(tableInfo)
     }
-    tableIndex.addNode(tableName, tableNode)
+    tableIndex.addNode(tableInfo.toString(), tableNode)
     return tableNode
 }
 
@@ -122,7 +122,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 fileStream.pause()
 
                 // Get table information from the table index, or create a temp table if not exists
-                const tableNode = tableIndex.hasNode(batch.tableName) ? tableIndex.getNodeData(batch.tableName) : await createTableNode(batch.tableName)
+                const tableNode = tableIndex.hasNode(batch.tableInfo.toString()) ? tableIndex.getNodeData(batch.tableInfo.toString()) : await createTableNode(batch.tableInfo)
                 // Copy the batch to database
                 const start = performance.now()
                 stats.unprocessedBatches++
@@ -296,7 +296,7 @@ async function main() {
     tableIndex.entryNodes().forEach(tableName => {
         const node = tableIndex.getNodeData(tableName)
         node.dependencies.forEach(dependency => {
-            tableIndex.addDependency(tableName, `${dependency.schema}.${dependency.name}`)
+            tableIndex.addDependency(tableName, dependency.toString())
         })
     })
 
@@ -308,8 +308,6 @@ async function main() {
         const tableNode = tableIndex.getNodeData(tableName)
         // upsert records from temp table into table; truncate tables if full sync
         await upsertTable(tableNode, !SINCE)
-        // drop temp table when done
-        await dropTable(tableNode.tempTable)
     }
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 

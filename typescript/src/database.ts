@@ -2,6 +2,10 @@ import { TableInfo, TableNode, Batch } from './types.js'
 import { logInfo, logError, logDebug, isValidDate } from './util.js'
 import { dbConfig } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 // PostgreSQL connection pool
 export const pgp = pgplib({
@@ -12,48 +16,37 @@ export const pgp = pgplib({
     }
 })
 
+// Helper for linking to external query files:
+function sql(file: string, options?: pgplib.IQueryFileOptions) {
+    const fullPath = join(__dirname, '../queries/sql/', file)
+    return new pgp.QueryFile(fullPath, options || { minify: true })
+}
+
 // Creating a new database instance from the connection details:
 const db = pgp(dbConfig)
 
 const qTemplates = {
-    dropTable: 'DROP TABLE IF EXISTS $<schema:name>.$<name:name>;',
-    createTempTable: 'CREATE UNLOGGED TABLE $<tempTableInfo.schema:name>.$<tempTableInfo.name:name> (LIKE $<tableInfo.schema:name>.$<tableInfo.name:name> INCLUDING ALL EXCLUDING CONSTRAINTS EXCLUDING INDEXES );',
-    getTableColumns: `
-        SELECT column_name AS name, data_type AS datatype
-        FROM information_schema.columns
-        WHERE table_name = $<name> AND table_schema = $<schema> AND column_name NOT IN ('created_at','updated_at')`,
-    getDependentTables: `
-        SELECT DISTINCT
-            ccu.table_schema AS schema,
-            ccu.table_name AS name
-        FROM information_schema.table_constraints AS tc 
-        JOIN information_schema.key_column_usage AS kcu
-            ON tc.constraint_name = kcu.constraint_name
-            AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-            ON ccu.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_schema=$<schema>
-            AND tc.table_name=$<name>;`,
-    getTablePrimaryKeys: `
-        SELECT COLUMN_NAME from information_schema.key_column_usage 
-        WHERE table_name = $<name> AND table_schema = $<schema> AND constraint_name LIKE '%pkey'`,
+    dropTable: sql('drop_table.sql'),
+    createTempTable: sql('create_temp_table.sql'),
+    getTableColumns: sql('get_table_columns.sql'),
+    getDependentTables: sql('get_dependent_tables.sql'),
+    getTablePrimaryKeys: sql('get_table_primary_keys.sql'),
     upsertTable: `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:name>) DO UPDATE SET `,
-    truncateTable: 'TRUNCATE $<schema:name>.$<name:name> CASCADE',
-    renameTable:'ALTER TABLE $<schema:name>.$<from:name> RENAME TO $<schema:name>.$<to:name>;'
+    truncateTable: sql('truncate_table.sql')
 }
 
-// Helper function to create a table dynamically based on the columns
+
+// Helper function to create a table dynamically based on the columns for incremental load
 export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> {
     // Construct temp table name
     const { schema, name } = tableInfo
     const tempTableInfo = new TableInfo(schema, `temp_${name}`)
 
     try {
-        await db.task(async t => {
+        await db.tx('create-temp-table', async t => {
             await t.none(qTemplates.dropTable, tempTableInfo)
             await t.none(qTemplates.createTempTable, { tempTableInfo, tableInfo })
         })
@@ -66,6 +59,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
     }
 }
 
+// Helper function to drop a table
 export async function dropTable(tableInfo: TableInfo) {
     try {
         await db.none(qTemplates.dropTable, tableInfo)
@@ -106,7 +100,7 @@ export async function getTableColumns(tableInfo: TableInfo): Promise<ColumnSet> 
 // Helper function to retrieve primary keys for a specific table
 export async function getDependentTables(tableInfo: TableInfo): Promise<TableInfo[]> {
     try {
-        return await db.manyOrNone(qTemplates.getDependentTables, tableInfo)
+        return (await db.manyOrNone(qTemplates.getDependentTables, tableInfo)).map(row => new TableInfo(row.schema, row.name))
     } catch (err) {
         logError(`Error retrieving dependent tables for table ${tableInfo}`, err)
         throw err
@@ -124,14 +118,10 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<string[
     }
 }
 
+// Helper function to upsert a temp table into the final table
 export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
-    // Build query
-    const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
-        + columns.assignColumns({ from: 'EXCLUDED' })
-
-    logDebug(insertQuery)
     try {
         const rowCount = await db.tx('process-upserts', async t => {
             // Truncate table first if desired
@@ -139,7 +129,17 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before upsert.`)
             }
-            return await t.result(insertQuery, null, r => r.rowCount)
+
+            // Build query
+            const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys })
+                + columns.assignColumns({ from: 'EXCLUDED' })
+
+            logDebug(insertQuery)
+            // perform upsert and catch amount of upserted rows
+            const rslt = await t.result(insertQuery, null, r => r.rowCount)
+            // drop temp table when done
+            await t.none(qTemplates.dropTable, tempTable)
+            return rslt
         })
         logInfo(`Upserted ${rowCount} records for table ${tableInfo}!`)
     } catch (err) {
@@ -148,6 +148,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
     }
 }
 
+// Help function to insert a batch into a table
 export async function batchInsert(tableNode: TableNode, batch: Batch) {
     if (!batch.length) return
 
@@ -168,6 +169,7 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
     }
 }
 
+// shuts down the connection pool associated with the Database object
 export async function closeConnectionPool() {
-    return await db.$pool.end() // shuts down the connection pool associated with the Database object
+    return await db.$pool.end()
 }
