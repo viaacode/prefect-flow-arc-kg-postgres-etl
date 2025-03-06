@@ -12,7 +12,8 @@ from psycopg2.extras import RealDictCursor
 
 @task(task_run_name="Run deployment {flow_name}/{deployment_name}")
 def run_deployment_task(flow_name: str, deployment_name: str, parameters: dict):
-    run_deployment(name=f"{flow_name}/{deployment_name}", parameters=parameters)
+    flow_run = run_deployment(name=f"{flow_name}/{deployment_name}", parameters=parameters)
+    return flow_run.state
 
 
 @task
