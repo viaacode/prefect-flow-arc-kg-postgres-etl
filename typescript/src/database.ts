@@ -164,7 +164,7 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true)
             const mergeQuery = pgp.as.format(`
             MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
             USING $<tempTable.schema:name>.$<tempTable.name:name> y
-            ON ${primaryKeys.assignColumns({from: 'y', to: 'x'})}
+            ON ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')}
             WHEN MATCHED THEN
                 UPDATE SET ${columns.assignColumns({from: 'y'})} 
             WHEN NOT MATCHED THEN
