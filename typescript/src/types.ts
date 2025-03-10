@@ -95,6 +95,6 @@ export class Batch {
 
 }
 
-export type TableNode = { tableInfo: TableInfo, tempTable: TableInfo, columns: ColumnSet, dependencies: TableInfo[], primaryKeys: string[] }
+export type TableNode = { tableInfo: TableInfo, tempTable: TableInfo, columns: ColumnSet, dependencies: TableInfo[], primaryKeys: ColumnSet }
 export type Destination = { dataset: Dataset, graph: string }
 export type GraphInfo = { account: User | Org, dataset: Dataset, destination: Destination, }

@@ -18,7 +18,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo, Batch, InsertRecord } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, upsertTable, batchInsert } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, batchInsert, mergeTable } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -307,7 +307,8 @@ async function main() {
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
         // upsert records from temp table into table; truncate tables if full sync
-        await upsertTable(tableNode, !SINCE)
+        //await upsertTable(tableNode, !SINCE)
+        await mergeTable(tableNode, !SINCE)
     }
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
