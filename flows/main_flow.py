@@ -12,7 +12,10 @@ from psycopg2.extras import RealDictCursor
 
 @task(task_run_name="Run deployment {flow_name}/{deployment_name}")
 def run_deployment_task(flow_name: str, deployment_name: str, parameters: dict):
-    run_deployment(name=f"{flow_name}/{deployment_name}", parameters=parameters)
+    flow_run = run_deployment(
+        name=f"{flow_name}/{deployment_name}", parameters=parameters
+    )
+    return flow_run.state
 
 
 @task
@@ -42,19 +45,22 @@ def delete_records_from_db(
         # Run query
 
         # Delete the Intellectual Entities
-        logger.info("Deleting the Intellectual Entities from database")
         cursor.execute(
             """
         DELETE FROM graph."intellectual_entity" x
         USING graph."mh_fragment_identifier" y
         WHERE y.intellectual_entity_id = x.id AND y.is_deleted;"""
         )
+        logger.info(
+            "Deleted the Intellectual Entities from database(%s records)",
+            cursor.rowcount,
+        )
 
         # Delete the fragment entries in database
-        logger.info('Deleting the fragments from table graph."mh_fragment_identifier"')
-        cursor.execute(
-            """
-        DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;"""
+        cursor.execute('DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;')
+        logger.info(
+            'Deleted the fragments from table graph."mh_fragment_identifier" (%s records)',
+            cursor.rowcount,
         )
 
         # Commit your changes in the database
