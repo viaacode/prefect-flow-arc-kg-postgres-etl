@@ -25,6 +25,7 @@ function sql(file: string, options?: pgplib.IQueryFileOptions) {
 // Creating a new database instance from the connection details:
 const db = pgp(dbConfig)
 
+// Cache all query templates from file
 const qTemplates = {
     dropTable: sql('drop_table.sql'),
     createTempTable: sql('create_temp_table.sql'),
@@ -123,7 +124,7 @@ export async function upsertTable(tableNode: TableNode, truncate: boolean = true
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
     try {
-        const rowCount = await db.tx('process-upserts', async t => {
+        const rowCount = await db.tx('process-upsert', async t => {
             // Truncate table first if desired
             if (truncate) {
                 await t.none(qTemplates.truncateTable, tableInfo)
@@ -170,11 +171,12 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true)
             WHEN NOT MATCHED THEN
                 INSERT (${columns.names}) VALUES (${columns.columns.map(c => `y.${c.escapedName}`).join(',')});
             `, { tableInfo, tempTable, primaryKeys}) 
-            console.log(mergeQuery)
+            
+            logDebug(mergeQuery)
 
-            // perform upsert and catch amount of upserted rows
+            // Perform merge and catch amount of merged rows
             const rslt = await t.result(mergeQuery, null, r => r.rowCount)
-            // drop temp table when done
+            // Drop temp table when done
             await t.none(qTemplates.dropTable, tempTable)
             return rslt
         })

@@ -37,6 +37,7 @@ export const dbConfig = {
 }
 
 export const DEBUG_MODE = process.env.DEBUG_MODE === 'True'
+export const USE_MERGE = (process.env.POSTGRES_USE_MERGE || 'True')  === 'True'
 
 
 

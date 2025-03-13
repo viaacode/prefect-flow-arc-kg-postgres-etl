@@ -5,6 +5,7 @@ import { parse as parseDuration, toSeconds } from "iso8601-duration"
 import { fromRdf } from 'rdf-literal'
 import { Batch, InsertRecord } from './types.js'
 
+// Transform stream that turns quads/triples into records
 export class RecordContructor extends Transform {
 
     // Init variables that track the current subject, record and table
@@ -40,7 +41,15 @@ export class RecordContructor extends Transform {
         return value
     }
 
+    /**
+     * Pivots quads with the same subject into a record until subject changes
+     * @param quad 
+     * @param _encoding 
+     * @param cb 
+     * @returns 
+     */
     _transform(quad: Quad, _encoding: string, cb: Function) {
+        // Skip statements until the offset is reached
         if (this._statementIndex < this._offset) {
             this._statementIndex++
             return cb()
@@ -56,6 +65,7 @@ export class RecordContructor extends Transform {
         const subject = quad.subject.value
         const predicate = quad.predicate.value
         let object = quad.object.value
+        // Do extra processing on literals
         let language
         // Convert literal to primitive
         if (quad.object.termType === "Literal") {
@@ -71,6 +81,7 @@ export class RecordContructor extends Transform {
                 this.push(this.currentRecord)
             }
 
+            // Reset the record
             this.currentSubject = subject
             this.currentRecord = new InsertRecord()
         }
@@ -96,6 +107,7 @@ export class RecordContructor extends Transform {
     }
 
     _flush(cb: TransformCallback) {
+        // push the last record from buffer
         if (this.currentSubject && this.currentRecord) {
             this.push(this.currentRecord)
         }
@@ -104,8 +116,10 @@ export class RecordContructor extends Transform {
 
 }
 
+// Transform stream turning records into batches
 export class RecordBatcher extends Transform {
 
+    // Bactch buffer per table
     private batches: { [tableName: string]: Batch } = {}
 
     constructor() {

@@ -3,6 +3,7 @@ import Org from '@triply/triplydb/Org.js'
 import User from '@triply/triplydb/User.js'
 import { ColumnSet } from 'pg-promise'
 
+// Class to store basic table information
 export class TableInfo {
     private _name: string
     private _schema: string
@@ -31,6 +32,7 @@ export class TableInfo {
     }
 }
 
+// Class to store a record
 export class InsertRecord {
     private static _index: number = 0
     private _id: number
@@ -38,6 +40,7 @@ export class InsertRecord {
     public values: Record<string, string> = {}
 
     constructor() {
+        // use static counter to count the amount of created records
         this._id = InsertRecord._index++
     }
 
@@ -54,6 +57,7 @@ export class InsertRecord {
     }
 }
 
+// Class to store a batch of records
 export class Batch {
     private _tableInfo: TableInfo
     private _records: Record<string, string>[] = []
@@ -62,6 +66,7 @@ export class Batch {
 
     constructor(tableName: string) {
         this._tableInfo = new TableInfo(tableName)
+        // Static counter for the amount to created batches
         this._id = Batch._index++
     }
 
@@ -69,6 +74,9 @@ export class Batch {
         return this._tableInfo
     }
 
+    /**
+     * Return all records in batch
+     */
     public get records(): Record<string, string>[] {
         return this._records
     }
@@ -81,10 +89,16 @@ export class Batch {
         return Batch._index
     }
 
+    /**
+     * Add a record to the batch
+     * @param record 
+     */
     public add(record: InsertRecord) {
         this._records.push(record.values)
     }
-
+    /**
+     * Return the current number of records in the batch
+     */
     public get length(): number {
         return this._records.length
     }
@@ -95,6 +109,7 @@ export class Batch {
 
 }
 
+// Helper types
 export type TableNode = { tableInfo: TableInfo, tempTable: TableInfo, columns: ColumnSet, dependencies: TableInfo[], primaryKeys: ColumnSet }
 export type Destination = { dataset: Dataset, graph: string }
 export type GraphInfo = { account: User | Org, dataset: Dataset, destination: Destination, }

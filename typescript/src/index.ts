@@ -14,11 +14,12 @@ import {
     SKIP_VIEW,
     SKIP_CLEANUP,
     DEBUG_MODE,
+    USE_MERGE,
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Destination, GraphInfo, Batch, InsertRecord } from './types.js'
-import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, batchInsert, mergeTable } from './database.js'
+import { closeConnectionPool, createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, dropTable, batchInsert, mergeTable, upsertTable } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -32,9 +33,12 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+// Create a dependency graph to store information about tables and their FK dependencies
 const tableIndex = new DepGraph<TableNode>()
 
+// Helper function to add a SPARQL Query to TriplyDB as Saved Query; needed to run them as Query Job
 async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
+    // Remove query if it exists
     try {
         const query = await account.getQuery(queryName)
         await query.delete()
@@ -45,7 +49,9 @@ async function addQuery(account: Account, queryName: string, params: AddQueryOpt
     return account.addQuery(queryName, params)
 }
 
-async function addJobQueries(account: Account, source: Dataset) {
+// Function to add SPARQL queries in files to TriplyDB
+async function addJobQueries(account: Account, dataset: Dataset) {
+    // Determine the path where queries are located
     const queryDir = join(__dirname, QUERY_PATH)
     const files = (await readdir(queryDir))
         // Only use sparql files
@@ -53,16 +59,19 @@ async function addJobQueries(account: Account, source: Dataset) {
 
     const queries = []
     for (const file of files) {
+        // Read the query string from file
         const filePath = join(queryDir, file)
         const queryString = await readFile(filePath, 'utf8')
         const queryName = parse(filePath).name
 
+        // Set the query configuration
         const params: AddQueryOptions = {
-            dataset: source,
+            dataset,
             queryString,
             serviceType: 'speedy',
             output: 'response',
             variables: [
+                // The 'since' parameter is used for incremental loading
                 {
                     name: 'since',
                     required: false,
@@ -72,12 +81,15 @@ async function addJobQueries(account: Account, source: Dataset) {
             ]
         }
 
+        // Add the query to TriplyDB and to the list of results
         const query = await addQuery(account, queryName, params)
         queries.push(query)
     }
+    // Return the created queries
     return queries
 }
 
+// Function to bundle all information about a table in one dependency graph node.
 async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
     const tableNode = {
         tableInfo,
@@ -89,30 +101,34 @@ async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
         // Get primary keys
         primaryKeys: await getTablePrimaryKeys(tableInfo)
     }
+    // add node to index
     tableIndex.addNode(tableInfo.toString(), tableNode)
     return tableNode
 }
 
+// Function that processes the RDF graph that results from running the different query jobs
 async function processGraph(graph: Graph, recordLimit?: number) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
-    // Retrieve the graph as a stream of RDFjs objects
-    //const quadStream = await graph.toStream('rdf-js')
-
+    
+    // Download the graph for local processing
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
     await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream (Debug mode is ${DEBUG_MODE}).`)
 
-    const fileStream = createReadStream("graph.ttl.gz")
+    
 
-    // Process the stream
     const startGraph = performance.now()
 
-    // Init components
+    // Create a stream to read from the file
+    const fileStream = createReadStream("graph.ttl.gz")
+    // Create a transform stream that turns triples into records
     const recordConstructor = new RecordContructor({ limit: recordLimit }).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
+    // Create a transfrom stream that turns records into batches
     const batcher = new RecordBatcher()
 
+    // Create a stream consumer of batches that writes each batch to the target table
     function BatchConsumer(): Writable {
         const writer = new Writable({ objectMode: true })
         stats.numberOfStatements = numberOfStatements
@@ -161,10 +177,11 @@ async function processGraph(graph: Graph, recordLimit?: number) {
         return writer
     }
 
-    // Init record Stream
+    // Assemble the components above in one pipeline; and
+    // process the local graph as a stream of RDFjs objects
     try {
         await pipeline(
-            fileStream,
+            fileStream, // Read from file
             createGunzip(), // Unzip
             new StreamParser(), // Turn into quads
             recordConstructor, // Turn into records
@@ -182,20 +199,24 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     }
 }
 
+// Helper function to remove the created graphs and temporary tables
 async function cleanup() {
     const { destination } = await getInfo()
     // Clear graphs
     logInfo(`- Clearing graphs in dataset ${destination.dataset.slug}`)
     await destination.dataset.clear("graphs")
-    // Clear temp tables
+    
+    // Loop over all temp tables
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
+        
+        // Drop temp table
         logInfo(`- Dropping ${tableNode.tempTable}`)
-        // drop temp table when done
         await dropTable(tableNode.tempTable)
     }
 }
 
+// Helper function to get account, dataset and graph information from TriplyDB token
 async function getInfo(): Promise<GraphInfo> {
     const triply = App.get({ token: TOKEN })
 
@@ -212,26 +233,39 @@ async function getInfo(): Promise<GraphInfo> {
 // Main execution function
 async function main() {
     logInfo(`Starting sync from ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+
+    // Get all TriplyDB information
     let { account, dataset, destination } = await getInfo()
 
     logInfo(`--- Syncing ${DATASET} to graph ${destination.graph} of ${DESTINATION_DATASET} ---`)
     let start: number
     if (!SKIP_VIEW) {
+        // To improve performance, squash all graphs into one graph.
         if (!SKIP_SQUASH) {
             logInfo('--- Step 0: Squash graphs ---')
             start = performance.now()
+
+            // Compose the name of the graph
             const graphName = GRAPH_BASE + DATASET
 
+            // Delete all trailing graphs in the target dataset
+            // TODO: this is quite destructive whem the destination is somehow the source
+            // refactor to something more fine-grained
             await destination.dataset.clear("graphs")
             logInfo(`Cleared graphs of dataset ${DESTINATION_DATASET}.`)
 
+            // Create configuration for construct query
             const params: AddQueryOptions = {
                 dataset,
                 queryString: 'CONSTRUCT WHERE { ?s ?p ?o }',
                 serviceType: 'speedy',
                 output: 'response',
             }
+
+            // Add the query to TriplyDB
             const query = await addQuery(account, 'squash-graphs', params)
+
+            // Run the query as pipeline/job in TriplyDB and wait for completion
             logInfo(`Starting pipeline for ${query.slug} to ${graphName}.`)
             await query.runPipeline({
                 onProgress: progress => logInfo(`Pipeline ${query.slug}: ${Math.round(progress.progress * 100)}% complete.`),
@@ -248,11 +282,13 @@ async function main() {
 
         logInfo('--- Step 1: Construct view ---')
         start = performance.now()
-
+        
+        // Add all queries needed to construct the view
         const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset)
 
         logInfo(`Deleting destination graph ${destination.graph}.`)
 
+        // Delete the destination graph if it already exists
         try {
             const g = await destination.dataset.getGraph(destination.graph)
             await g.delete()
@@ -261,6 +297,8 @@ async function main() {
         }
 
         logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph} ${SINCE ? `from ${SINCE}`: '(full sync)'}.`)
+
+        // Run the queries as a pipeline in TriplyDB and wait for completion
         await account.runPipeline({
             destination,
             onProgress: progress => logInfo(`Pipeline ${queries.map(q => q.slug)}: ${Math.round(progress.progress * 100)}% complete.`),
@@ -283,16 +321,17 @@ async function main() {
     logInfo('--- Step 2: load temporary tables --')
     start = performance.now()
 
-    // Get destination graph and process
+    // Get destination graph
     const graph = await destination.dataset.getGraph(destination.graph)
 
+    // Process and load the view graph and wait for completion
     await processGraph(graph, RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
     logInfo('--- Step 3: upsert tables --')
     start = performance.now()
 
-    // Resolve dependencies to table graph
+    // Add the table nodes to the depency graph to determine correct order
     tableIndex.entryNodes().forEach(tableName => {
         const node = tableIndex.getNodeData(tableName)
         node.dependencies.forEach(dependency => {
@@ -301,14 +340,17 @@ async function main() {
     })
 
 
-    // Upsert tables in the right order
+    // Upsert tables in the correct order
     const tables = tableIndex.overallOrder()
     logInfo(`Upserting tables in order ${tables.join(', ')}.`)
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
         // upsert records from temp table into table; truncate tables if full sync
-        //await upsertTable(tableNode, !SINCE)
-        await mergeTable(tableNode, !SINCE)
+        if (USE_MERGE)
+            await mergeTable(tableNode, !SINCE)
+        else {
+            await upsertTable(tableNode, !SINCE)
+        }
     }
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
@@ -325,6 +367,7 @@ async function main() {
     logInfo('--- Sync done. --')
 }
 
+// Monitor heap usage for memory leak detection
 let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff();
 function logHeap() {
     logDebug('Heap difference',heapDiff.end());
