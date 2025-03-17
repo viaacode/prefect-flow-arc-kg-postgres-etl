@@ -10,6 +10,7 @@ import os
 from psycopg2.extras import RealDictCursor
 
 
+# Run a deployment as a task
 @task(task_run_name="Run deployment {flow_name}/{deployment_name}")
 def run_deployment_task(flow_name: str, deployment_name: str, parameters: dict):
     flow_run = run_deployment(
@@ -37,8 +38,6 @@ def delete_records_from_db(
     db_conn.autocommit = False
 
     try:
-        # Compose SQL query to retrieve deleted documents
-
         # Create server-side cursor
         cursor = db_conn.cursor()
 
@@ -123,7 +122,7 @@ def main_flow(
     # Figure out start time
     last_modified_date = get_last_run_config("%Y-%m-%d") if not full_sync else None
 
-    # Run javascript
+    # Run javascript which loads graph into postgres
     sync_service_script: str = "index.js"
 
     loading = run_javascript.with_options(
@@ -150,6 +149,7 @@ def main_flow(
         postgres_pool_max=db_pool_max,
     )
 
+    # Run the indexer
     indexing = run_deployment_task.submit(
         flow_name=flow_name_indexer,
         deployment_name=deployment_name_indexer,
@@ -162,6 +162,7 @@ def main_flow(
         wait_for=loading,
     )
 
+    # Delete all records from database
     delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=indexing)
 
 
