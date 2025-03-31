@@ -278,9 +278,6 @@ CONSTRUCT {
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?premis_identifier)))) AS ?ie_local_id)
     }
   
-    UNION { ?ie haDes:pageNumber ?schema_position }
-    UNION { ?ie haDes:numberOfPages ?ha_des_number_of_pages }
-    UNION { ?ie schema:issueNumber ?schema_issue_number }
     UNION { ?ie rel:isp ?relation_is_part_of }
     UNION { ?ie dct:available ?dcterms_available }
     UNION { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
@@ -412,11 +409,11 @@ CONSTRUCT {
       {
         # - digital reps
         ?rep a haObj:DigitalRepresentation;
-              haObj:isAccessCopyOf|^haObj:hasIIIFCopy ?ie.
+              haObj:isAccessCopyOf ?ie.
       } UNION {
         # - fragment rep 
         ?rep a haObj:FragmentRepresentation;
-        rel:rep ?ie;
+        haObj:isFragmentRepresentationOf ?ie;
         schema:startTime ?fr_schema_start_time;
         schema:endTime ?fr_schema_end_time;
         ebucore:isMediaFragmentOf ?fr_is_media_fragment_of
