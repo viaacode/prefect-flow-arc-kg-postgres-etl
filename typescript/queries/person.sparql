@@ -5,6 +5,8 @@ PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 prefix premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
 
 PREFIX : <urn:kg-to-postgres:>
 
@@ -32,8 +34,9 @@ CONSTRUCT {
 
 }WHERE {
     # 1. Intellectual Entity data
-    ?ie a premis:IntellectualEntity;
-           schema:license ?schema_license;
+    VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
+    ?ie a ?ie_type;
+           (schema:license|(rel:isp/schema:license)) ?schema_license;
            dct:format ?format ;
            schema:mentions ?person;
            prov:wasDerivedFrom/schema:dateModified ?modified .
@@ -49,7 +52,7 @@ CONSTRUCT {
         haLicId:VIAA-INTRA_CP-CONTENT ,
         haLicId:Publiek-Domein,
         haLicId:COPYRIGHT-UNDETERMINED
-    ) && ?format != "image")
+    ))
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
@@ -76,12 +79,15 @@ CONSTRUCT {
         ?person schema:deathPlace/schema:name ?person_schema_death_place
     }
 
-    ?mention ebucore:isAnnotatedMediaResource ?mention_resource;
-                ebucore:width ?mention_width;
-                ebucore:height ?mention_height;
-                ebucore:regionDelimX ?mention_x;
-                ebucore:regionDelimY ?mention_y.
+    ?mention a ebucore:MediaFragment;
+            ebucore:width ?mention_width;
+            ebucore:height ?mention_height;
+            ebucore:regionDelimX ?mention_x;
+            ebucore:regionDelimY ?mention_y.
                 
     ?mention_resource ebucore:annotationConfidence ?mention_confidence;
-            ebucore:hasAnnotationAgent ?person.
+            ebucore:hasAnnotationRelatedAgent ?person;
+             ebucore:isAnnotatedMediaResource ?mention.
+
+
 }

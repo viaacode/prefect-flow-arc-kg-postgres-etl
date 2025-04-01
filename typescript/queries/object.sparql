@@ -30,7 +30,6 @@ CONSTRUCT {
 :ebucore_has_cast_member ?ebucore_has_cast_member;
 :ebucore_has_object_type ?ebucore_has_object_type;
 :ebucore_synopsis ?ebucore_synopsis;
-:ha_des_number_of_pages ?ha_des_number_of_pages;
 :relation_is_part_of ?relation_is_part_of;
 :schema_abstract ?schema_abstract;
 :schema_copyright_notice ?schema_copyright_notice;
@@ -200,8 +199,8 @@ CONSTRUCT {
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     BIND(IF(
-      # Do not include haLicId:VIAA-PUBLIEK-CONTENT when object is AV
-      ?schema_license_res = haLicId:VIAA-PUBLIEK-CONTENT,
+      # Do not include haLicId:VIAA-PUBLIEK-CONTENT or haLicId:Publiek-Domein when object is AV
+      ?schema_license_res IN (haLicId:VIAA-PUBLIEK-CONTENT, haLicId:Publiek-Domein),
       ?unbound,
       REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
     ) as ?schema_license)
@@ -278,9 +277,6 @@ CONSTRUCT {
         BIND(IRI(CONCAT(str(?ie),"/",md5(str(?premis_identifier)))) AS ?ie_local_id)
     }
   
-    UNION { ?ie haDes:pageNumber ?schema_position }
-    UNION { ?ie haDes:numberOfPages ?ha_des_number_of_pages }
-    UNION { ?ie schema:issueNumber ?schema_issue_number }
     UNION { ?ie rel:isp ?relation_is_part_of }
     UNION { ?ie dct:available ?dcterms_available }
     UNION { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
@@ -412,11 +408,11 @@ CONSTRUCT {
       {
         # - digital reps
         ?rep a haObj:DigitalRepresentation;
-              haObj:isAccessCopyOf|^haObj:hasIIIFCopy ?ie.
+              haObj:isAccessCopyOf ?ie.
       } UNION {
         # - fragment rep 
         ?rep a haObj:FragmentRepresentation;
-        rel:rep ?ie;
+        haObj:isFragmentRepresentationOf ?ie;
         schema:startTime ?fr_schema_start_time;
         schema:endTime ?fr_schema_end_time;
         ebucore:isMediaFragmentOf ?fr_is_media_fragment_of
