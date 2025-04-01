@@ -30,7 +30,6 @@ CONSTRUCT {
 :ebucore_has_cast_member ?ebucore_has_cast_member;
 :ebucore_has_object_type ?ebucore_has_object_type;
 :ebucore_synopsis ?ebucore_synopsis;
-:ha_des_number_of_pages ?ha_des_number_of_pages;
 :relation_is_part_of ?relation_is_part_of;
 :schema_abstract ?schema_abstract;
 :schema_copyright_notice ?schema_copyright_notice;
@@ -200,8 +199,8 @@ CONSTRUCT {
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     BIND(IF(
-      # Do not include haLicId:VIAA-PUBLIEK-CONTENT when object is AV
-      ?schema_license_res = haLicId:VIAA-PUBLIEK-CONTENT,
+      # Do not include haLicId:VIAA-PUBLIEK-CONTENT or haLicId:Publiek-Domein when object is AV
+      ?schema_license_res IN (haLicId:VIAA-PUBLIEK-CONTENT, haLicId:Publiek-Domein),
       ?unbound,
       REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
     ) as ?schema_license)
