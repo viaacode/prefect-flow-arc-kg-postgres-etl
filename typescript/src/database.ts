@@ -36,7 +36,8 @@ const qTemplates = {
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:raw>) DO UPDATE SET `,
-    truncateTable: sql('truncate_table.sql')
+    truncateTable: sql('truncate_table.sql'),
+    copyTableData: sql('copy_table_data.sql')
 }
 
 
@@ -120,67 +121,42 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<ColumnS
 }
 
 // Helper function to upsert a temp table into the final table
-export async function upsertTable(tableNode: TableNode, truncate: boolean = true) {
-    const { columns, primaryKeys, tempTable, tableInfo } = tableNode
-
-    try {
-        const rowCount = await db.tx('process-upsert', async t => {
-            // Truncate table first if desired
-            if (truncate) {
-                await t.none(qTemplates.truncateTable, tableInfo)
-                logInfo(`Truncated table ${tableInfo} before upsert.`)
-            }
-
-            // Build query
-            const insertQuery = pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys: primaryKeys.names })
-                + columns.assignColumns({ from: 'EXCLUDED' })
-
-            logDebug(insertQuery)
-            // perform upsert and catch amount of upserted rows
-            const rslt = await t.result(insertQuery, null, r => r.rowCount)
-            // drop temp table when done
-            await t.none(qTemplates.dropTable, tempTable)
-            return rslt
-        })
-        logInfo(`Upserted ${rowCount} records for table ${tableInfo}!`)
-    } catch (err) {
-        logError(`Error during upsert from '${tempTable}' to '${tableInfo}'`, err)
-        throw err
-    }
-}
-
-// Helper function to upsert a temp table into the final table
-export async function mergeTable(tableNode: TableNode, truncate: boolean = true) {
+export async function mergeTable(tableNode: TableNode, truncate: boolean = true, useMerge: boolean = true) {
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
     try {
         const rowCount = await db.tx('process-merge', async t => {
+            let rslt = 0
             // Truncate table first if desired
             if (truncate) {
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before merge.`)
+                // Perform simple insert because table is truncated anyway
+                rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
+            } else {
+                // Build query
+                const mergeQuery = useMerge ? pgp.as.format(`
+                MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
+                USING $<tempTable.schema:name>.$<tempTable.name:name> y
+                ON ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')}
+                WHEN MATCHED THEN
+                    UPDATE SET ${columns.assignColumns({ from: 'y' })} 
+                WHEN NOT MATCHED THEN
+                    INSERT (${columns.names}) VALUES (${columns.columns.map(c => `y.${c.escapedName}`).join(',')});
+                `, { tableInfo, tempTable, primaryKeys }) : pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys: primaryKeys.names })
+                + columns.assignColumns({ from: 'EXCLUDED' })
+
+                logDebug(mergeQuery)
+
+                // Perform merge/upsert and catch amount of merged rows
+                rslt = await t.result(mergeQuery, null, r => r.rowCount)
             }
 
-            // Build query
-            const mergeQuery = pgp.as.format(`
-            MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
-            USING $<tempTable.schema:name>.$<tempTable.name:name> y
-            ON ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')}
-            WHEN MATCHED THEN
-                UPDATE SET ${columns.assignColumns({from: 'y'})} 
-            WHEN NOT MATCHED THEN
-                INSERT (${columns.names}) VALUES (${columns.columns.map(c => `y.${c.escapedName}`).join(',')});
-            `, { tableInfo, tempTable, primaryKeys}) 
-            
-            logDebug(mergeQuery)
-
-            // Perform merge and catch amount of merged rows
-            const rslt = await t.result(mergeQuery, null, r => r.rowCount)
             // Drop temp table when done
             await t.none(qTemplates.dropTable, tempTable)
             return rslt
         })
-        logInfo(`Merged ${rowCount} records for table ${tableInfo}!`)
+        logInfo(`Merged ${rowCount} records for table ${tableInfo} (strategy: ${truncate ? "TRUNCATE+INSERT" : (useMerge ? "MERGE INTO": "INSERT ON CONFLICT")})!`)
     } catch (err) {
         logError(`Error during merge from '${tempTable}' to '${tableInfo}'`, err)
         throw err
