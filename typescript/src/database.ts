@@ -156,7 +156,7 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
             await t.none(qTemplates.dropTable, tempTable)
             return rslt
         })
-        logInfo(`Merged ${rowCount} records for table ${tableInfo} (using MERGE INTO: ${useMerge})!`)
+        logInfo(`Merged ${rowCount} records for table ${tableInfo} (strategy: ${truncate ? "TRUNCATE+INSERT" : (useMerge ? "MERGE INTO": "INSERT ON CONFLICT")})!`)
     } catch (err) {
         logError(`Error during merge from '${tempTable}' to '${tableInfo}'`, err)
         throw err
