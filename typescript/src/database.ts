@@ -125,7 +125,7 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
     const { columns, primaryKeys, tempTable, tableInfo } = tableNode
 
     try {
-        const rowCount = await db.tx('process-merge', async t => {
+        return await db.tx('process-merge', async t => {
             let rslt = 0
             // Truncate table first if desired
             if (truncate) {
@@ -156,7 +156,6 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
             await t.none(qTemplates.dropTable, tempTable)
             return rslt
         })
-        logInfo(`Merged ${rowCount} records for table ${tableInfo} (strategy: ${truncate ? "TRUNCATE+INSERT" : (useMerge ? "MERGE INTO": "INSERT ON CONFLICT")})!`)
     } catch (err) {
         logError(`Error during merge from '${tempTable}' to '${tableInfo}'`, err)
         throw err

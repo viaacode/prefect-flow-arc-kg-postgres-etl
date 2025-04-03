@@ -346,7 +346,9 @@ async function main() {
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
         // merge records from temp table into table; truncate tables if full sync
-        await mergeTable(tableNode, !SINCE, USE_MERGE)
+        const startMerge = performance.now()
+        const rowCount = await mergeTable(tableNode, !SINCE, USE_MERGE)
+        logInfo(`Merged ${rowCount} records for table ${tableNode.tableInfo} (${msToTime(performance.now() - startMerge)} - strategy: ${!SINCE ? "TRUNCATE+INSERT" : (USE_MERGE ? "MERGE INTO": "INSERT ON CONFLICT")})!`)
     }
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
