@@ -13,31 +13,29 @@ PREFIX : <urn:kg-to-postgres:>
 
 CONSTRUCT {
 
-?mention :tableName "graph.schema_mentions";
-:id ?mention;
-:intellectual_entity_id  ?ie; 
-:confidence ?mention_confidence;
-:height ?mention_height;
-:width ?mention_width;
-:x ?mention_x;
-:y ?mention_y;
-:thing_id ?person.
+  ?mention_iri :tableName "graph.schema_mentions";
+    :intellectual_entity_id  ?ie;
+    :confidence ?mention_confidence;
+    :height ?mention_height;
+    :width ?mention_width;
+    :x ?mention_x;
+    :y ?mention_y;
+    :thing_id ?person.
+  
+  ?person :tableName "graph.thing";
+    :id ?person;
+    :schema_name ?person_schema_name;
+    :schema_birth_date ?person_schema_birth_date;
+    :schema_birth_place ?person_schema_birth_place;
+    :schema_death_date ?person_schema_death_date;
+    :schema_death_place ?person_schema_death_place.
 
-?person :tableName "graph.thing";
-:id ?person;
-:schema_name ?person_schema_name;
-:schema_birth_date ?person_schema_birth_date;
-:schema_birth_place ?person_schema_birth_place;
-:schema_death_date ?person_schema_death_date;
-:schema_death_place ?person_schema_death_place.
-
-
-}WHERE {
+}
+WHERE {
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
     ?ie a ?ie_type;
            (schema:license|(rel:isp/schema:license)) ?schema_license;
-           dct:format ?format ;
            schema:mentions ?person;
            prov:wasDerivedFrom/schema:dateModified ?modified .
 
@@ -63,19 +61,20 @@ CONSTRUCT {
     
     FILTER langMatches(lang(?person_schema_name), "nl")
 
-    OPTIONAL {
+    {}
+    UNION {
         ?person schema:deathDate ?person_schema_death_date
     }
 
-    OPTIONAL {
+    UNION {
         ?person schema:birthDate ?person_schema_birth_date
     }
 
-    OPTIONAL {
+    UNION {
         ?person schema:birthPlace/schema:name ?person_schema_birth_place
     }
 
-    OPTIONAL {
+    UNION {
         ?person schema:deathPlace/schema:name ?person_schema_death_place
     }
 
@@ -89,5 +88,6 @@ CONSTRUCT {
             ebucore:hasAnnotationRelatedAgent ?person;
              ebucore:isAnnotatedMediaResource ?mention.
 
+    BIND(IRI(CONCAT(str(?ie),"/", md5(concat(str(?person),str(?mention_x),str(?mention_y))))) AS ?mention_iri)
 
 }
