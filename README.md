@@ -76,5 +76,37 @@ DEBUG_MODE=False # Print memory information in logs
 #RECORD_LIMIT=100 # Cut the process off early
 ```
 
+### Running the Prefect Flow
+
+The Prefect Flow requires setting the following parameters:
+
+- `triplydb_block_name`: name of the TriplyDB credentials block (default:`"triplydb"`)
+- `triplydb_owner`: name of the account in  TriplyDB (default:`"meemoo"`)
+- `triplydb_dataset`: name of the dataset in TriplyDB (default:`"knowledge-graph"`)
+- `triplydb_destination_dataset`: name of the dataset to store the view in (default:`"hetarchief"`)
+- `triplydb_destination_graph`: name of the graph to store the view in (default:`"hetarchief"`)
+- `base_path`: folder where javascript files are stored (default:`"/opt/prefect/typescript/"`)
+- `script_path`: folder of the javascript script (default:`"lib/"`)
+- `skip_squash`: skip copying all graphs to a single graph (default:`False`)
+- `skip_view`: skip creating a view graph (default:`False`)
+- `skip_cleanup`: skip cleanup of all graphs (default:`False`)
+- `es_block_name`: name of the elasticsearch block (default:`"arc-elasticsearch"`)
+- `es_chunk_size`: elasticsearch streaming chunk size (default:`500`)
+- `es_request_timeout`: number of seconds before elasticsearch request times out (default:`30`)
+- `es_max_retries`: number of times a failed document should be retried (default:`10`)
+- `es_retry_on_timeout`: retry when a document times out (default:`True`)
+- `db_indexing_batch_size`: size of the database cursor to read documents with (default:`500`)
+- `db_block_name`: name of the database block (default:`"local"`)
+- `db_index_table`: table whene the index documents are stored (default:`"graph._index_intellectual_entity"`)
+- `db_ssl`: enable SSL connection for database (default:`True`)
+- `db_pool_min`: minimum connections in pool (default:`0`)
+- `db_pool_max`: maximum connections in pool (default:`5`)
+- `db_loading_batch_size`: number of records that are inserted in a single query (default:`100`)
+- `record_limit`: limit the number of records that are being loaded (default:`None`)
+- `full_sync`: sync everything (default:`False`)
+- `debug_mode`: print extra logging about memory consumption (default:`False`)
+- `logging_level`: set the logging level of Javascript (default:`os.environ.get("PREFECT_LOGGING_LEVEL")` = same as prefect)
+- `flow_name_indexer`: name of the indexing flow (default:`"prefect-flow-arc-indexer"`)
+- `deployment_name_indexer`: name of the indexing flow deployment (default:`(default: "prefect-flow-arc-indexer-int")`)
 
 
