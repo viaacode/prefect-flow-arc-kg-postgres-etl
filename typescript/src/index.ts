@@ -15,6 +15,7 @@ import {
     SKIP_CLEANUP,
     DEBUG_MODE,
     USE_MERGE,
+    SKIP_LOAD,
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
@@ -110,14 +111,14 @@ async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
 async function processGraph(graph: Graph, recordLimit?: number) {
     // Retrieve total number of triples
     const { numberOfStatements } = await graph.getInfo()
-    
+
     // Download the graph for local processing
     logInfo(`Downloading graph of ${numberOfStatements} statements.`)
     const startDownload = performance.now()
     await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream (Debug mode is ${DEBUG_MODE}).`)
 
-    
+
 
     const startGraph = performance.now()
 
@@ -160,7 +161,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                         logInfo('Debug mode is on.')
                         logHeap()
                     }
-                
+
                 }
                 done()
             } catch (err: any) {
@@ -205,11 +206,11 @@ async function cleanup() {
     // Clear graphs
     logInfo(`- Clearing graphs in dataset ${destination.dataset.slug}`)
     await destination.dataset.clear("graphs")
-    
+
     // Loop over all temp tables
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
-        
+
         // Drop temp table
         logInfo(`- Dropping ${tableNode.tempTable}`)
         await dropTable(tableNode.tempTable)
@@ -282,7 +283,7 @@ async function main() {
 
         logInfo('--- Step 1: Construct view ---')
         start = performance.now()
-        
+
         // Add all queries needed to construct the view
         const queries = await addJobQueries(account, SKIP_SQUASH ? destination.dataset : dataset)
 
@@ -296,7 +297,7 @@ async function main() {
             logInfo(`Graph ${destination.graph} does not exist.\n`)
         }
 
-        logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph} ${SINCE ? `from ${SINCE}`: '(full sync)'}.`)
+        logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph} ${SINCE ? `from ${SINCE}` : '(full sync)'}.`)
 
         // Run the queries as a pipeline in TriplyDB and wait for completion
         await account.runPipeline({
@@ -317,40 +318,44 @@ async function main() {
         logInfo('--- Skipping view construction ---')
     }
 
-    // Parse and process the gzipped TriG file from the URL
-    logInfo('--- Step 2: load temporary tables --')
-    start = performance.now()
+    if (!SKIP_LOAD) {
+        // Parse and process the gzipped TriG file from the URL
+        logInfo('--- Step 2: load temporary tables --')
+        start = performance.now()
 
-    // Get destination graph
-    const graph = await destination.dataset.getGraph(destination.graph)
+        // Get destination graph
+        const graph = await destination.dataset.getGraph(destination.graph)
 
-    // Process and load the view graph and wait for completion
-    await processGraph(graph, RECORD_LIMIT)
-    logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
+        // Process and load the view graph and wait for completion
+        await processGraph(graph, RECORD_LIMIT)
+        logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
-    logInfo('--- Step 3: upsert tables --')
-    start = performance.now()
+        logInfo('--- Step 3: upsert tables --')
+        start = performance.now()
 
-    // Add the table nodes to the depency graph to determine correct order
-    tableIndex.entryNodes().forEach(tableName => {
-        const node = tableIndex.getNodeData(tableName)
-        node.dependencies.forEach(dependency => {
-            tableIndex.addDependency(tableName, dependency.toString())
+        // Add the table nodes to the depency graph to determine correct order
+        tableIndex.entryNodes().forEach(tableName => {
+            const node = tableIndex.getNodeData(tableName)
+            node.dependencies.forEach(dependency => {
+                tableIndex.addDependency(tableName, dependency.toString())
+            })
         })
-    })
 
 
-    // Upsert tables in the correct order
-    const tables = tableIndex.overallOrder()
-    logInfo(`Upserting tables in order ${tables.join(', ')}.`)
-    for (const tableName of tableIndex.overallOrder()) {
-        const tableNode = tableIndex.getNodeData(tableName)
-        // merge records from temp table into table; truncate tables if full sync
-        const startMerge = performance.now()
-        const rowCount = await mergeTable(tableNode, !SINCE, USE_MERGE)
-        logInfo(`Merged ${rowCount} records for table ${tableNode.tableInfo} (${msToTime(performance.now() - startMerge)} - strategy: ${!SINCE ? "TRUNCATE+INSERT" : (USE_MERGE ? "MERGE INTO": "INSERT ON CONFLICT")})!`)
+        // Upsert tables in the correct order
+        const tables = tableIndex.overallOrder()
+        logInfo(`Upserting tables in order ${tables.join(', ')}.`)
+        for (const tableName of tableIndex.overallOrder()) {
+            const tableNode = tableIndex.getNodeData(tableName)
+            // merge records from temp table into table; truncate tables if full sync
+            const startMerge = performance.now()
+            const rowCount = await mergeTable(tableNode, !SINCE, USE_MERGE)
+            logInfo(`Merged ${rowCount} records for table ${tableNode.tableInfo} (${msToTime(performance.now() - startMerge)} - strategy: ${!SINCE ? "TRUNCATE+INSERT" : (USE_MERGE ? "MERGE INTO" : "INSERT ON CONFLICT")})!`)
+        }
+        logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
+    } else {
+        logInfo('--- Skipping database loading ---')
     }
-    logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
     if (!SKIP_CLEANUP) {
         logInfo('--- Step 4: Graph cleanup --')
@@ -366,10 +371,10 @@ async function main() {
 }
 
 // Monitor heap usage for memory leak detection
-let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff();
+let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff()
 function logHeap() {
-    logDebug('Heap difference',heapDiff.end());
-    heapDiff = new memwatch.HeapDiff();
+    logDebug('Heap difference', heapDiff.end())
+    heapDiff = new memwatch.HeapDiff()
 }
 
 main().catch(async err => {
