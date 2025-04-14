@@ -13,7 +13,7 @@ PREFIX : <urn:kg-to-postgres:>
 
 CONSTRUCT {
 
-  ?mention_iri :tableName "graph.schema_mentions";
+  ?mention_resource :tableName "graph.schema_mentions";
     :intellectual_entity_id  ?ie;
     :confidence ?mention_confidence;
     :height ?mention_height;
@@ -87,7 +87,5 @@ WHERE {
     ?mention_resource ebucore:annotationConfidence ?mention_confidence;
             ebucore:hasAnnotationRelatedAgent ?person;
              ebucore:isAnnotatedMediaResource ?mention.
-
-    BIND(IRI(CONCAT(str(?ie),"/", md5(concat(str(?person),str(?mention_x),str(?mention_y))))) AS ?mention_iri)
 
 }
