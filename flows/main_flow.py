@@ -101,7 +101,7 @@ def main_flow(
     es_request_timeout: int = 30,
     es_max_retries: int = 10,
     es_retry_on_timeout: bool = True,
-    db_indexing_batch_size=500,
+    db_indexing_batch_size: int = 500,
     db_block_name: str = "local",
     db_index_table: str = "graph._index_intellectual_entity",
     db_ssl: bool = True,
