@@ -16,7 +16,7 @@ CONSTRUCT {
   :bibframe_preceeded_by ?bibframe_preceeded_by;
   :bibframe_succeeded_by ?bibframe_succeeded_by; 
   :bibframe_supplement_to ?bibframe_supplement_to;
-  :collection_type ?collection_type;
+  :collection_type ?collection_type_name;
   :schema_end_date ?schema_end_date;
   :schema_identifier ?schema_identifier ;
   :schema_is_part_of ?schema_is_part_of;
@@ -36,7 +36,7 @@ CONSTRUCT {
 
   ?ie_isp :tableName "graph.schema_is_part_of";
   :intellectual_entity_id ?ie;
-  :type ?collection_type;
+  :type ?collection_type_name;
   :collection_id ?id.
 }
 WHERE {
@@ -71,6 +71,17 @@ WHERE {
       schema:CreativeWorkSeason
       schema:BroadcastEvent
     }
+    BIND (
+      COALESCE(
+        IF(?collection_type = schema:Newspaper, "krant", 1/0),
+        IF(?collection_type = schema:Episode, "episode", 1/0),
+        IF(?collection_type = schema:ArchiveComponent, "archief", 1/0),
+        IF(?collection_type = schema:CreativeWorkSeries, "serie", 1/0),
+        IF(?collection_type = schema:CreativeWorkSeason, "seizoen", 1/0),
+        IF(?collection_type = schema:BroadcastEvent, "programma", 1/0),
+        "collectie"
+      ) AS ?collection_type_name
+    )
     ?id a ?collection_type; schema:name ?schema_name.
 
     BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
