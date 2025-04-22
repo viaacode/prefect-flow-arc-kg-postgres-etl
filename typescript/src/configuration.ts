@@ -14,7 +14,7 @@ export const SINCE = process.env.SINCE ? new Date(process.env.SINCE).toISOString
 export const SKIP_SQUASH = process.env.SKIP_SQUASH === 'True'
 export const SKIP_VIEW = process.env.SKIP_VIEW === 'True'
 export const SKIP_CLEANUP = process.env.SKIP_CLEANUP === 'True'
-export const SKIP_LOAD = process.env.SKIP_CLEANUP === 'True'
+export const SKIP_LOAD = process.env.SKIP_LOAD === 'True'
 export const LOGGING_LEVEL = process.env.LOGGING_LEVEL || undefined
 export const ACCOUNT = process.env.TRIPLYDB_OWNER ?? 'meemoo'
 export const DATASET = process.env.TRIPLYDB_DATASET ?? 'knowledge-graph'
