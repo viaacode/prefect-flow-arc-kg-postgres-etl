@@ -37,7 +37,9 @@ const qTemplates = {
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:raw>) DO UPDATE SET `,
     truncateTable: sql('truncate_table.sql'),
-    copyTableData: sql('copy_table_data.sql')
+    copyTableData: sql('copy_table_data.sql'),
+    alterTableIndexes: sql('alter_indexes.sql'),
+    reindexTable: sql('reindex_table.sql'),
 }
 
 
@@ -132,7 +134,10 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before merge.`)
                 // Perform simple insert because table is truncated anyway
+                t.none(qTemplates.alterTableIndexes, {schema: tableInfo.schema, name: tableInfo.name, enabled: false})
                 rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
+                t.none(qTemplates.alterTableIndexes, {schema: tableInfo.schema, name: tableInfo.name, enabled: true})
+                t.none(qTemplates.reindexTable, tableInfo)
             } else {
                 // Build query
                 const mergeQuery = useMerge ? pgp.as.format(`
