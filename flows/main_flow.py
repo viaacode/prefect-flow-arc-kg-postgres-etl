@@ -97,6 +97,7 @@ def main_flow(
     skip_view: bool = False,
     skip_cleanup: bool = False,
     skip_load: bool = False,
+    skip_indexing: bool = False,
     es_block_name: str = "arc-elasticsearch",
     es_chunk_size: int = 500,
     es_request_timeout: int = 30,
@@ -172,7 +173,7 @@ def main_flow(
             "db_batch_size": db_indexing_batch_size,
         },
         wait_for=loading,
-    )
+    ) if not skip_indexing else None
 
     # Delete all records from database
     delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=indexing)
