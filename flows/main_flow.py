@@ -1,3 +1,4 @@
+from enum import Enum
 import psycopg2
 from prefect import flow, task, get_run_logger
 from prefect.deployments import run_deployment
@@ -176,7 +177,7 @@ def main_flow(
     ) if not skip_indexing else None
 
     # Delete all records from database
-    delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=indexing)
+    delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=[loading, indexing])
 
 
 if __name__ == "__main__":
