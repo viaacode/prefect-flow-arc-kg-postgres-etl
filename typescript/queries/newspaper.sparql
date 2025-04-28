@@ -127,7 +127,7 @@ CONSTRUCT {
   :id ?pc;
   :bibframe_production_method ?car_bibframe_production_method;
   :ebucore_has_captioning ?car_ebucore_has_captioning;
-  :intellectual_entity_id ?car_intellectual_entity_id;
+  :intellectual_entity_id ?ie;
   :premis_medium ?car_premis_medium;
   :schema_height ?car_schema_height;
   :schema_identifier ?car_schema_identifier;
@@ -291,7 +291,7 @@ CONSTRUCT {
       ?ie ?role_pred ?role.
 
       BIND (
-        IF(?role_pred = schema:creator,"schema_publisher", 
+        IF(?role_pred = schema:creator,"schema_creator", 
         IF(?role_pred = schema:contributor, "schema_contributor", 
         IF(?role_pred = schema:publisher, "schema_publisher", "unknown")
       ) ) as ?role_type)
