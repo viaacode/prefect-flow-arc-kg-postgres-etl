@@ -296,7 +296,7 @@ CONSTRUCT {
       ?ie ?role_pred ?role.
 
       BIND (
-        IF(?role_pred = schema:creator,"schema_publisher", 
+        IF(?role_pred = schema:creator,"schema_creator", 
         IF(?role_pred = schema:contributor, "schema_contributor", 
         IF(?role_pred = schema:publisher, "schema_publisher", "unknown")
       ) ) as ?role_type)
