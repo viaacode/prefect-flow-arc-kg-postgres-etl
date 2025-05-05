@@ -14,7 +14,7 @@ CONSTRUCT {
 :dcterms_description ?dcterms_description;
 :foaf_homepage ?foaf_homepage;
 :ha_org_has_logo ?ha_org_has_logo;
-:ha_org_request_form ?ha_org_request_form;
+:ha_org_request_form ?fixed_form_url;
 :ha_org_sector ?ha_org_sector;
 :org_classification ?org_classification;
 :org_identifier ?org_identifier;
@@ -44,7 +44,10 @@ CONSTRUCT {
   OPTIONAL { ?org dct:description ?dcterms_description }
   OPTIONAL { ?org foaf:homepage ?foaf_homepage }
   OPTIONAL { ?org haOrg:hasLogo ?ha_org_has_logo }
-  OPTIONAL { ?org haOrg:requestForm ?ha_org_request_form } 
+  OPTIONAL { 
+    ?org haOrg:requestForm ?ha_org_request_form .
+  } 
+  BIND (REPLACE(?ha_org_request_form,"\\\\_","_") AS ?fixed_form_url)
   OPTIONAL { ?org haOrg:sector ?ha_org_sector } 
   OPTIONAL { 
     ?org org:classification/skos:prefLabel ?org_classification .
