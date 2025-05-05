@@ -83,13 +83,15 @@ WHERE {
     }
 
     ?mention a ebucore:MediaFragment;
+            ebucore:isMediaFragmentOf ?ie;
             ebucore:width ?mention_width;
             ebucore:height ?mention_height;
             ebucore:regionDelimX ?mention_x;
             ebucore:regionDelimY ?mention_y.
                 
-    ?mention_resource ebucore:annotationConfidence ?mention_confidence;
+    ?mention_resource a ebucore:TextAnnotation;
+            ebucore:annotationConfidence ?mention_confidence;
             ebucore:hasAnnotationRelatedAgent ?person;
-             ebucore:isAnnotatedMediaResource ?mention.
+            ebucore:isAnnotatedMediaResource ?mention.
 
 }
