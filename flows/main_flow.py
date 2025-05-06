@@ -19,6 +19,40 @@ def run_deployment_task(flow_name: str, deployment_name: str, parameters: dict):
     )
     return flow_run.state
 
+@task
+def populate_index_table(db_credentials: DatabaseCredentials, since: str = None):
+    logger = get_run_logger()
+
+    # Connect to ES and Postgres
+    logger.info("(Re)connecting to postgres")
+    db_conn = psycopg2.connect(
+        user=db_credentials.username,
+        password=db_credentials.password.get_secret_value(),
+        host=db_credentials.host,
+        port=db_credentials.port,
+        database=db_credentials.database,
+        cursor_factory=RealDictCursor,
+    )
+
+
+    # Create cursor
+    cursor = db_conn.cursor()
+
+    # Run query
+
+    # Delete the Intellectual Entities
+    cursor.execute("call graph.update_index_documents_all(%(since)s);", {"since": since})
+    logger.info(
+        "Populated index_documents table.",
+        cursor.rowcount,
+    )
+
+    # closing database connection.
+    if db_conn:
+        cursor.close()
+        db_conn.close()
+        logger.info("PostgreSQL connection is closed")
+
 
 @task
 def delete_records_from_db(
@@ -106,7 +140,6 @@ def main_flow(
     es_retry_on_timeout: bool = True,
     db_indexing_batch_size: int = 500,
     db_block_name: str = "local",
-    db_index_table: str = "graph._index_intellectual_entity",
     db_ssl: bool = True,
     db_pool_min: int = 0,
     db_pool_max: int = 5,
@@ -158,13 +191,20 @@ def main_flow(
         postgres_pool_max=db_pool_max,
     )
 
+    # Populate the index table
+    populating = populate_index_table.submit(
+        db_credentials=postgres_creds,
+        since=last_modified_date,
+        wait_for=loading,
+    )
+
     # Run the indexer
-    indexing = run_deployment_task.submit(
+    run_deployment_task.submit(
         flow_name=flow_name_indexer,
         deployment_name=deployment_name_indexer,
         parameters={
             "db_block_name": db_block_name,
-            "db_table": db_index_table,
+            "db_table": "graph.index_documents",
             "es_block_name": es_block_name,
             "full_sync": full_sync,
             "es_chunk_size": es_chunk_size,
@@ -173,11 +213,11 @@ def main_flow(
             "es_retry_on_timeout": es_retry_on_timeout,
             "db_batch_size": db_indexing_batch_size,
         },
-        wait_for=loading,
+        wait_for=populating,
     ) if not skip_indexing else None
 
     # Delete all records from database
-    delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=[loading, indexing])
+    delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=[loading, populating])
 
 
 if __name__ == "__main__":
