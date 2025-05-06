@@ -9,6 +9,7 @@ from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 import os
 from psycopg2.extras import RealDictCursor
+from datetime import MINYEAR
 
 
 # Run a deployment as a task
@@ -18,6 +19,7 @@ def run_deployment_task(flow_name: str, deployment_name: str, parameters: dict):
         name=f"{flow_name}/{deployment_name}", parameters=parameters
     )
     return flow_run.state
+
 
 @task
 def populate_index_table(db_credentials: DatabaseCredentials, since: str = None):
@@ -34,14 +36,16 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         cursor_factory=RealDictCursor,
     )
 
-
     # Create cursor
     cursor = db_conn.cursor()
 
     # Run query
 
     # Delete the Intellectual Entities
-    cursor.execute("call graph.update_index_documents_all(%(since)s);", {"since": since})
+    cursor.execute(
+        "call graph.update_index_documents_all(%(since)s);",
+        {"since": since if since is not None else MINYEAR},
+    )
     logger.info(
         "Populated index_documents table.",
         cursor.rowcount,
@@ -217,7 +221,9 @@ def main_flow(
     ) if not skip_indexing else None
 
     # Delete all records from database
-    delete_records_from_db.submit(db_credentials=postgres_creds, wait_for=[loading, populating])
+    delete_records_from_db.submit(
+        db_credentials=postgres_creds, wait_for=[loading, populating]
+    )
 
 
 if __name__ == "__main__":
