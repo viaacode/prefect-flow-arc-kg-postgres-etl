@@ -19,8 +19,12 @@ CONSTRUCT {
     :confidence ?mention_confidence;
     :thing_id ?person.
 
-  ?mention :tableName "graph.highlight";
+  ?mention_highlight :tableName "graph.schema_mentions_highlight";
     :schema_mentions_id  ?mention_resource;
+    :highlight_id ?mention.
+
+  ?mention :tableName "graph.highlight";
+    :id ?mention;
     :height ?mention_height;
     :width ?mention_width;
     :x ?mention_x;
@@ -93,5 +97,7 @@ WHERE {
             ebucore:annotationConfidence ?mention_confidence;
             ebucore:hasAnnotationRelatedAgent ?person;
             ebucore:isAnnotatedMediaResource ?mention.
+
+    BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
 
 }
