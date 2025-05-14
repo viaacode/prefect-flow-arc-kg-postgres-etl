@@ -7,6 +7,7 @@ PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 prefix premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
 
 PREFIX : <urn:kg-to-postgres:>
 
@@ -94,9 +95,13 @@ WHERE {
             ebucore:regionDelimY ?mention_y.
                 
     ?mention_resource a ebucore:TextAnnotation;
-            ebucore:annotationConfidence ?mention_confidence;
             ebucore:hasAnnotationRelatedAgent ?person;
             ebucore:isAnnotatedMediaResource ?mention.
+
+    OPTIONAL {
+      ?mention_resource ebucore:annotationConfidence ?confidence;
+    }
+    BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
 
     BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
 
