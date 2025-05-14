@@ -9,7 +9,11 @@ from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 import os
 from psycopg2.extras import RealDictCursor
-from datetime import MINYEAR
+from datetime import datetime
+
+
+def get_min_date(format="%Y-%m-%dT%H:%M:%S.%fZ"):
+    return datetime.min.strftime(format)
 
 
 # Run a deployment as a task
@@ -44,7 +48,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     # Delete the Intellectual Entities
     cursor.execute(
         "call graph.update_index_documents_all(%(since)s);",
-        {"since": since if since is not None else MINYEAR},
+        {"since": since if since is not None else get_min_date()},
     )
     logger.info(
         "Populated index_documents table.",
