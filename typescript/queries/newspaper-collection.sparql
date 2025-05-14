@@ -73,13 +73,13 @@ WHERE {
     }
     BIND (
       COALESCE(
-        IF(?collection_type = schema:Newspaper, "krant", 1/0),
+        IF(?collection_type = schema:Newspaper, "newspaper", 1/0),
         IF(?collection_type = schema:Episode, "episode", 1/0),
-        IF(?collection_type = schema:ArchiveComponent, "archief", 1/0),
-        IF(?collection_type = schema:CreativeWorkSeries, "serie", 1/0),
-        IF(?collection_type = schema:CreativeWorkSeason, "seizoen", 1/0),
-        IF(?collection_type = schema:BroadcastEvent, "programma", 1/0),
-        "collectie"
+        IF(?collection_type = schema:ArchiveComponent, "archive", 1/0),
+        IF(?collection_type = schema:CreativeWorkSeries, "series", 1/0),
+        IF(?collection_type = schema:CreativeWorkSeason, "season", 1/0),
+        IF(?collection_type = schema:BroadcastEvent, "program", 1/0),
+        "collection"
       ) AS ?collection_type_name
     )
     ?id a ?collection_type; schema:name ?schema_name.
