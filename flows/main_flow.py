@@ -44,11 +44,16 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     cursor = db_conn.cursor()
 
     # Run query
+    query_vars = {"since": since if since is not None else get_min_date()}
+    logger.info(
+        "Start populating index_documents table since %s.",
+        query_vars["since"],
+    )
 
     # Delete the Intellectual Entities
     cursor.execute(
         "call graph.update_index_documents_all(%(since)s);",
-        {"since": since if since is not None else get_min_date()},
+        query_vars,
     )
     logger.info(
         "Populated index_documents table.",
