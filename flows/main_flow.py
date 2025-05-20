@@ -77,7 +77,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
 
             # Delete the Intellectual Entities
             cursor.execute(
-                "select graph.update_index_documents_per_cp_cur(%(partition)s,%(since)s);",
+                "select graph.update_index_documents_per_cp(%(partition)s,%(since)s);",
                 query_vars,
             )
             logger.info(
@@ -90,7 +90,8 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
 
         except (Exception, psycopg2.DatabaseError) as error:
             logger.error(
-                "Error in transction Reverting all other operations of a transction ",
+                "Error while populating partition %s; rolling back. ",
+                partition,
                 error,
             )
             db_conn.rollback()
