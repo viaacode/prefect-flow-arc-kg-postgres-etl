@@ -39,26 +39,58 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         database=db_credentials.database,
         cursor_factory=RealDictCursor,
     )
+    db_conn.autocommit = False
 
     # Create cursor
     cursor = db_conn.cursor()
 
-    # Run query
-    query_vars = {"since": since if since is not None else get_min_date()}
-    logger.info(
-        "Start populating index_documents table since %s.",
-        query_vars["since"],
-    )
-
-    # Delete the Intellectual Entities
+    # Get list of partitions
     cursor.execute(
-        "call graph.update_index_documents_all(%(since)s);",
-        query_vars,
+        """
+        select 
+        distinct(ie.schema_maintainer) as id, 
+        count(*) as cnt
+        from
+        graph.intellectual_entity ie 
+        group by 1 
+        order by 2 ASC
+        """,
     )
-    logger.info(
-        "Populated index_documents table.",
-        cursor.rowcount,
-    )
+    partitions = cursor.fetchall()
+
+    for (partition,) in partitions:
+        try:
+            # Run query
+            query_vars = {
+                "partition": partition,
+                "since": since if since is not None else get_min_date(),
+            }
+
+            logger.info(
+                "Start populating index_documents table for partition %s since %s.",
+                partition,
+                query_vars["since"],
+            )
+
+            # Delete the Intellectual Entities
+            cursor.execute(
+                "select graph.update_index_documents_per_cp_cur(%(partition)s,%(since)s);",
+                query_vars,
+            )
+            logger.info(
+                "Populated index_documents partition %s (%s records).",
+                partition,
+                cursor.rowcount,
+            )
+            # Commit your changes in the database
+            db_conn.commit()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(
+                "Error in transction Reverting all other operations of a transction ",
+                error,
+            )
+            db_conn.rollback()
 
     # closing database connection.
     if db_conn:
