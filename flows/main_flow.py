@@ -56,9 +56,11 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         order by 2 ASC
         """,
     )
-    partitions = cursor.fetchall()
 
-    for (partition,) in partitions:
+    for row in cursor.fetchall():
+        partition = row["id"]
+        count = row["cnt"]
+
         try:
             # Run query
             query_vars = {
@@ -67,9 +69,10 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             }
 
             logger.info(
-                "Start populating index_documents table for partition %s since %s.",
+                "Start populating index_documents table for partition %s since %s (%s records).",
                 partition,
                 query_vars["since"],
+                count,
             )
 
             # Delete the Intellectual Entities
