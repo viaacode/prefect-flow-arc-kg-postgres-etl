@@ -106,8 +106,9 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         logger.info("PostgreSQL connection is closed")
 
     total = len(partitions)
-    if failed > 0:
-        return Failed(message=f"Failed to populate {failed}/{total} partitions.")
+    failed_count = len(failed)
+    if failed_count > 0:
+        return Failed(message=f"Failed to populate {failed_count}/{total} partitions: {failed}.")
     return Completed(message=f"Batch succeeded: {total} partitions populated.")
 
 
