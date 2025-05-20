@@ -1,4 +1,5 @@
 from enum import Enum
+from prefect.states import Failed, Completed
 import psycopg2
 from prefect import flow, task, get_run_logger
 from prefect.deployments import run_deployment
@@ -56,11 +57,12 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         order by 2 ASC
         """,
     )
-
-    for row in cursor.fetchall():
+    partitions = cursor.fetchall()
+    for row in partitions:
         partition = row["id"]
         count = row["cnt"]
 
+        failed = []
         try:
             # Run query
             query_vars = {
@@ -95,12 +97,18 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
                 error,
             )
             db_conn.rollback()
+            failed.append(partition)
 
     # closing database connection.
     if db_conn:
         cursor.close()
         db_conn.close()
         logger.info("PostgreSQL connection is closed")
+
+    total = len(partitions)
+    if failed > 0:
+        return Failed(message=f"Failed to populate {failed}/{total} partitions.")
+    return Completed(message=f"Batch succeeded: {total} partitions populated.")
 
 
 @task
