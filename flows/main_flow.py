@@ -1,16 +1,18 @@
+import os
+from datetime import datetime
 from enum import Enum
-from prefect.states import Failed, Completed
-import psycopg2
-from prefect import flow, task, get_run_logger
+
+from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
+from prefect.states import Completed, Failed
 from prefect.task_runners import ConcurrentTaskRunner
-from prefect_meemoo.config.last_run import get_last_run_config, save_last_run_config
+from prefect_meemoo.config.last_run import (get_last_run_config,
+                                            save_last_run_config)
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
-import os
+from psycopg2 import DatabaseError, connect, sql
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
 
 
 def get_min_date(format="%Y-%m-%dT%H:%M:%S.%fZ"):
@@ -32,7 +34,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
 
     # Connect to ES and Postgres
     logger.info("(Re)connecting to postgres")
-    db_conn = psycopg2.connect(
+    db_conn = connect(
         user=db_credentials.username,
         password=db_credentials.password.get_secret_value(),
         host=db_credentials.host,
@@ -48,25 +50,37 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     # Get list of partitions
     cursor.execute(
         """
-        select 
-        distinct(ie.schema_maintainer) as id, 
+        SELECT 
+        ie.schema_maintainer as id, 
+        lower(replace(org_identifier, '-','_')) as partition,
         count(*) as cnt
-        from
+        FROM
         graph.intellectual_entity ie 
-        group by 1 
-        order by 2 ASC
+        JOIN graph.organization o ON ie.schema_maintainer = o.id
+        GROUP BY 1,2 
+        ORDER BY 3 ASC
         """,
     )
     partitions = cursor.fetchall()
     for row in partitions:
-        partition = row["id"]
+        partition = row["partition"]
         count = row["cnt"]
 
         failed = []
         try:
+            # when full sync, truncate partition first
+            if since is None:
+                sql_query = sql.SQL("TRUNCATE {db_table};").format(
+                    db_table=sql.Identifier("graph", partition),
+                )
+                cursor.execute(sql_query)
+                logger.info(
+                    "Truncated partition %s in index_documents table.",
+                    partition,
+                )
             # Run query
             query_vars = {
-                "partition": partition,
+                "id": row["id"],
                 "since": since if since is not None else get_min_date(),
             }
 
@@ -79,7 +93,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
 
             # Delete the Intellectual Entities
             cursor.execute(
-                "select graph.update_index_documents_per_cp(%(partition)s,%(since)s);",
+                "select graph.update_index_documents_per_cp(%(id)s,%(since)s);",
                 query_vars,
             )
             logger.info(
@@ -90,7 +104,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             # Commit your changes in the database
             db_conn.commit()
 
-        except (Exception, psycopg2.DatabaseError) as error:
+        except (Exception, DatabaseError) as error:
             logger.error(
                 "Error while populating partition %s; rolling back. ",
                 partition,
@@ -108,7 +122,9 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     total = len(partitions)
     failed_count = len(failed)
     if failed_count > 0:
-        return Failed(message=f"Failed to populate {failed_count}/{total} partitions: {failed}.")
+        return Failed(
+            message=f"Failed to populate {failed_count}/{total} partitions: {failed}."
+        )
     return Completed(message=f"Batch succeeded: {total} partitions populated.")
 
 
@@ -120,7 +136,7 @@ def delete_records_from_db(
 
     # Connect to ES and Postgres
     logger.info("(Re)connecting to postgres")
-    db_conn = psycopg2.connect(
+    db_conn = connect(
         user=db_credentials.username,
         password=db_credentials.password.get_secret_value(),
         host=db_credentials.host,
@@ -159,7 +175,7 @@ def delete_records_from_db(
         db_conn.commit()
         logger.info("Database deletes succesful")
 
-    except (Exception, psycopg2.DatabaseError) as error:
+    except (Exception, DatabaseError) as error:
         logger.error(
             "Error in transction Reverting all other operations of a transction ", error
         )
