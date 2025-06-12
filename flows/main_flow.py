@@ -73,7 +73,6 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
                 sql_query = sql.SQL("TRUNCATE {db_table};").format(
                     db_table=sql.Identifier("graph", partition),
                 )
-                logger.info(sql_query)
                 cursor.execute(sql_query)
                 logger.info(
                     "Truncated partition %s in index_documents table.",
