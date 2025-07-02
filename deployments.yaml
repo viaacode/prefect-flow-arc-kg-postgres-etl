@@ -1,0 +1,13 @@
+deployments:
+  - name: ''
+    file: flows/main_flow.py
+    flow: main_flow
+    queue: q-knowledge-graph
+  - name: kg-view
+    file: flows/kg_view_flow.py
+    flow: kg_view_flow
+    queue: q-knowledge-graph
+  - name: kg-postgres
+    file: flows/kg_postgres_flow.py
+    flow: kg_postgres_flow
+    queue: q-knowledge-graph

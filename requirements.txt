@@ -1,6 +1,6 @@
 psycopg2-binary==2.9.5
-prefect-meemoo[triplydb]==1.0.0
-prefect-meemoo[config]==1.0.0
+prefect-meemoo[triplydb]==1.3.2
+prefect-meemoo[config]==1.3.2
 prefect-sqlalchemy
 prefect==2.20.16
 prefect-aws==0.4.20
