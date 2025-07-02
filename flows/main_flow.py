@@ -22,6 +22,7 @@ from prefect_meemoo.prefect.deployment import (
 def main_flow(
     deployment_kg_view_flow: DeploymentModel,
     deployment_kg_postgres_flow: DeploymentModel,
+    deployment_arc_alto_to_json_flow: DeploymentModel,
     deployment_arc_indexer_flow: DeploymentModel,
     last_modified: DateTime = None,
     or_ids: list[str] = None,
@@ -78,6 +79,20 @@ def main_flow(
         name=deployment_kg_postgres_flow.name, wait_for=[kg_view_flow, arc_db_load_parameter_change]
     ) if deployment_kg_postgres_flow.active else None
 
+    arc_alto_to_json_parameter_change = change_deployment_parameters.submit(
+        name=deployment_arc_alto_to_json_flow.name,
+        parameters={
+            "last_modified": last_modified,
+            "or_ids": or_ids,
+            "full_sync": full_sync or deployment_arc_alto_to_json_flow.full_sync,
+        },
+        wait_for=[arc_db_load_result]
+    ) if deployment_arc_alto_to_json_flow.active else None
+
+    arc_alto_to_json_result = run_deployment_task.submit(
+        name=deployment_arc_alto_to_json_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_parameter_change]
+    ) if deployment_arc_alto_to_json_flow.active else None
+
     arc_indexer_result = run_deployment_task.submit(
-        name=deployment_arc_indexer_flow.name, wait_for=[arc_db_load_result]
+        name=deployment_arc_indexer_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_result]
     ) if deployment_arc_indexer_flow.active else None
