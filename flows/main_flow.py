@@ -21,7 +21,7 @@ from prefect_meemoo.prefect.deployment import (
 @flow(name="prefect_flow_arc")
 def main_flow(
     deployment_kg_view_flow: DeploymentModel,
-    deployment_arc_db_load_flow: DeploymentModel,
+    deployment_kg_postgres_flow: DeploymentModel,
     deployment_arc_indexer_flow: DeploymentModel,
     last_modified: DateTime = None,
     or_ids: list[str] = None,
@@ -40,7 +40,7 @@ def main_flow(
     if check_deployment_blocking(
         [
             deployment_kg_view_flow,
-            deployment_arc_db_load_flow,
+            deployment_kg_postgres_flow,
             deployment_arc_indexer_flow,
         ]
     ):
@@ -65,18 +65,18 @@ def main_flow(
     ) if deployment_kg_view_flow.active else None
 
     arc_db_load_parameter_change = change_deployment_parameters.submit(
-        name=deployment_arc_db_load_flow.name,
+        name=deployment_kg_postgres_flow.name,
         parameters={
             "last_modified": last_modified,
             "or_ids": or_ids,
             "full_sync": full_sync or deployment_kg_view_flow.full_sync
         },
         wait_for=[kg_view_flow]
-    ) if deployment_arc_db_load_flow.active else None
+    ) if deployment_kg_postgres_flow.active else None
 
     arc_db_load_result = run_deployment_task.submit(
-        name=deployment_arc_db_load_flow.name, wait_for=[kg_view_flow, arc_db_load_parameter_change]
-    ) if deployment_arc_db_load_flow.active else None
+        name=deployment_kg_postgres_flow.name, wait_for=[kg_view_flow, arc_db_load_parameter_change]
+    ) if deployment_kg_postgres_flow.active else None
 
     arc_indexer_result = run_deployment_task.submit(
         name=deployment_arc_indexer_flow.name, wait_for=[arc_db_load_result]
