@@ -35,6 +35,9 @@ def main_flow(
     # Ensure the deployment is ready to run
     if check_deployment_running_flows(
         name=f"{flow_run.get_flow_name()}/{deployment.get_name()}",
+        # Max running, because this one is counted as well
+        max_running=1
+        
     ):
         logger.info("Deployment is already running, skipping execution.")
         return
