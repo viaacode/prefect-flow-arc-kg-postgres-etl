@@ -32,16 +32,25 @@ def main_flow(
         # Max running = 1, because this one is counted as well
         max_running=1
     ):
-        logger.info("Deployment is already running, skipping execution.")
+        logger.warning("Deployment is already running, skipping execution.")
         return
     # Deployments are never blocking if they are in full sync mode
     blocking_deployments = [dep for dep in [deployment_kg_view_flow, deployment_kg_postgres_flow, deployment_arc_indexer_flow, deployment_arc_alto_to_json_flow, deployment_arc_indexer_flow] if not dep.full_sync]
     if check_deployment_blocking(blocking_deployments)  and not full_sync:
-        logger.info("Blocking deployments are running, skipping execution.")
+        logger.warning("Blocking deployments are running, skipping execution.")
         return
         
     current_start_time = get_scheduled_start_time().in_timezone("Europe/Brussels")
     logger.info(f"Current start time: {current_start_time}")
+
+    # Check if the last flow run of the knowledge graph view flow failed
+    kg_view_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_kg_view_flow.name)
+    # Check if the last flow run of the knowledge graph to postgres flow failed
+    kg_to_postgres_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_kg_postgres_flow.name)
+    # Check if the last flow run of the arc alto to json flow failed
+    arc_alto_to_json_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_arc_alto_to_json_flow.name)
+    # Check if the last flow run of the arc indexer flow failed
+    arc_indexer_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_arc_indexer_flow.name)
 
     # Only change the full_sync parameter if the flow is active
     kg_view_parameter_change = change_deployment_parameters.submit(
@@ -60,7 +69,7 @@ def main_flow(
         },
         wait_for=[kg_view_parameter_change]
     ) if deployment_kg_view_flow.active and (
-        not check_deployment_last_flow_run_failed(deployment_kg_view_flow.name) 
+        (not kg_view_last_flow_run_failed)
         or full_sync or deployment_kg_view_flow.full_sync
     ) else None
 
@@ -80,7 +89,7 @@ def main_flow(
         wait_for=[kg_view_flow]
     ) if deployment_kg_postgres_flow.active else None
 
-    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    # Only change the last_modified parameter if the flow is active and the last flow run or its dependant flow runs did not fail or if it is a full sync
     kg_to_postgres_last_modified_parameter_change = change_deployment_parameters.submit(
         name=deployment_kg_postgres_flow.name,
         parameters={
@@ -88,7 +97,7 @@ def main_flow(
         },
         wait_for=[kg_to_postgres_parameter_change]
     ) if deployment_kg_postgres_flow.active and (
-        not check_deployment_last_flow_run_failed(deployment_kg_postgres_flow.name)
+        not any([kg_view_last_flow_run_failed, kg_to_postgres_last_flow_run_failed])
         or full_sync or deployment_kg_postgres_flow.full_sync
     ) else None
 
@@ -107,7 +116,7 @@ def main_flow(
         wait_for=[kg_to_postgres_result]
     ) if deployment_arc_alto_to_json_flow.active else None
 
-    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    # Only change the last_modified parameter if the flow is active and the last flow run or its dependant flow runs did not fail or if it is a full sync
     arc_alto_to_json_last_modified_parameter_change = change_deployment_parameters.submit(
         name=deployment_arc_alto_to_json_flow.name,
         parameters={
@@ -115,7 +124,11 @@ def main_flow(
         },
         wait_for=[arc_alto_to_json_parameter_change]
     ) if deployment_arc_alto_to_json_flow.active and (
-        not check_deployment_last_flow_run_failed(deployment_arc_alto_to_json_flow.name)
+        not any([
+            arc_alto_to_json_last_flow_run_failed,
+            kg_view_last_flow_run_failed,
+            kg_to_postgres_last_flow_run_failed
+        ])
         or full_sync or deployment_arc_alto_to_json_flow.full_sync
     ) else None
 
@@ -135,7 +148,7 @@ def main_flow(
 
     ) if deployment_arc_indexer_flow.active else None
 
-    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    # Only change the last_modified parameter if the flow is active and the last flow run or its dependant flow runs did not fail or if it is a full sync
     arc_indexer_last_modified_parameter_change = change_deployment_parameters.submit(
         name=deployment_arc_indexer_flow.name,
         parameters={
@@ -143,7 +156,12 @@ def main_flow(
         },
         wait_for=[arc_indexer_parameter_change]
     ) if deployment_arc_indexer_flow.active and (
-        not check_deployment_last_flow_run_failed(deployment_arc_indexer_flow.name)
+        not any([
+            arc_indexer_last_flow_run_failed,
+            arc_alto_to_json_last_flow_run_failed,
+            kg_view_last_flow_run_failed,
+            kg_to_postgres_last_flow_run_failed
+        ])
         or full_sync or deployment_arc_indexer_flow.full_sync
     ) else None
 
