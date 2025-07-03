@@ -1,21 +1,15 @@
-from enum import Enum
 
-from functools import partial
 from pendulum import DateTime
-from prefect import task, flow, get_run_logger
-from prefect.client.orchestration import get_client
-from prefect.client.schemas.objects import StateType
+from prefect import flow, get_run_logger
 from prefect.runtime import deployment, flow_run
 from prefect.runtime.flow_run import get_scheduled_start_time
-from prefect._internal.concurrency.api import create_call, from_sync
 from prefect_meemoo.prefect.deployment import (
     DeploymentModel,
     change_deployment_parameters,
     run_deployment_task,
-    task_failure_hook_change_deployment_parameters,
-    get_deployment_parameter,
     check_deployment_blocking,
-    check_deployment_running_flows
+    check_deployment_running_flows,
+    check_deployment_last_flow_run_failed
 )
 
 @flow(name="prefect_flow_arc")
@@ -35,74 +29,125 @@ def main_flow(
     # Ensure the deployment is ready to run
     if check_deployment_running_flows(
         name=f"{flow_run.get_flow_name()}/{deployment.get_name()}",
-        # Max running, because this one is counted as well
+        # Max running = 1, because this one is counted as well
         max_running=1
-        
     ):
         logger.info("Deployment is already running, skipping execution.")
         return
-    if check_deployment_blocking(
-        [
-            deployment_kg_view_flow,
-            deployment_kg_postgres_flow,
-            deployment_arc_indexer_flow,
-        ]
-    ):
+    # Deployments are never blocking if they are in full sync mode
+    blocking_deployments = [dep for dep in [deployment_kg_view_flow, deployment_kg_postgres_flow, deployment_arc_indexer_flow, deployment_arc_alto_to_json_flow, deployment_arc_indexer_flow] if not dep.full_sync]
+    if check_deployment_blocking(blocking_deployments)  and not full_sync:
         logger.info("Blocking deployments are running, skipping execution.")
         return
         
     current_start_time = get_scheduled_start_time().in_timezone("Europe/Brussels")
     logger.info(f"Current start time: {current_start_time}")
 
-    kg_view_parameter_change = change_deployment_parameters(
+    # Only change the full_sync parameter if the flow is active
+    kg_view_parameter_change = change_deployment_parameters.submit(
         name = deployment_kg_view_flow.name,
         parameters={
-            "last_modified": last_modified,
+            # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
             "full_sync": full_sync or deployment_kg_view_flow.full_sync,
         }
     ) if deployment_kg_view_flow.active else None
 
-    kg_view_flow = run_deployment_task.submit(
+    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    kg_view_last_modified_parameter_change = change_deployment_parameters.submit(
         name=deployment_kg_view_flow.name,
-        wait_for=[kg_view_parameter_change]
-    ) if deployment_kg_view_flow.active else None
-
-    arc_db_load_parameter_change = change_deployment_parameters.submit(
-        name=deployment_kg_postgres_flow.name,
         parameters={
             "last_modified": last_modified,
+        },
+        wait_for=[kg_view_parameter_change]
+    ) if deployment_kg_view_flow.active and (
+        not check_deployment_last_flow_run_failed(deployment_kg_view_flow.name) 
+        or full_sync or deployment_kg_view_flow.full_sync
+    ) else None
+
+    # Run the knowledge graph view flow if it is active
+    kg_view_flow = run_deployment_task.submit(
+        name=deployment_kg_view_flow.name,
+        wait_for=[kg_view_parameter_change, kg_view_last_modified_parameter_change]
+    ) if deployment_kg_view_flow.active else None
+
+    # Only change the full_sync parameter if the flow is active
+    kg_to_postgres_parameter_change = change_deployment_parameters.submit(
+        name=deployment_kg_postgres_flow.name,
+        parameters={
+            # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
             "full_sync": full_sync or deployment_kg_view_flow.full_sync
         },
         wait_for=[kg_view_flow]
     ) if deployment_kg_postgres_flow.active else None
 
-    arc_db_load_result = run_deployment_task.submit(
-        name=deployment_kg_postgres_flow.name, wait_for=[kg_view_flow, arc_db_load_parameter_change]
+    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    kg_to_postgres_last_modified_parameter_change = change_deployment_parameters.submit(
+        name=deployment_kg_postgres_flow.name,
+        parameters={
+            "last_modified": last_modified,
+        },
+        wait_for=[kg_to_postgres_parameter_change]
+    ) if deployment_kg_postgres_flow.active and (
+        not check_deployment_last_flow_run_failed(deployment_kg_postgres_flow.name)
+        or full_sync or deployment_kg_postgres_flow.full_sync
+    ) else None
+
+    # Run the knowledge graph to postgres flow if it is active
+    kg_to_postgres_result = run_deployment_task.submit(
+        name=deployment_kg_postgres_flow.name, wait_for=[kg_view_flow, kg_to_postgres_parameter_change, kg_to_postgres_last_modified_parameter_change]
     ) if deployment_kg_postgres_flow.active else None
 
+    # Only change the full_sync parameter if the flow is active
     arc_alto_to_json_parameter_change = change_deployment_parameters.submit(
         name=deployment_arc_alto_to_json_flow.name,
         parameters={
-            "last_modified": last_modified,
+            # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
             "full_sync": full_sync or deployment_arc_alto_to_json_flow.full_sync,
         },
-        wait_for=[arc_db_load_result]
+        wait_for=[kg_to_postgres_result]
     ) if deployment_arc_alto_to_json_flow.active else None
 
+    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    arc_alto_to_json_last_modified_parameter_change = change_deployment_parameters.submit(
+        name=deployment_arc_alto_to_json_flow.name,
+        parameters={
+            "last_modified": last_modified,
+        },
+        wait_for=[arc_alto_to_json_parameter_change]
+    ) if deployment_arc_alto_to_json_flow.active and (
+        not check_deployment_last_flow_run_failed(deployment_arc_alto_to_json_flow.name)
+        or full_sync or deployment_arc_alto_to_json_flow.full_sync
+    ) else None
+
+    # Run the arc alto to json flow if it is active
     arc_alto_to_json_result = run_deployment_task.submit(
-        name=deployment_arc_alto_to_json_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_parameter_change]
+        name=deployment_arc_alto_to_json_flow.name, wait_for=[kg_to_postgres_result, arc_alto_to_json_parameter_change, arc_alto_to_json_last_modified_parameter_change]
     ) if deployment_arc_alto_to_json_flow.active else None
 
+    # Only change the full_sync parameter and the or_ids filter if the flow is active
     arc_indexer_parameter_change = change_deployment_parameters.submit(
         name=deployment_arc_indexer_flow.name,
         parameters={
-            "last_modified": last_modified,
             "or_ids": or_ids,
             "full_sync": full_sync or deployment_arc_indexer_flow.full_sync,
         },
         wait_for=[arc_alto_to_json_result]
 
     ) if deployment_arc_indexer_flow.active else None
+
+    # Only change the last_modified parameter if the flow is active and the last flow run did not fail or if it is a full sync
+    arc_indexer_last_modified_parameter_change = change_deployment_parameters.submit(
+        name=deployment_arc_indexer_flow.name,
+        parameters={
+            "last_modified": last_modified,
+        },
+        wait_for=[arc_indexer_parameter_change]
+    ) if deployment_arc_indexer_flow.active and (
+        not check_deployment_last_flow_run_failed(deployment_arc_indexer_flow.name)
+        or full_sync or deployment_arc_indexer_flow.full_sync
+    ) else None
+
+    # Run the arc indexer flow if it is active
     arc_indexer_result = run_deployment_task.submit(
-        name=deployment_arc_indexer_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_result, arc_indexer_parameter_change]
+        name=deployment_arc_indexer_flow.name, wait_for=[kg_to_postgres_result, arc_alto_to_json_result, arc_indexer_parameter_change, arc_indexer_last_modified_parameter_change]
     ) if deployment_arc_indexer_flow.active else None
