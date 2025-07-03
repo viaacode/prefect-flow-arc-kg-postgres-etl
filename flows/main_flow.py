@@ -83,9 +83,8 @@ def main_flow(
     arc_alto_to_json_parameter_change = change_deployment_parameters.submit(
         name=deployment_arc_alto_to_json_flow.name,
         parameters={
-            # "last_modified": last_modified,
-            # "or_ids": or_ids,
-            # "full_sync": full_sync or deployment_arc_alto_to_json_flow.full_sync,
+            "last_modified": last_modified,
+            "full_sync": full_sync or deployment_arc_alto_to_json_flow.full_sync,
         },
         wait_for=[arc_db_load_result]
     ) if deployment_arc_alto_to_json_flow.active else None
@@ -94,6 +93,16 @@ def main_flow(
         name=deployment_arc_alto_to_json_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_parameter_change]
     ) if deployment_arc_alto_to_json_flow.active else None
 
+    arc_indexer_parameter_change = change_deployment_parameters.submit(
+        name=deployment_arc_indexer_flow.name,
+        parameters={
+            "last_modified": last_modified,
+            "or_ids": or_ids,
+            "full_sync": full_sync or deployment_arc_indexer_flow.full_sync,
+        },
+        wait_for=[arc_alto_to_json_result]
+
+    ) if deployment_arc_indexer_flow.active else None
     arc_indexer_result = run_deployment_task.submit(
-        name=deployment_arc_indexer_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_result]
+        name=deployment_arc_indexer_flow.name, wait_for=[arc_db_load_result, arc_alto_to_json_result, arc_indexer_parameter_change]
     ) if deployment_arc_indexer_flow.active else None
