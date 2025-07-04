@@ -98,6 +98,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             db_conn.commit()
 
         except (Exception, DatabaseError) as error:
+            logger.error("Error while populating partition %s", partition)
             logger.error(
                 "Error while populating partition %s; rolling back. ",
                 partition,
@@ -105,6 +106,12 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             )
             db_conn.rollback()
             failed.append(partition)
+        else:
+            logger.info(
+                "Partition %s populated successfully with %s records.",
+                partition,
+                cursor.rowcount,
+            )
 
     # closing database connection.
     if db_conn:
