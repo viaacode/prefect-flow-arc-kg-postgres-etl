@@ -55,11 +55,11 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         """,
     )
     partitions = cursor.fetchall()
+    failed = []
+    last_error = None
     for row in partitions:
         partition = row["partition"]
         count = row["cnt"]
-
-        failed = []
         try:
             # when full sync, truncate partition first
             if since is None:
@@ -105,6 +105,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
                 error,
             )
             db_conn.rollback()
+            last_error = error
             failed.append(partition)
         else:
             logger.info(
@@ -122,6 +123,8 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     total = len(partitions)
     failed_count = len(failed)
     if failed_count > 0:
+        logger.error(f"Failed to populate {failed_count}/{total} partitions: {failed}.")
+        raise last_error
         return Failed(
             message=f"Failed to populate {failed_count}/{total} partitions: {failed}."
         )
