@@ -163,7 +163,8 @@ CONSTRUCT {
   :premis_stored_at ?file_premis_stored_at;
   :schema_duration ?file_schema_duration;
   :schema_name ?file_schema_name;
-  :schema_thumbnail_url ?file_schema_thumbnail_url.
+  :schema_thumbnail_url ?file_schema_thumbnail_url;
+  :peak_file ?peak.
 
 } WHERE {
 
@@ -443,6 +444,13 @@ CONSTRUCT {
           premis:storedAt/rdf:value ?file_premis_stored_at ;
           rel:isi|^ebucore:isMediaFragmentOf ?rep;
           ebucore:hasMimeType ?file_ebucore_has_mime_type .
+
+      # search for peak files
+      OPTIONAL {
+        ?file rel:isi/rel:inc ?peak.
+        ?peak premis:originalName ?peak_name; ebucore:hasMimeType "application/json".
+        FILTER(contains(?peak_name,"peak"))
+      }
 
       VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "image/jpeg" "audio/mpeg" "audio/m4a" }
       FILTER (langMatches(lang(?file_schema_name), "nl"))
