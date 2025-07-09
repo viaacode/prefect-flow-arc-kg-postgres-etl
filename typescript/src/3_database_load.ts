@@ -60,8 +60,6 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     await graph.toFile("graph.ttl.gz", { compressed: true })
     logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream (Debug mode is ${DEBUG_MODE}).`)
 
-
-
     const startGraph = performance.now()
 
     // Create a stream to read from the file
@@ -141,12 +139,9 @@ async function processGraph(graph: Graph, recordLimit?: number) {
 
     }
 }
-// Helper function to remove the created graphs and temporary tables
+
+// Helper function to remove the created temporary tables
 async function cleanup() {
-    const { destination } = await getInfo()
-    // Clear graphs
-    logInfo(`- Clearing graphs in dataset ${destination.dataset.slug}`)
-    await destination.dataset.clear("graphs")
 
     // Loop over all temp tables
     for (const tableName of tableIndex.overallOrder()) {
@@ -163,11 +158,11 @@ async function main() {
     // Get all TriplyDB information
     let { destination } = await getInfo()
 
-    let start: number
+    // Init timer
+    let start: number = performance.now()
 
     // Parse and process the gzipped TriG file from the URL
-    logInfo('--- Step 2: load temporary tables --')
-    start = performance.now()
+    logInfo('--- Step 1: load temporary tables --')
 
     // Get destination graph
     const graph = await destination.dataset.getGraph(destination.graph)
@@ -176,8 +171,9 @@ async function main() {
     await processGraph(graph, RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
-    logInfo('--- Step 3: upsert tables --')
+    // Init timer
     start = performance.now()
+    logInfo('--- Step 2: upsert tables --')
 
     // Add the table nodes to the depency graph to determine correct order
     tableIndex.entryNodes().forEach(tableName => {
@@ -201,13 +197,13 @@ async function main() {
     logInfo(`Upserting completed (${msToTime(performance.now() - start)}).`)
 
     if (!SKIP_CLEANUP) {
-        logInfo('--- Step 4: Graph cleanup --')
+        logInfo('--- Step 3: Table cleanup --')
         start = performance.now()
         await cleanup()
 
         logInfo(`Cleanup completed (${msToTime(performance.now() - start)}).`)
     } else {
-        logInfo('--- Skipping graph cleanup ---')
+        logInfo('--- Skipping table cleanup ---')
     }
 
     logInfo('--- Sync done. --')
@@ -217,10 +213,10 @@ async function main() {
 main().catch(async err => {
     logError('Error in main function', err)
     if (!SKIP_CLEANUP) {
-        logInfo('--- Graph and table cleanup because of error --')
+        logInfo('--- Table cleanup because of error --')
         await cleanup()
     } else {
-        logInfo('--- Skipping graph cleanup ---')
+        logInfo('--- Skipping table cleanup ---')
     }
     process.exit(1)
 }).finally(async () => {

@@ -166,6 +166,6 @@ def main_flow(
     ) else None
 
     # Run the arc indexer flow if it is active
-    arc_indexer_result = run_deployment_task.submit(
+    run_deployment_task.submit(
         name=deployment_arc_indexer_flow.name, wait_for=[kg_to_postgres_result, arc_alto_to_json_result, arc_indexer_parameter_change, arc_indexer_last_modified_parameter_change]
     ) if deployment_arc_indexer_flow.active else None

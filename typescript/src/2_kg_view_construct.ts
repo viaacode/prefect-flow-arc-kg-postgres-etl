@@ -9,15 +9,13 @@ import { addJobQueries, getInfo } from './helpers.js'
 
 // Main execution function
 async function main() {
-    logInfo(`Starting sync from ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+    logInfo(`Starting view construction for sync ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+
+    // Init timer
+    let start: number = performance.now()
 
     // Get all TriplyDB information
     let { account, destination } = await getInfo()
-
-    logInfo(`--- Syncing ${DATASET} to graph ${destination.graph} of ${DESTINATION_DATASET} ---`)
-    let start: number
-    logInfo('--- Step 1: Construct view ---')
-    start = performance.now()
 
     // Add all queries needed to construct the view
     const queries = await addJobQueries(account,  destination.dataset)
@@ -26,8 +24,7 @@ async function main() {
 
     // Delete the destination graph if it already exists
     try {
-        const g = await destination.dataset.getGraph(destination.graph)
-        await g.delete()
+        await destination.dataset.deleteGraph(destination.graph)
     } catch (err) {
         logInfo(`Graph ${destination.graph} does not exist.\n`)
     }
@@ -49,13 +46,11 @@ async function main() {
         })),
     })
     logInfo(`View construction completed (${msToTime(performance.now() - start)}).`)
-    logInfo('--- Sync done. --')
 }
 
 main().catch(async err => {
     logError('Error in main function', err)
     process.exit(1)
-}).finally(async () => {
 })
 
 // Disaster handling

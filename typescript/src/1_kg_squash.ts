@@ -9,24 +9,16 @@ import { addQuery, getInfo } from './helpers.js'
 
 // Main execution function
 async function main() {
-    logInfo(`Starting sync from ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+    logInfo(`Starting graph squash for sync ${DATASET} to ${DESTINATION_DATASET} (${DESTINATION_GRAPH})`)
+
+    // Init timer
+    let start: number = performance.now()
 
     // Get all TriplyDB information
     let { account, dataset, destination } = await getInfo()
 
-    logInfo(`--- Syncing ${DATASET} to graph ${destination.graph} of ${DESTINATION_DATASET} ---`)
-    let start: number
-    logInfo('--- Step 0: Squash graphs ---')
-    start = performance.now()
-
     // Compose the name of the graph
     const graphName = GRAPH_BASE + DATASET
-
-    // Delete all trailing graphs in the target dataset
-    // TODO: this is quite destructive whem the destination is somehow the source
-    // refactor to something more fine-grained
-    await destination.dataset.clear("graphs")
-    logInfo(`Cleared graphs of dataset ${DESTINATION_DATASET}.`)
 
     // Create configuration for construct query
     const params: AddQueryOptions = {
@@ -39,6 +31,14 @@ async function main() {
     // Add the query to TriplyDB
     const query = await addQuery(account, 'squash-graphs', params)
 
+    // Delete the destination graph if it already exists
+    try {
+        await destination.dataset.deleteGraph(graphName)
+    } catch (err) {
+        logInfo(`Graph ${destination.graph} does not exist.\n`)
+    }
+    logInfo(`Deleted graph ${graphName} of dataset ${DESTINATION_DATASET}.`)
+
     // Run the query as pipeline/job in TriplyDB and wait for completion
     logInfo(`Starting pipeline for ${query.slug} to ${graphName}.`)
     await query.runPipeline({
@@ -50,14 +50,11 @@ async function main() {
     })
     dataset = destination.dataset
     logInfo(`Squash graphs completed (${msToTime(performance.now() - start)}).`)
-
-    logInfo('--- Sync done. --')
 }
 
 main().catch(async err => {
     logError('Error in main function', err)
     process.exit(1)
-}).finally(async () => {
 })
 
 // Disaster handling

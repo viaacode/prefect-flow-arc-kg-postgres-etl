@@ -39,8 +39,6 @@ def kg_view_flow(
     # Run javascript which loads graph into postgres
     kg_squash_script: str = "1_kg_squash.js"
 
-    kg_view_script: str = "2_kg_view_construct.js"
-
     squashing = run_javascript.with_options(
         name=f"Sync KG to services with {kg_squash_script}",
     ).submit(
@@ -55,7 +53,9 @@ def kg_view_flow(
     ) if not skip_squash else None
 
     # Run javascript which constructs the view
-    view_construction = run_javascript.with_options(
+    kg_view_script: str = "2_kg_view_construct.js"
+    
+    run_javascript.with_options(
         name=f"Construct view with {kg_view_script}",
     ).submit(
         script_path=base_path + script_path + kg_view_script,
