@@ -19,7 +19,8 @@ prefix edm: <http://www.europeana.eu/schemas/edm/>
 PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
-
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 PREFIX : <urn:kg-to-postgres:>
 
@@ -158,6 +159,13 @@ CONSTRUCT {
   :schema_thumbnail_url ?file_schema_thumbnail_url.
 
 } WHERE {
+
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
 
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage}
@@ -392,8 +400,7 @@ CONSTRUCT {
       UNION { ?file schema:duration ?file_schema_duration }
 
       # 4. includes
-      BIND(IRI(
-           CONCAT(str(?file), "/", md5(str(?rep)))
-           ) AS ?inc)
-    }
+      BIND(IRI(CONCAT(str(?file), "/", md5(str(?rep)))) AS ?inc)
+    } 
+  }
 }

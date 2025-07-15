@@ -8,8 +8,11 @@ prefix premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
 prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX org: <http://www.w3.org/ns/org#>
 
 PREFIX : <urn:kg-to-postgres:>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 
 CONSTRUCT {
@@ -41,11 +44,17 @@ CONSTRUCT {
 
 }
 WHERE {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
     ?ie a ?ie_type;
            (schema:license|(rel:isp/schema:license)) ?schema_license;
-           schema:mentions ?person;
+           schema:maintainer ?schema_maintainer;
            prov:wasDerivedFrom/schema:dateModified ?modified .
 
     # Only include the right licenses
@@ -63,9 +72,10 @@ WHERE {
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
-
-
+  }
+  GRAPH graphs:names-nvgo {
     ?person a schema:Person; 
+        ^schema:mentions ?ie;
         schema:name ?person_schema_name.
     
     FILTER langMatches(lang(?person_schema_name), "nl")
@@ -101,8 +111,8 @@ WHERE {
     OPTIONAL {
       ?mention_resource ebucore:annotationConfidence ?confidence;
     }
+    
     BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
-
     BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
-
+  }
 }

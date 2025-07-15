@@ -31,7 +31,7 @@ CONSTRUCT {
 :schema_email ?schema_email;
 :schema_telephone ?schema_telephone.
 
-}WHERE {
+} WHERE {
 
    ?org a org:Organization;
             org:identifier ?org_identifier;
