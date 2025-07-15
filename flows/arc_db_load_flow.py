@@ -197,7 +197,7 @@ def delete_records_from_db(
     task_runner=ConcurrentTaskRunner(),
     on_completion=[save_last_run_config],
 )
-def kg_postgres_flow(
+def arc_db_load_flow(
     triplydb_block_name: str = "triplydb",
     triplydb_owner: str = "meemoo",
     triplydb_dataset: str = "knowledge-graph",
@@ -264,7 +264,7 @@ def kg_postgres_flow(
 
 
 if __name__ == "__main__":
-    kg_postgres_flow(
+    arc_db_load_flow(
         triplydb_block_name="triplydb-meemoo",
         db_block_name="local-hasura",
         base_path="./typescript/",

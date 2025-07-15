@@ -15,7 +15,7 @@ from prefect_meemoo.prefect.deployment import (
 @flow(name="prefect_flow_arc")
 def main_flow(
     deployment_kg_view_flow: DeploymentModel,
-    deployment_kg_postgres_flow: DeploymentModel,
+    deployment_arc_db_load_flow: DeploymentModel,
     deployment_arc_alto_to_json_flow: DeploymentModel,
     deployment_arc_indexer_flow: DeploymentModel,
     last_modified: DateTime = None,
@@ -35,7 +35,7 @@ def main_flow(
         logger.warning("Deployment is already running, skipping execution.")
         return
     # Deployments are never blocking if they are in full sync mode
-    blocking_deployments = [dep for dep in [deployment_kg_view_flow, deployment_kg_postgres_flow, deployment_arc_indexer_flow, deployment_arc_alto_to_json_flow, deployment_arc_indexer_flow] if not dep.full_sync]
+    blocking_deployments = [dep for dep in [deployment_kg_view_flow, deployment_arc_db_load_flow, deployment_arc_indexer_flow, deployment_arc_alto_to_json_flow, deployment_arc_indexer_flow] if not dep.full_sync]
     if check_deployment_blocking(blocking_deployments)  and not full_sync:
         logger.warning("Blocking deployments are running, skipping execution.")
         return
@@ -46,7 +46,7 @@ def main_flow(
     # Check if the last flow run of the knowledge graph view flow failed
     kg_view_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_kg_view_flow.name)
     # Check if the last flow run of the knowledge graph to postgres flow failed
-    kg_to_postgres_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_kg_postgres_flow.name)
+    kg_to_postgres_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_arc_db_load_flow.name)
     # Check if the last flow run of the arc alto to json flow failed
     arc_alto_to_json_last_flow_run_failed = check_deployment_last_flow_run_failed(deployment_arc_alto_to_json_flow.name)
     # Check if the last flow run of the arc indexer flow failed
@@ -81,30 +81,30 @@ def main_flow(
 
     # Only change the full_sync parameter if the flow is active
     kg_to_postgres_parameter_change = change_deployment_parameters.submit(
-        name=deployment_kg_postgres_flow.name,
+        name=deployment_arc_db_load_flow.name,
         parameters={
             # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
             "full_sync": full_sync or deployment_kg_view_flow.full_sync
         },
         wait_for=[kg_view_flow]
-    ) if deployment_kg_postgres_flow.active else None
+    ) if deployment_arc_db_load_flow.active else None
 
     # Only change the last_modified parameter if the flow is active and the last flow run or its dependant flow runs did not fail or if it is a full sync
     kg_to_postgres_last_modified_parameter_change = change_deployment_parameters.submit(
-        name=deployment_kg_postgres_flow.name,
+        name=deployment_arc_db_load_flow.name,
         parameters={
             "last_modified": last_modified,
         },
         wait_for=[kg_to_postgres_parameter_change]
-    ) if deployment_kg_postgres_flow.active and (
+    ) if deployment_arc_db_load_flow.active and (
         not any([kg_view_last_flow_run_failed, kg_to_postgres_last_flow_run_failed])
-        or full_sync or deployment_kg_postgres_flow.full_sync
+        or full_sync or deployment_arc_db_load_flow.full_sync
     ) else None
 
     # Run the knowledge graph to postgres flow if it is active
     kg_to_postgres_result = run_deployment_task.submit(
-        name=deployment_kg_postgres_flow.name, wait_for=[kg_view_flow, kg_to_postgres_parameter_change, kg_to_postgres_last_modified_parameter_change]
-    ) if deployment_kg_postgres_flow.active else None
+        name=deployment_arc_db_load_flow.name, wait_for=[kg_view_flow, kg_to_postgres_parameter_change, kg_to_postgres_last_modified_parameter_change]
+    ) if deployment_arc_db_load_flow.active else None
 
     # Only change the full_sync parameter if the flow is active
     arc_alto_to_json_parameter_change = change_deployment_parameters.submit(

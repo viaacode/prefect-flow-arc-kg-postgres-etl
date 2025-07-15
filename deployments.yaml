@@ -8,6 +8,6 @@ deployments:
     flow: kg_view_flow
     queue: q-knowledge-graph
   - name: kg-postgres
-    file: flows/kg_postgres_flow.py
-    flow: kg_postgres_flow
+    file: flows/arc_db_load_flow.py
+    flow: arc_db_load_flow
     queue: q-knowledge-graph
