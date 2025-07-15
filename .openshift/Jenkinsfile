@@ -1,3 +1,4 @@
+def toDeploy = true
 pipeline {
     agent { label 'node' }
     options {
@@ -9,7 +10,7 @@ pipeline {
         BASE_IMG_NAME = 'prefecthq/prefect'
         OC_URL = 'https://c113-e.private.eu-de.containers.cloud.ibm.com:30227'
         JIRA_URL = 'meemoo.atlassian.net'
-        APP_NAME = 'prefect-flow-arc-kg-postgres-etl'
+        APP_NAME = 'prefect-flow-arc-etl'
         PREFECT_QUEUE = 'q-kg'
         REGISTRY = 'default-route-openshift-image-registry.meemoo2-2bc857e5f10eb63ab790a3a1d19a696c-i000.eu-de.containers.appdomain.cloud'
         REGISTRY_SCHEMA = "https://$REGISTRY"
@@ -21,6 +22,7 @@ pipeline {
             steps {
                 script {
                     env.GIT_SHORT_COMMIT = sh(script: "printf \$(git rev-parse --short ${GIT_COMMIT})", returnStdout: true)
+                    env.GIT_COMMIT_MESSAGE = sh(script: "git log --format=%B -n 1 ${GIT_COMMIT}", returnStdout: true)
                     env.IMAGE_TAG = sh(script: 'git describe --tags || echo latest', returnStdout: true)
                     // The name used for the build config based on the image tag
                     // Replace '.' with '_' as '.' is not allowed.
@@ -39,6 +41,7 @@ pipeline {
             steps {
                 script {
                     getPrefectApiAndVersion('int')
+                    env.DEPLOYMENT_ENV = 'int'
                 }
             }
             post {
@@ -57,6 +60,7 @@ pipeline {
             steps {
                 script {
                     getPrefectApiAndVersion('qas')
+                    env.DEPLOYMENT_ENV = 'qas'
                 }
             }
             post {
@@ -72,12 +76,27 @@ pipeline {
             steps {
                 script {
                     getPrefectApiAndVersion('prd')
+                    env.DEPLOYMENT_ENV = 'prd'
                 }
             }
         }
         stage('Test code') {
             steps {
                 sh 'echo "No tests implemented"'
+            }
+        }
+        stage('To deploy or not to deploy') {
+            steps {
+                script {
+                    sh 'echo $CHANGE_BRANCH'
+                    if (env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('DND')){
+                        toDeploy = false
+                        sh 'echo "Not deploying"'
+                    }
+                    else {
+                        sh 'echo "Deploying"'
+                    }
+                }
             }
         }
         stage('Build and push docker') {
@@ -92,13 +111,19 @@ pipeline {
                     withCredentials([string(credentialsId: 'triplydb_gitlab_token', variable: 'triplydb_gitlab_token')]) {
                         docker.withRegistry(REGISTRY_SCHEMA, REGISTRY_CREDENTIAL) {
                             dockerImage = docker.build("$REGISTRY/prefect/$APP_NAME:$GIT_SHORT_COMMIT", "--no-cache --build-arg TRIPLYDB_GITLAB_TOKEN=$triplydb_gitlab_token .")
-                            dockerImage.push()
+                            if (toDeploy) {
+                                dockerImage.push()
+                            }
                         }
                     }
                 }
             }
         }
+        
         stage('Build Python Infra Block') {
+            when {
+                expression { toDeploy == true }
+            }
             steps {
                 script {
                     runInPrefectContainer("python infra_block.py --image $REGISTRY/prefect/$APP_NAME:$GIT_SHORT_COMMIT --name ${APP_NAME}-$DEPLOYMENT_ENV --registry docker-registry")
@@ -106,9 +131,26 @@ pipeline {
             }
         }
         stage('Build and apply prefect deployment') {
+            when {
+                expression { 
+                    return !(env.GIT_COMMIT_MESSAGE?.contains('SKIP_DEPLOY')) && toDeploy == true 
+                }
+            }
             steps {
                 script {
-                    runInPrefectContainer("prefect deployment build flows/main_flow.py:main_flow -n ${APP_NAME}-$DEPLOYMENT_ENV -ib docker-container/${APP_NAME}-$DEPLOYMENT_ENV --skip-upload -q $PREFECT_QUEUE --apply")
+                    sh "docker image prune -af"
+                    def deployments = readYaml file: 'deployments.yaml'
+                    for (deployment in deployments.deployments) {
+                        if (deployment.containsKey('env')) {
+                            if (deployment.env != env.DEPLOYMENT_ENV) {
+                                continue
+                            }
+                        }
+                        def deploy_command = deployment.name ? 
+                            "prefect deployment build ${deployment.file}:${deployment.flow} -n ${APP_NAME}-${deployment.name}-$DEPLOYMENT_ENV -ib docker-container/${APP_NAME}-$DEPLOYMENT_ENV --skip-upload -q ${deployment.queue} --apply"
+                            : "prefect deployment build ${deployment.file}:${deployment.flow} -n ${APP_NAME}-$DEPLOYMENT_ENV -ib docker-container/${APP_NAME}-$DEPLOYMENT_ENV --skip-upload -q ${deployment.queue} --apply"
+                        runInPrefectContainer(deploy_command)
+                    }                
                 }
             }
             
@@ -154,7 +196,6 @@ void setGitHubBuildStatus(String message, String state) {
 }
 void getPrefectApiAndVersion(String deploy_env) {
     String prefect_api = ''
-    env.DEPLOYMENT_ENV = deploy_env
     switch (deploy_env) {
         case 'int':
             env.PREFECT_API = "${PREFECT_URL_INT}"

@@ -1,0 +1,13 @@
+deployments:
+  - name: ''
+    file: flows/main_flow.py
+    flow: main_flow
+    queue: q-knowledge-graph
+  - name: kg-view
+    file: flows/kg_view_flow.py
+    flow: kg_view_flow
+    queue: q-knowledge-graph
+  - name: db-load
+    file: flows/arc_db_load_flow.py
+    flow: arc_db_load_flow
+    queue: q-knowledge-graph
