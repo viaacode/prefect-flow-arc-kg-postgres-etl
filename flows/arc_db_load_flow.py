@@ -36,7 +36,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         cursor_factory=RealDictCursor,
     )
     db_conn.autocommit = False
-
+ 
     # Create cursor
     cursor = db_conn.cursor()
 
@@ -47,8 +47,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         ie.schema_maintainer as id, 
         lower(replace(org_identifier, '-','_')) as partition,
         count(*) as cnt
-        FROM
-        graph.intellectual_entity ie 
+        FROM graph.intellectual_entity ie 
         JOIN graph.organization o ON ie.schema_maintainer = o.id
         GROUP BY 1,2 
         ORDER BY 3 ASC
@@ -61,6 +60,18 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         partition = row["partition"]
         count = row["cnt"]
         try:
+            # Try to create partition
+            create_query = sql.SQL(
+                "CREATE TABLE IF NOT EXISTS {db_table} PARTITION OF graph.index_documents FOR VALUES IN (%(id)s);"
+                ).format(
+                db_table=sql.Identifier("graph", partition),
+            )
+            cursor.execute(create_query, {"id": row["id"]})
+            logger.info(
+                "Created partition %s in index_documents table.",
+                partition,
+            )
+
             # when full sync, truncate partition first
             if since is None:
                 sql_query = sql.SQL("TRUNCATE {db_table};").format(

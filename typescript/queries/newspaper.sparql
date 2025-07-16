@@ -361,9 +361,6 @@ CONSTRUCT {
       } AS ?car_ebucore_has_captioning)
     }
 
-
-
-
     UNION {
       # 3. Representation
       # - digital reps
