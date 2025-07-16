@@ -109,7 +109,6 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             db_conn.commit()
 
         except (Exception, DatabaseError) as error:
-            logger.error("Error while populating partition %s", partition)
             logger.error(
                 "Error while populating partition %s; rolling back. ",
                 partition,
@@ -125,6 +124,42 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
                 cursor.rowcount,
             )
 
+    # Drop partitions that are no longer there
+    if since is None:
+        # Get all partitions that were not touched
+        cursor.execute(
+            """
+            SELECT lower(replace(index, '-','_')) as partition,
+            FROM graph.index_documents 
+            WHERE index NOT IN(%(id)s)
+            """,
+            {id: [row["id"] for row in partitions]}
+        )
+        deleted_partitions = cursor.fetchall()
+        for row in deleted_partitions:
+            partition = row["partition"]
+            try:
+                sql_query = sql.SQL("DROP {db_table};").format(
+                    db_table=sql.Identifier("graph", partition),
+                )
+                cursor.execute(sql_query)
+                logger.info(
+                    "Dropped partition %s in index_documents table.",
+                    partition,
+                )
+                # Commit your changes in the database
+                db_conn.commit()
+
+            except (Exception, DatabaseError) as error:
+                logger.error(
+                    "Error while populating partition %s; rolling back. ",
+                    partition,
+                    error,
+                )
+                db_conn.rollback()
+
+    
+    
     # closing database connection.
     if db_conn:
         cursor.close()
