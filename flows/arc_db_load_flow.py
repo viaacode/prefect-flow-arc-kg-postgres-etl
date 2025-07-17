@@ -56,9 +56,11 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     partitions = cursor.fetchall()
     failed = []
     last_error = None
+    ids = []
     for row in partitions:
         partition = row["partition"]
         count = row["cnt"]
+        ids.append(row["id"])
         try:
             # Try to create partition
             create_query = sql.SQL(
@@ -129,13 +131,14 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         # Get all partitions that were not touched
         cursor.execute(
             """
-            SELECT lower(replace(index, '-','_')) as partition,
+            SELECT lower(replace(index, '-','_')) as partition
             FROM graph.index_documents 
             WHERE index NOT IN(%(id)s)
             """,
-            {id: [row["id"] for row in partitions]}
+            {"id": ids}
         )
         deleted_partitions = cursor.fetchall()
+        logger.info("Cleaning partitions that are no longer there: %s", list(deleted_partitions))
         for row in deleted_partitions:
             partition = row["partition"]
             try:
