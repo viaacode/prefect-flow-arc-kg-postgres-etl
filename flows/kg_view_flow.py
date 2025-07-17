@@ -35,7 +35,7 @@ def kg_view_flow(
     triply_creds = TriplyDBCredentials.load(triplydb_block_name)
 
     # Run javascript which constructs the view
-    kg_view_script: str = "2_kg_view_construct.js"
+    kg_view_script: str = "1_kg_view_construct.js"
     
     run_javascript.with_options(
         name=f"Construct view with {kg_view_script}",

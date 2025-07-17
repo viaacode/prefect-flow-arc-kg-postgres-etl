@@ -276,7 +276,7 @@ def arc_db_load_flow(
     postgres_creds = DatabaseCredentials.load(db_block_name)
 
     # Run javascript which loads graph into postgres
-    load_db_script: str = "3_database_load.js"
+    load_db_script: str = "2_database_load.js"
 
     loading = run_javascript.with_options(
         name=f"Sync KG to services with {load_db_script}",
