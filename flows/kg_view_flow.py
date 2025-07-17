@@ -3,8 +3,7 @@ import os
 from pendulum.datetime import DateTime
 from prefect import flow
 from prefect.task_runners import ConcurrentTaskRunner
-from prefect_meemoo.config.last_run import (get_last_run_config,
-                                            save_last_run_config)
+from prefect_meemoo.config.last_run import save_last_run_config
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 
@@ -36,7 +35,7 @@ def kg_view_flow(
 
     # Run javascript which constructs the view
     kg_view_script: str = "1_kg_view_construct.js"
-    
+
     run_javascript.with_options(
         name=f"Construct view with {kg_view_script}",
     ).submit(
@@ -48,8 +47,9 @@ def kg_view_flow(
         triplydb_destination_dataset=triplydb_destination_dataset,
         triplydb_destination_graph=triplydb_destination_graph,
         logging_level=logging_level,
-        since=last_modified if not full_sync else None
+        since=last_modified if not full_sync else None,
     )
+
 
 if __name__ == "__main__":
     kg_view_flow(

@@ -1,14 +1,11 @@
 import os
 from datetime import datetime
-from enum import Enum
 
 from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
-from prefect.deployments import run_deployment
 from prefect.states import Completed, Failed
 from prefect.task_runners import ConcurrentTaskRunner
-from prefect_meemoo.config.last_run import (get_last_run_config,
-                                            save_last_run_config)
+from prefect_meemoo.config.last_run import save_last_run_config
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
@@ -18,7 +15,6 @@ from psycopg2.extras import RealDictCursor
 
 def get_min_date(format="%Y-%m-%dT%H:%M:%S.%fZ"):
     return datetime.min.strftime(format)
-
 
 
 @task
@@ -112,10 +108,9 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             db_conn.commit()
 
         except (Exception, DatabaseError) as error:
-            logger.error(
+            logger.exception(
                 "Error while populating partition %s; rolling back. ",
                 partition,
-                error,
             )
             db_conn.rollback()
             last_error = error
@@ -172,11 +167,11 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     total = len(partitions)
     failed_count = len(failed)
     if failed_count > 0:
-        logger.error(f"Failed to populate {failed_count}/{total} partitions: {failed}.")
-        raise last_error
-        return Failed(
-            message=f"Failed to populate {failed_count}/{total} partitions: {failed}."
+        logger.error(
+            "Failed to populate %s/%s partitions: %s.", failed_count, total, failed,
         )
+        raise last_error
+
     return Completed(message=f"Batch succeeded: {total} partitions populated.")
 
 
@@ -227,11 +222,12 @@ def delete_records_from_db(
         db_conn.commit()
         logger.info("Database deletes succesful")
 
-    except (Exception, DatabaseError) as error:
-        logger.error(
-            "Error in transction Reverting all other operations of a transction ", error
+    except (Exception, DatabaseError):
+        logger.exception(
+            "Error in transction Reverting all other operations of a transction.",
         )
         db_conn.rollback()
+        raise
 
     finally:
         # closing database connection.
@@ -278,26 +274,30 @@ def arc_db_load_flow(
     # Run javascript which loads graph into postgres
     load_db_script: str = "2_database_load.js"
 
-    loading = run_javascript.with_options(
-        name=f"Sync KG to services with {load_db_script}",
-    ).submit(
-        script_path=base_path + script_path + load_db_script,
-        base_path=base_path,
-        triplydb=triply_creds,
-        triplydb_owner=triplydb_owner,
-        triplydb_dataset=triplydb_dataset,
-        triplydb_destination_dataset=triplydb_destination_dataset,
-        triplydb_destination_graph=triplydb_destination_graph,
-        postgres=postgres_creds,
-        record_limit=record_limit,
-        batch_size=db_loading_batch_size,
-        since=last_modified if not full_sync else None,
-        debug_mode=debug_mode,
-        logging_level=logging_level,
-        postgres_ssl=db_ssl,
-        postgres_pool_min=db_pool_min,
-        postgres_pool_max=db_pool_max,
-    ) if not skip_load else None
+    loading = (
+        run_javascript.with_options(
+            name=f"Sync KG to services with {load_db_script}",
+        ).submit(
+            script_path=base_path + script_path + load_db_script,
+            base_path=base_path,
+            triplydb=triply_creds,
+            triplydb_owner=triplydb_owner,
+            triplydb_dataset=triplydb_dataset,
+            triplydb_destination_dataset=triplydb_destination_dataset,
+            triplydb_destination_graph=triplydb_destination_graph,
+            postgres=postgres_creds,
+            record_limit=record_limit,
+            batch_size=db_loading_batch_size,
+            since=last_modified if not full_sync else None,
+            debug_mode=debug_mode,
+            logging_level=logging_level,
+            postgres_ssl=db_ssl,
+            postgres_pool_min=db_pool_min,
+            postgres_pool_max=db_pool_max,
+        )
+        if not skip_load
+        else None
+    )
 
     # Populate the index table
     populating = populate_index_table.submit(
