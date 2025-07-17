@@ -7,6 +7,9 @@ prefix prov: <http://www.w3.org/ns/prov#>
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX graph: <https://data.hetarchief.be/graph/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX org: <http://www.w3.org/ns/org#>
 
 PREFIX : <urn:kg-to-postgres:>
 
@@ -40,6 +43,12 @@ CONSTRUCT {
   :collection_id ?id.
 }
 WHERE {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     # Only get collections where the IEs are disseminated
    VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage }
    ?ie a ?ie_type;
@@ -91,38 +100,40 @@ WHERE {
     UNION { ?id schema:isPartOf ?schema_is_part_of }
     
     OPTIONAL {
-      ?id a schema:Newspaper;
-          schema:identifier ?schema_identifier;
-          schema:hasPart ?serie.
-      {}
-      UNION {
-        ?id schema:inLanguage ?schema_in_language.
-        BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
+      GRAPH graph:anet {
+        ?id a schema:Newspaper;
+            schema:identifier ?schema_identifier;
+            schema:hasPart ?serie.
+        {}
+        UNION {
+          ?id schema:inLanguage ?schema_in_language.
+          BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
+        }
+    
+        UNION {
+          ?id schema:alternateName ?schema_alternate_name.
+          BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
+        }
+    
+        UNION {
+          ?serie schema:locationCreated/schema:name ?schema_location_created.
+          FILTER langMatches(lang(?schema_location_created), "nl")
+        }
+    
+        UNION { ?serie schema:endDate ?schema_end_date. }
+        UNION { ?serie schema:startDate ?schema_start_date. }
+        UNION { 
+          # TODO: can also result into entry in graph.thing table
+          ?serie schema:publisher/schema:name ?schema_publisher. 
+          FILTER langMatches(lang(?schema_publisher), "nl")
+        }
+    
+        #UNION { ?id bf:preceededBy ?bibframe_preceeded_by }
+    
+        #UNION { ?id bf:succeededBy ?bibframe_succeeded_by }
+    
+        #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
       }
-  
-      UNION {
-        ?id schema:alternateName ?schema_alternate_name.
-        BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
-      }
-  
-      UNION {
-        ?serie schema:locationCreated/schema:name ?schema_location_created.
-        FILTER langMatches(lang(?schema_location_created), "nl")
-      }
-  
-      UNION { ?serie schema:endDate ?schema_end_date. }
-      UNION { ?serie schema:startDate ?schema_start_date. }
-      UNION { 
-        # TODO: can also result into entry in graph.thing table
-        ?serie schema:publisher/schema:name ?schema_publisher. 
-        FILTER langMatches(lang(?schema_publisher), "nl")
-      }
-  
-      #UNION { ?id bf:preceededBy ?bibframe_preceeded_by }
-  
-      #UNION { ?id bf:succeededBy ?bibframe_succeeded_by }
-  
-      #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
     }
-        
+  }
 }

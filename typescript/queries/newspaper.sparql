@@ -20,9 +20,9 @@ PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
-PREFIX graph: <https://data.hetarchief.be/graph/>
 
 PREFIX : <urn:kg-to-postgres:>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 
 CONSTRUCT {
@@ -284,13 +284,26 @@ CONSTRUCT {
     UNION { ?ie ebucore:synopsis ?ebucore_synopsis }
 
     UNION {
-      ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
+      ?ie schema:copyrightHolder ?schema_copyright_holder_c.
+      
+      {} UNION {
+        GRAPH graph:thesauri {
+          ?schema_copyright_holder_c skos:prefLabel ?schema_copyright_holder.
+        }
+      }
+      UNION {
+        ?schema_copyright_holder_c schema:name ?schema_copyright_holder.
+      }
+      
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
     }
     # krant
-    UNION{ 
-      ?ie bf:edition/skos:prefLabel ?bibframe_edition .
-      FILTER langMatches(lang(?bibframe_edition), "nl")
+    UNION { 
+      ?ie bf:edition ?bibframe_edition_c.
+      GRAPH graph:thesauri {
+        ?bibframe_edition_c skos:prefLabel ?bibframe_edition .
+        FILTER langMatches(lang(?bibframe_edition), "nl")
+      }
     }
 
     # - roles & things
@@ -324,12 +337,18 @@ CONSTRUCT {
       # - physical carrier
       ?pc a haObj:PhysicalCarrier;
       schema:name ?car_schema_name;
-      premis:medium/skos:prefLabel ?car_premis_medium.
+      premis:medium ?car_premis_medium_c 
+      GRAPH graph:thesauri {
+        ?car_premis_medium_c skos:prefLabel ?car_premis_medium.
+      }
       FILTER (langMatches(lang(?car_schema_name), "nl") && langMatches(lang(?car_premis_medium), "nl"))
 
       {} UNION {
-        ?crep bf:productionMethod/skos:prefLabel ?car_bibframe_production_method.
-        FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        ?crep bf:productionMethod ?car_bibframe_production_method_c.
+        GRAPH graph:thesauri {
+          ?car_bibframe_production_method_c skos:prefLabel ?car_bibframe_production_method.
+          FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        }
       }
 
       UNION {

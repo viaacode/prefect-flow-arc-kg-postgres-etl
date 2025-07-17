@@ -383,8 +383,8 @@ CONSTRUCT {
       {} UNION {
         ?crep bf:productionMethod ?car_bibframe_production_method_c.
         GRAPH graph:thesauri {
-          car_bibframe_production_method_c skos:prefLabel ?car_bibframe_production_method.
-          ILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+          ?car_bibframe_production_method_c skos:prefLabel ?car_bibframe_production_method.
+          FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
         }
       }
       

@@ -72,47 +72,49 @@ WHERE {
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
+
+    GRAPH <https://meemoo.triply.cc/meemoo/knowledge-graph/graphs/names-nvgo> {
+      ?person a schema:Person; 
+          ^schema:mentions ?ie;
+          schema:name ?person_schema_name.
+      
+      FILTER langMatches(lang(?person_schema_name), "nl")
+  
+      {}
+      UNION {
+          ?person schema:deathDate ?person_schema_death_date
+      }
+  
+      UNION {
+          ?person schema:birthDate ?person_schema_birth_date
+      }
+  
+      UNION {
+          ?person schema:birthPlace/schema:name ?person_schema_birth_place
+      }
+  
+      UNION {
+          ?person schema:deathPlace/schema:name ?person_schema_death_place
+      }
+  
+      ?mention a ebucore:MediaFragment;
+              ebucore:isMediaFragmentOf ?ie;
+              ebucore:width ?mention_width;
+              ebucore:height ?mention_height;
+              ebucore:regionDelimX ?mention_x;
+              ebucore:regionDelimY ?mention_y.
+                  
+      ?mention_resource a ebucore:TextAnnotation;
+              ebucore:hasAnnotationRelatedAgent ?person;
+              ebucore:isAnnotatedMediaResource ?mention.
+  
+      OPTIONAL {
+        ?mention_resource ebucore:annotationConfidence ?confidence;
+      }
+      BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
+  
+      BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
+    }
   }
-  GRAPH graphs:names-nvgo {
-    ?person a schema:Person; 
-        ^schema:mentions ?ie;
-        schema:name ?person_schema_name.
-    
-    FILTER langMatches(lang(?person_schema_name), "nl")
-
-    {}
-    UNION {
-        ?person schema:deathDate ?person_schema_death_date
-    }
-
-    UNION {
-        ?person schema:birthDate ?person_schema_birth_date
-    }
-
-    UNION {
-        ?person schema:birthPlace/schema:name ?person_schema_birth_place
-    }
-
-    UNION {
-        ?person schema:deathPlace/schema:name ?person_schema_death_place
-    }
-
-    ?mention a ebucore:MediaFragment;
-            ebucore:isMediaFragmentOf ?ie;
-            ebucore:width ?mention_width;
-            ebucore:height ?mention_height;
-            ebucore:regionDelimX ?mention_x;
-            ebucore:regionDelimY ?mention_y.
-                
-    ?mention_resource a ebucore:TextAnnotation;
-            ebucore:hasAnnotationRelatedAgent ?person;
-            ebucore:isAnnotatedMediaResource ?mention.
-
-    OPTIONAL {
-      ?mention_resource ebucore:annotationConfidence ?confidence;
-    }
-    
-    BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
-    BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
-  }
+  
 }
