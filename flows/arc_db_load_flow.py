@@ -130,16 +130,9 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
     # Drop partitions that are no longer there
     if since is None:
         # Get all partitions that were not touched
-        logger.info(cursor.mogrify(
-                        """
-            SELECT lower(replace(index, '-','_')) as partition
-            FROM graph.index_documents 
-            WHERE index NOT IN %(indexes)s
-            """,
-            {"indexes": tuple(indexes)}))
         cursor.execute(
             """
-            SELECT lower(replace(index, '-','_')) as partition
+            SELECT DISTINCT lower(replace(index, '-','_')) as partition
             FROM graph.index_documents 
             WHERE index NOT IN %(indexes)s
             """,
