@@ -43,12 +43,12 @@ CONSTRUCT {
   :collection_id ?id.
 }
 WHERE {
-  GRAPH graph:organization {
-    ?schema_maintainer a haOrg:ContentPartner ;
-    org:identifier ?maintainer_id
-  }
-  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
-  GRAPH ?ORGraph {
+  # GRAPH graph:organization {
+  #   ?schema_maintainer a haOrg:ContentPartner ;
+  #   org:identifier ?maintainer_id
+  # }
+  # BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  # GRAPH ?ORGraph {
     # Only get collections where the IEs are disseminated
    VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage }
    ?ie a ?ie_type;
@@ -98,8 +98,7 @@ WHERE {
     {}
     UNION { ?id schema:seasonNumber ?schema_season_number }
     UNION { ?id schema:isPartOf ?schema_is_part_of }
-    
-    OPTIONAL {
+    UNION {
       GRAPH graph:anet {
         ?id a schema:Newspaper;
             schema:identifier ?schema_identifier;
@@ -135,5 +134,5 @@ WHERE {
         #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
       }
     }
-  }
+  #}
 }
