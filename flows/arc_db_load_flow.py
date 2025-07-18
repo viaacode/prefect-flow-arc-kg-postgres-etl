@@ -36,7 +36,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         cursor_factory=RealDictCursor,
     )
     db_conn.autocommit = False
-
+ 
     # Create cursor
     cursor = db_conn.cursor()
 
@@ -45,22 +45,36 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         """
         SELECT 
         ie.schema_maintainer as id, 
+        lower(org_identifier) as index,
         lower(replace(org_identifier, '-','_')) as partition,
         count(*) as cnt
-        FROM
-        graph.intellectual_entity ie 
+        FROM graph.intellectual_entity ie 
         JOIN graph.organization o ON ie.schema_maintainer = o.id
-        GROUP BY 1,2 
-        ORDER BY 3 ASC
+        GROUP BY 1,2,3 
+        ORDER BY 4 ASC
         """,
     )
     partitions = cursor.fetchall()
     failed = []
     last_error = None
+    indexes = []
     for row in partitions:
         partition = row["partition"]
         count = row["cnt"]
+        indexes.append(row["index"])
         try:
+            # Try to create partition
+            create_query = sql.SQL(
+                "CREATE TABLE IF NOT EXISTS {db_table} PARTITION OF graph.index_documents FOR VALUES IN (%(index)s);"
+                ).format(
+                db_table=sql.Identifier("graph", partition),
+            )
+            cursor.execute(create_query, {"index": row["index"]})
+            logger.info(
+                "Created partition %s in index_documents table.",
+                partition,
+            )
+
             # when full sync, truncate partition first
             if since is None:
                 sql_query = sql.SQL("TRUNCATE {db_table};").format(
@@ -98,7 +112,6 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
             db_conn.commit()
 
         except (Exception, DatabaseError) as error:
-            logger.error("Error while populating partition %s", partition)
             logger.error(
                 "Error while populating partition %s; rolling back. ",
                 partition,
@@ -114,6 +127,42 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
                 cursor.rowcount,
             )
 
+    # Drop partitions that are no longer there
+    if since is None:
+        # Get all partitions that were not touched
+        cursor.execute(
+            """
+            SELECT DISTINCT lower(replace(index, '-','_')) as partition
+            FROM graph.index_documents 
+            WHERE index NOT IN %(indexes)s
+            """,
+            {"indexes": tuple(indexes)}
+        )
+        deleted_partitions = cursor.fetchall()
+        for row in deleted_partitions:
+            deleted_partition = row["partition"]
+            try:
+                sql_query = sql.SQL("DROP {db_table};").format(
+                    db_table=sql.Identifier("graph", deleted_partition),
+                )
+                cursor.execute(sql_query)
+                logger.info(
+                    "Dropped partition %s in index_documents table.",
+                    deleted_partition,
+                )
+                # Commit your changes in the database
+                db_conn.commit()
+
+            except (Exception, DatabaseError) as error:
+                logger.error(
+                    "Error while populating partition %s; rolling back. ",
+                    partition,
+                    error,
+                )
+                db_conn.rollback()
+
+    
+    
     # closing database connection.
     if db_conn:
         cursor.close()
