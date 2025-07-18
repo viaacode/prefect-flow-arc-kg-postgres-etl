@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
-from prefect.states import Completed, Failed
+from prefect.states import Completed
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_meemoo.config.last_run import save_last_run_config
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
@@ -148,15 +148,14 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
                 # Commit your changes in the database
                 db_conn.commit()
 
-            except (Exception, DatabaseError) as error:
-                logger.error(
+            except (Exception, DatabaseError):
+                logger.exception(
                     "Error while populating partition %s; rolling back. ",
                     partition,
-                    error,
                 )
                 db_conn.rollback()
+                raise
 
-    
     
     # closing database connection.
     if db_conn:
