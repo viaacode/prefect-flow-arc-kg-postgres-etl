@@ -15,10 +15,10 @@ async function main() {
     let start: number = performance.now()
 
     // Get all TriplyDB information
-    let { account, destination } = await getInfo()
+    let { account, destination, dataset } = await getInfo()
 
     // Add all queries needed to construct the view
-    const queries = await addJobQueries(account,  destination.dataset)
+    const queries = await addJobQueries(account,  dataset)
 
     logInfo(`Deleting destination graph ${destination.graph}.`)
 
