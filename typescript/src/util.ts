@@ -34,8 +34,10 @@ export function getErrorMessage(e: unknown): string | undefined {
         return e.toString() // works, `e` narrowed to string
     } else if (e instanceof Error) {
         return e.message // works, `e` narrowed to Error
+    } else if (typeof e === 'object' && e !== null && 'message' in e) {
+        return (e as { message?: unknown }).message?.toString();
     }
-    return
+    return "Unknown error";
 }
 
 // Helper function to check if a date is a Date object
