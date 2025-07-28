@@ -1,6 +1,6 @@
 import { TableInfo, TableNode, Batch } from './types.js'
 import { logInfo, logError, logDebug, isValidDate } from './util.js'
-import { dbConfig } from './configuration.js'
+import { dbConfig, DEBUG_MODE } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -153,7 +153,12 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
             }
 
             // Drop temp table when done
-            await t.none(qTemplates.dropTable, tempTable)
+            if(!DEBUG_MODE) {
+                await t.none(qTemplates.dropTable, tempTable)
+                logInfo(`Dropped temporary table ${tempTable} after merge.`)
+            } else {
+                logDebug(`DEBUG_MODE is enabled, not dropping temporary table ${tempTable}.`)
+            }
             return rslt
         })
     } catch (err) {
