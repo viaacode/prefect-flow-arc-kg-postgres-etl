@@ -228,6 +228,7 @@ async function main() {
     try {
       await main(); // or just `main()` if it's sync
     } catch (err) {
+        logError('Error in main function')
         logError('Error in main function', err)
         if (!SKIP_CLEANUP) {
             logInfo('--- Table cleanup because of error --')

@@ -9,7 +9,7 @@ export function logInfo(message: any, ...optionalParams: any[]) {
     logPrefect('INFO', message, optionalParams)
 }
 
-export function logError(message: any, error: unknown, ...optionalParams: any[]) {
+export function logError(message: any, error?: unknown, ...optionalParams: any[]) {
     logPrefect('ERROR', message + ':' + getErrorMessage(error), optionalParams)
 }
 
