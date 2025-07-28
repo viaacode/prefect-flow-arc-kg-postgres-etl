@@ -230,7 +230,7 @@ async function main() {
     } catch (err) {
         logError('Error in main function')
         logError('Error in main function', err)
-        if (!SKIP_CLEANUP) {
+        if (!SKIP_CLEANUP && !DEBUG_MODE) {
             logInfo('--- Table cleanup because of error --')
             await cleanup()
         } else {
