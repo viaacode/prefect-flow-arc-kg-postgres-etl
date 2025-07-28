@@ -210,19 +210,37 @@ async function main() {
 }
 
 
-main().catch(async err => {
-    logError('Error in main function', err)
-    if (!SKIP_CLEANUP) {
-        logInfo('--- Table cleanup because of error --')
-        await cleanup()
-    } else {
-        logInfo('--- Skipping table cleanup ---')
+// main().catch(async err => {
+//     logError('Error in main function', err)
+//     if (!SKIP_CLEANUP) {
+//         logInfo('--- Table cleanup because of error --')
+//         await cleanup()
+//     } else {
+//         logInfo('--- Skipping table cleanup ---')
+//     }
+//     process.exit(1)
+// }).finally(async () => {
+//     logDebug('Closing connection pool')
+//     await closeConnectionPool()
+// })
+
+(async () => {
+    try {
+      await main(); // or just `main()` if it's sync
+    } catch (err) {
+        logError('Error in main function', err)
+        if (!SKIP_CLEANUP) {
+            logInfo('--- Table cleanup because of error --')
+            await cleanup()
+        } else {
+            logInfo('--- Skipping table cleanup ---')
+        }
+        throw err; // Re-throw to ensure the error is caught by the disaster handling
+    } finally {
+        logDebug('Closing connection pool')
+        await closeConnectionPool()
     }
-    process.exit(1)
-}).finally(async () => {
-    logDebug('Closing connection pool')
-    await closeConnectionPool()
-})
+})()
 
 // Disaster handling
 process.on('SIGTERM', signal => {
