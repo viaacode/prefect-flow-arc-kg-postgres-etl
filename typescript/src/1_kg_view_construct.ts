@@ -1,5 +1,6 @@
 import {
     DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, 
+    PREFIX_ID_BASE, 
     SINCE,
 } from './configuration.js'
 import { logInfo, logError, msToTime } from './util.js'
@@ -40,7 +41,8 @@ async function main() {
             // TODO report bug on 'less than one property`
             ...SINCE ? {
                 variables: {
-                    since: SINCE
+                    since: SINCE,
+                    prefix_id_base: PREFIX_ID_BASE
                 }
             } : {}
         })),

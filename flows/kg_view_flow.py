@@ -20,6 +20,7 @@ def kg_view_flow(
     triplydb_destination_dataset: str = "hetarchief",
     triplydb_destination_graph: str = "hetarchief",
     base_path: str = "/opt/prefect/typescript/",
+    prefix_id_base: str = "https://data.hetarchief.be/id/entity/",
     script_path: str = "lib/",
     last_modified: DateTime = None,
     full_sync: bool = False,
@@ -48,6 +49,7 @@ def kg_view_flow(
         triplydb_destination_graph=triplydb_destination_graph,
         logging_level=logging_level,
         since=last_modified if not full_sync else None,
+        prefix_id_base=prefix_id_base,
     )
 
 

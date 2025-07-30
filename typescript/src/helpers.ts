@@ -53,6 +53,13 @@ export async function addJobQueries(account: Account, dataset: Dataset) {
             variables: [
                 // The 'since' parameter is used for incremental loading
                 {
+                    name: 'prefix_id_base',
+                    required: false,
+                    termType: 'Literal',
+                    datatype: 'http://www.w3.org/2001/XMLSchema#string',
+                    defaultValue: 'https://data.hetarchief.be/id/entity/'
+                },
+                {
                     name: 'since',
                     required: false,
                     termType: 'Literal',

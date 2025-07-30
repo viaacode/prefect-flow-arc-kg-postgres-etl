@@ -42,11 +42,12 @@ where {
       ?fragment a mh:Fragment;
         schema:identifier ?mh_fragment_identifier;
         schema:dateModified ?modified;
+        mh:PID ?pid;
         schema:dateDeleted ?date_deleted.
 
       # only run for fragments that were modified since
       filter (bound(?since) && ?modified >= ?since )
-      bind(?none as ?ie)
+      BIND(iri(concat(?prefix_id_base, ?pid)) as ?ie)
     } union {
       ?fragment a mh:Fragment;
         schema:identifier ?mh_fragment_identifier;
