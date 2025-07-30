@@ -1,74 +1,81 @@
 # position: 1
 prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
-PREFIX schema: <https://schema.org/>
-PREFIX dct: <http://purl.org/dc/terms/>
-PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
-PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
-PREFIX haLicId: <https://data.hetarchief.be/id/license/>
-PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
-PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+prefix premis: <http://www.loc.gov/premis/rdf/v3/>
+prefix schema: <https://schema.org/>
+prefix dct: <http://purl.org/dc/terms/>
+prefix haObj: <https://data.hetarchief.be/ns/object/>
+prefix haDes: <https://data.hetarchief.be/ns/description/>
+prefix haLicId: <https://data.hetarchief.be/id/license/>
+prefix rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/>
+prefix ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 prefix prov: <http://www.w3.org/ns/prov#>
 # EBUCore - the Dublin Core for media
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
-PREFIX org: <http://www.w3.org/ns/org#>
-PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+prefix org: <http://www.w3.org/ns/org#>
+prefix bf: <http://id.loc.gov/ontologies/bibframe/>
+prefix skos: <http://www.w3.org/2004/02/skos/core#>
 prefix edm: <http://www.europeana.eu/schemas/edm/>
-PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
-PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
-PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
-PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
-PREFIX graph: <https://data.hetarchief.be/graph/>
+prefix haEvt: <https://data.hetarchief.be/id/event-type/>
+prefix eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
+prefix mh: <https://data.hetarchief.be/ns/mediahaven/>
+prefix haOrg: <https://data.hetarchief.be/ns/organization/>
+prefix graph: <https://data.hetarchief.be/graph/>
 
-PREFIX : <urn:kg-to-postgres:>
+prefix : <urn:kg-to-postgres:>
 
 
 CONSTRUCT {
-    ?ie_fragment :tableName "graph.mh_fragment_identifier";
+    ?fragment :tableName "graph.mh_fragment_identifier";
         :intellectual_entity_id ?ie;
         :mh_fragment_identifier ?mh_fragment_identifier;
         :is_deleted true
-} WHERE {
-  GRAPH graph:organization {
+}
+where {
+  graph graph:organization {
     ?schema_maintainer a haOrg:ContentPartner ;
-    org:identifier ?maintainer_id
+      org:identifier ?maintainer_id
   }
-  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
-  GRAPH ?ORGraph {
-    { 
-        ?fragment a mh:Fragment;
-            schema:dateModified ?modified;
-            schema:dateDeleted ?date_deleted.
+  bind(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  graph ?ORGraph {
+    {
+      ?fragment a mh:Fragment;
+        schema:identifier ?mh_fragment_identifier;
+        schema:dateModified ?modified;
+        schema:dateDeleted ?date_deleted.
 
-        # only run for fragments that were modified since
-        FILTER (BOUND(?since) && ?modified >= ?since )
-    } UNION {
-        ?fragment a mh:Fragment;
-            schema:dateModified ?modified.
-        # only run for fragments that were modified since
-        FILTER (BOUND(?since) && ?modified >= ?since )
+      # only run for fragments that were modified since
+      filter (bound(?since) && ?modified >= ?since )
+      bind(?none as ?ie)
+    } union {
+      ?fragment a mh:Fragment;
+        schema:identifier ?mh_fragment_identifier;
+        schema:dateModified ?modified.
+      # only run for fragments that were modified since
+      filter (bound(?since) && ?modified >= ?since )
+      values ?ie_type {
+        haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage
+      }
 
-        FILTER NOT EXISTS {
-            VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}               
-            ?ie a ?ie_type;
-                prov:wasDerivedFrom ?fragment ;    
-                (schema:license|(rel:isp/schema:license)) ?schema_license .
-
-            # Only include the right licenses
-            FILTER (?schema_license IN ( 
-                haLicId:VIAA-PUBLIEK-METADATA-LTD, 
-                haLicId:VIAA-PUBLIEK-METADATA-ALL,
-                haLicId:VIAA-PUBLIEK-CONTENT,
-                haLicId:BEZOEKERTOOL-METADATA-ALL,
-                haLicId:BEZOEKERTOOL-CONTENT ,
-                haLicId:VIAA-INTRA_CP-METADATA-ALL ,
-                haLicId:VIAA-INTRA_CP-CONTENT ,
-                haLicId:Publiek-Domein,
-                haLicId:COPYRIGHT-UNDETERMINED
-            ))
-        }
+      ?ie a ?ie_type;
+        prov:wasDerivedFrom ?fragment ;
+      optional {
+        ?ie  (schema:license|(rel:isp/schema:license)) ?schema_license .
+      }
+      filter not exists {
+        ?ie (schema:license | (rel:isp/schema:license)) ?excluded_license .
+        filter(?excluded_license in (
+          haLicId:VIAA-PUBLIEK-METADATA-LTD,
+          haLicId:VIAA-PUBLIEK-METADATA-ALL,
+          haLicId:VIAA-PUBLIEK-CONTENT,
+          haLicId:BEZOEKERTOOL-METADATA-ALL,
+          haLicId:BEZOEKERTOOL-CONTENT,
+          haLicId:VIAA-INTRA_CP-METADATA-ALL,
+          haLicId:VIAA-INTRA_CP-CONTENT,
+          haLicId:Publiek-Domein,
+          haLicId:COPYRIGHT-UNDETERMINED
+        ))
+      }
     }
   }
 }
