@@ -135,14 +135,17 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
                 rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
             } else {
                 // If clearValue is set, we need to clear the values in the tables for the given primarykeys in temptable before merging
-                if (clearValue) {
+                // also check if the primary key set contains the intellectual_entity_id column
+                if (clearValue && primaryKeys.columns.some(c => c.name === 'intellectual_entity_id')) {
                     // Build query to clear values in the main table
+                    // Set all columns to NULL where intellectual_entity_id matches
                     const clearQuery = pgp.as.format(`
                         UPDATE $<tableInfo.schema:name>.$<tableInfo.name:name>
                         SET ${columns.assignColumns({ from: 'NULL' })}
-                        FROM $<tempTable.schema:name>.$<tempTable.name:name> y
-                        WHERE ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')};
-                    `, { tableInfo, tempTable, primaryKeys })
+                        WHERE intellectual_entity_id IN (
+                            SELECT intellectual_entity_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
+                        );
+                    `, { tableInfo, tempTable, columns })
                     logDebug(clearQuery)
                     // Perform clearing of values in the main table
                     let clearResult = await t.result(clearQuery, null, r => r.rowCount)
