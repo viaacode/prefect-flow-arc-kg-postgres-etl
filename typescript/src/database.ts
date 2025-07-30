@@ -1,6 +1,6 @@
 import { TableInfo, TableNode, Batch } from './types.js'
 import { logInfo, logError, logDebug, isValidDate } from './util.js'
-import { dbConfig, DEBUG_MODE } from './configuration.js'
+import { clearValueTables, dbConfig, DEBUG_MODE } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -122,7 +122,7 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<ColumnS
 
 // Helper function to upsert a temp table into the final table
 export async function mergeTable(tableNode: TableNode, truncate: boolean = true, useMerge: boolean = true) {
-    const { columns, primaryKeys, tempTable, tableInfo } = tableNode
+    const { columns, primaryKeys, tempTable, tableInfo, clearValue } = tableNode
 
     try {
         return await db.tx('process-merge', async t => {
@@ -134,6 +134,20 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
                 // Perform simple insert because table is truncated anyway
                 rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
             } else {
+                // If clearValue is set, we need to clear the values in the tables for the given primarykeys in temptable before merging
+                if (clearValue) {
+                    // Build query to clear values in the main table
+                    const clearQuery = pgp.as.format(`
+                        UPDATE $<tableInfo.schema:name>.$<tableInfo.name:name>
+                        SET ${columns.assignColumns({ from: 'NULL' })}
+                        FROM $<tempTable.schema:name>.$<tempTable.name:name> y
+                        WHERE ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')};
+                    `, { tableInfo, tempTable, primaryKeys })
+                    logDebug(clearQuery)
+                    // Perform clearing of values in the main table
+                    let clearResult = await t.result(clearQuery, null, r => r.rowCount)
+                    logInfo(`Cleared ${clearResult} rows in table ${tableInfo} before merge.`)
+                }
                 // Build query
                 const mergeQuery = useMerge ? pgp.as.format(`
                 MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
@@ -186,6 +200,11 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
         logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
         throw err
     }
+}
+
+export function checkClearValueTable(tableInfo: TableInfo): boolean {
+    // Check if the table is in the list of tables to clear values
+    return clearValueTables.includes(tableInfo.name)
 }
 
 // shuts down the connection pool associated with the Database object

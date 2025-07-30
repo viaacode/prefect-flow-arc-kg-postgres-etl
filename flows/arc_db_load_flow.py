@@ -255,6 +255,7 @@ def arc_db_load_flow(
     db_pool_min: int = 0,
     db_pool_max: int = 5,
     db_loading_batch_size: int = 100,
+    db_clear_value_tables: list[str] = None,
     record_limit: int = None,
     last_modified: DateTime = None,
     full_sync: bool = False,
@@ -293,6 +294,7 @@ def arc_db_load_flow(
             postgres_ssl=db_ssl,
             postgres_pool_min=db_pool_min,
             postgres_pool_max=db_pool_max,
+            db_clear_value_tables=','.join(db_clear_value_tables) if db_clear_value_tables else None,
         )
         if not skip_load
         else None
