@@ -140,9 +140,9 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
                     // Build query to clear values in the main table
                     // Set all columns to NULL where intellectual_entity_id matches
                     const clearQuery = pgp.as.format(`
-                        DELETE FROM $<tempTable.schema:name>.$<tempTable.name:name>
+                        DELETE FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
                         WHERE intellectual_entity_id IN (
-                            SELECT intellectual_entity_id FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
+                            SELECT intellectual_entity_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
                         );
                     `, { tableInfo, tempTable, columns })
                     logDebug(clearQuery)
@@ -206,7 +206,7 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
 
 export function checkClearValueTable(tableInfo: TableInfo): boolean {
     // Check if the table is in the list of tables to clear values
-    logInfo(`Checking if table ${tableInfo} is a clear value table.`)
+    logInfo(`Checking if table ${tableInfo.name} is a clear value table.`)
     logInfo(clearValueTables.join(', '))
     return clearValueTables.includes(tableInfo.name)
 }
