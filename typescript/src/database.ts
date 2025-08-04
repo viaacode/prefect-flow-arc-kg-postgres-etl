@@ -1,6 +1,6 @@
 import { TableInfo, TableNode, Batch } from './types.js'
 import { logInfo, logError, logDebug, isValidDate } from './util.js'
-import { dbConfig } from './configuration.js'
+import { clearValueTables, dbConfig, DEBUG_MODE } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -122,7 +122,7 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<ColumnS
 
 // Helper function to upsert a temp table into the final table
 export async function mergeTable(tableNode: TableNode, truncate: boolean = true, useMerge: boolean = true) {
-    const { columns, primaryKeys, tempTable, tableInfo } = tableNode
+    const { columns, primaryKeys, tempTable, tableInfo, clearValue } = tableNode
 
     try {
         return await db.tx('process-merge', async t => {
@@ -134,6 +134,22 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
                 // Perform simple insert because table is truncated anyway
                 rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
             } else {
+                // If clearValue is set, we need to clear the values in the tables for the given primarykeys in temptable before merging
+                // also check if the primary key set contains the intellectual_entity_id column
+                if (clearValue && primaryKeys.columns.some(c => c.name === 'intellectual_entity_id')) {
+                    // Build query to clear values in the main table
+                    // Set all columns to NULL where intellectual_entity_id matches
+                    const clearQuery = pgp.as.format(`
+                        DELETE FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
+                        WHERE intellectual_entity_id IN (
+                            SELECT intellectual_entity_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
+                        );
+                    `, { tableInfo, tempTable, columns })
+                    logDebug(clearQuery)
+                    // Perform clearing of values in the main table
+                    let clearResult = await t.result(clearQuery, null, r => r.rowCount)
+                    logInfo(`Cleared ${clearResult} rows in table ${tableInfo} before merge.`)
+                }
                 // Build query
                 const mergeQuery = useMerge ? pgp.as.format(`
                 MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
@@ -153,7 +169,12 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
             }
 
             // Drop temp table when done
-            await t.none(qTemplates.dropTable, tempTable)
+            if(!DEBUG_MODE) {
+                await t.none(qTemplates.dropTable, tempTable)
+                logInfo(`Dropped temporary table ${tempTable} after merge.`)
+            } else {
+                logDebug(`DEBUG_MODE is enabled, not dropping temporary table ${tempTable}.`)
+            }
             return rslt
         })
     } catch (err) {
@@ -181,6 +202,13 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
         logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
         throw err
     }
+}
+
+export function checkClearValueTable(tableInfo: TableInfo): boolean {
+    // Check if the table is in the list of tables to clear values
+    logInfo(`Checking if table ${tableInfo.name} is a clear value table.`)
+    logInfo(clearValueTables.join(', '))
+    return clearValueTables.includes(tableInfo.name)
 }
 
 // shuts down the connection pool associated with the Database object

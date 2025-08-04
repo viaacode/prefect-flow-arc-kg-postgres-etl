@@ -9,7 +9,7 @@ export function logInfo(message: any, ...optionalParams: any[]) {
     logPrefect('INFO', message, optionalParams)
 }
 
-export function logError(message: any, error: unknown, ...optionalParams: any[]) {
+export function logError(message: any, error?: unknown, ...optionalParams: any[]) {
     logPrefect('ERROR', message + ':' + getErrorMessage(error), optionalParams)
 }
 
@@ -19,7 +19,7 @@ export function logDebug(message: any, ...optionalParams: any[]) {
 }
 
 export function logWarning(message: any, ...optionalParams: any[]) {
-    if (LOGGING_LEVEL === 'WARNING')
+    if (LOGGING_LEVEL !== 'ERROR')
         logPrefect('WARNING', message, optionalParams)
 }
 
@@ -34,8 +34,10 @@ export function getErrorMessage(e: unknown): string | undefined {
         return e.toString() // works, `e` narrowed to string
     } else if (e instanceof Error) {
         return e.message // works, `e` narrowed to Error
+    } else if (typeof e === 'object' && e !== null && 'message' in e) {
+        return (e as { message?: unknown }).message?.toString();
     }
-    return
+    return "Unknown error";
 }
 
 // Helper function to check if a date is a Date object

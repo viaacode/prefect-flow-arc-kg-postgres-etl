@@ -8,16 +8,17 @@ PREFIX haDes: <https://data.hetarchief.be/ns/description/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
-prefix prov: <http://www.w3.org/ns/prov#>
-# EBUCore - the Dublin Core for media
+PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
 PREFIX org: <http://www.w3.org/ns/org#>
 PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-prefix edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX edm: <http://www.europeana.eu/schemas/edm/>
 PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 PREFIX : <urn:kg-to-postgres:>
 
@@ -167,6 +168,13 @@ CONSTRUCT {
 
 } WHERE {
 
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
+
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:Film haDes:DVD haDes:DVDChapter}
     ?ie a ?ie_type;
@@ -286,7 +294,17 @@ CONSTRUCT {
     UNION { ?ie ebucore:synopsis ?ebucore_synopsis }
 
     UNION {
-      ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
+      ?ie schema:copyrightHolder ?schema_copyright_holder_c.
+      
+      {} UNION {
+        GRAPH graph:thesauri {
+          ?schema_copyright_holder_c skos:prefLabel ?schema_copyright_holder.
+        }
+      }
+      UNION {
+        ?schema_copyright_holder_c schema:name ?schema_copyright_holder.
+      }
+      
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
     }
 
@@ -351,7 +369,10 @@ CONSTRUCT {
       # - physical carrier
       ?pc a haObj:PhysicalCarrier;
       schema:name ?car_schema_name;
-      premis:medium/skos:prefLabel ?car_premis_medium.
+      premis:medium ?car_premis_medium_c 
+      GRAPH graph:thesauri {
+        ?car_premis_medium_c skos:prefLabel ?car_premis_medium.
+      }
       FILTER (langMatches(lang(?car_schema_name), "nl") && langMatches(lang(?car_premis_medium), "nl"))
 
       BIND(EXISTS {
@@ -360,8 +381,11 @@ CONSTRUCT {
 
 
       {} UNION {
-        ?crep bf:productionMethod/skos:prefLabel ?car_bibframe_production_method.
-        FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        ?crep bf:productionMethod ?car_bibframe_production_method_c.
+        GRAPH graph:thesauri {
+          ?car_bibframe_production_method_c skos:prefLabel ?car_bibframe_production_method.
+          FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        }
       }
       
       UNION {
@@ -402,7 +426,10 @@ CONSTRUCT {
         ?type_res rdfs:label ?car_type.
         FILTER (langMatches(lang(?car_type), "nl"))
         OPTIONAL {
-          ?pc haDes:coloringType/skos:prefLabel  ?ha_des_coloring_type
+          ?pc haDes:coloringType ?ha_des_coloring_type_c
+          GRAPH graph:thesauri {
+            ?ha_des_coloring_type_c skos:prefLabel  ?ha_des_coloring_type
+          }
           FILTER (langMatches(lang(?ha_des_coloring_type), "nl"))
            BIND(IRI(CONCAT(str(?pc),md5(str(?ha_des_coloring_type)))) AS ?pc_ct)
         }
@@ -453,8 +480,7 @@ CONSTRUCT {
       UNION { ?file schema:duration ?file_schema_duration }
 
       # 4. includes
-      BIND(IRI(
-           CONCAT(str(?file), "/", md5(str(?rep)))
-           ) AS ?inc)
+      BIND(IRI(CONCAT(str(?file), "/", md5(str(?rep)))) AS ?inc)
     } 
+  } 
 }

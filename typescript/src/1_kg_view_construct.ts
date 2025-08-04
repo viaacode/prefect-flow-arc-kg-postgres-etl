@@ -1,5 +1,6 @@
 import {
     DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, 
+    PREFIX_ID_BASE, 
     SINCE,
 } from './configuration.js'
 import { logInfo, logError, msToTime } from './util.js'
@@ -15,10 +16,10 @@ async function main() {
     let start: number = performance.now()
 
     // Get all TriplyDB information
-    let { account, destination } = await getInfo()
+    let { account, destination, dataset } = await getInfo()
 
     // Add all queries needed to construct the view
-    const queries = await addJobQueries(account,  destination.dataset)
+    const queries = await addJobQueries(account,  dataset)
 
     logInfo(`Deleting destination graph ${destination.graph}.`)
 
@@ -40,7 +41,8 @@ async function main() {
             // TODO report bug on 'less than one property`
             ...SINCE ? {
                 variables: {
-                    since: SINCE
+                    since: SINCE,
+                    prefix_id_base: PREFIX_ID_BASE
                 }
             } : {}
         })),
@@ -50,7 +52,7 @@ async function main() {
 
 main().catch(async err => {
     logError('Error in main function', err)
-    process.exit(1)
+    throw err; // Re-throw to ensure the error is caught by the disaster handling
 })
 
 // Disaster handling

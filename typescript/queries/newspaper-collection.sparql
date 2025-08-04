@@ -1,12 +1,14 @@
-# position: 2
-prefix schema: <https://schema.org/>
+PREFIX schema: <https://schema.org/>
 PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
-prefix prov: <http://www.w3.org/ns/prov#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX graph: <https://data.hetarchief.be/graph/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX org: <http://www.w3.org/ns/org#>
 
 PREFIX : <urn:kg-to-postgres:>
 
@@ -40,11 +42,18 @@ CONSTRUCT {
   :collection_id ?id.
 }
 WHERE {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     # Only get collections where the IEs are disseminated
    VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage }
    ?ie a ?ie_type;
       (schema:license|(rel:isp/schema:license)) ?schema_license;
       prov:wasDerivedFrom/schema:dateModified ?modified;
+      schema:maintainer ?schema_maintainer;
       schema:isPartOf ?id.
 
     # Only include the right licenses
@@ -62,67 +71,48 @@ WHERE {
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
-
-    VALUES ?collection_type {
-      schema:Newspaper
-      schema:Episode 
-      schema:ArchiveComponent 
-      schema:CreativeWorkSeries
-      schema:CreativeWorkSeason
-      schema:BroadcastEvent
-    }
-    BIND (
-      COALESCE(
-        IF(?collection_type = schema:Newspaper, "newspaper", 1/0),
-        IF(?collection_type = schema:Episode, "episode", 1/0),
-        IF(?collection_type = schema:ArchiveComponent, "archive", 1/0),
-        IF(?collection_type = schema:CreativeWorkSeries, "series", 1/0),
-        IF(?collection_type = schema:CreativeWorkSeason, "season", 1/0),
-        IF(?collection_type = schema:BroadcastEvent, "program", 1/0),
-        "collection"
-      ) AS ?collection_type_name
-    )
-    ?id a ?collection_type; schema:name ?schema_name.
-
-    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
     
     {}
-    UNION { ?id schema:seasonNumber ?schema_season_number }
-    UNION { ?id schema:isPartOf ?schema_is_part_of }
-    
-    OPTIONAL {
-      ?id a schema:Newspaper;
-          schema:identifier ?schema_identifier;
-          schema:hasPart ?serie.
-      {}
-      UNION {
-        ?id schema:inLanguage ?schema_in_language.
-        BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
-      }
-  
-      UNION {
-        ?id schema:alternateName ?schema_alternate_name.
-        BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
-      }
-  
-      UNION {
-        ?serie schema:locationCreated/schema:name ?schema_location_created.
-        FILTER langMatches(lang(?schema_location_created), "nl")
-      }
-  
-      UNION { ?serie schema:endDate ?schema_end_date. }
-      UNION { ?serie schema:startDate ?schema_start_date. }
-      UNION { 
-        # TODO: can also result into entry in graph.thing table
-        ?serie schema:publisher/schema:name ?schema_publisher. 
-        FILTER langMatches(lang(?schema_publisher), "nl")
-      }
-  
-      #UNION { ?id bf:preceededBy ?bibframe_preceeded_by }
-  
-      #UNION { ?id bf:succeededBy ?bibframe_succeeded_by }
-  
-      #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
-    }
+    UNION {
+      ?ie schema:isPartOf ?id.
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
+      BIND ("newspaper" AS ?collection_type_name)
+      GRAPH graph:anet {
         
+        ?id a schema:Newspaper;
+            schema:name ?schema_name;
+            schema:identifier ?schema_identifier;
+            schema:hasPart ?serie.
+        {}
+        UNION {
+          ?id schema:inLanguage ?schema_in_language.
+          BIND(IRI(CONCAT(str(?id),md5(?schema_in_language))) AS ?il)
+        }
+    
+        UNION {
+          ?id schema:alternateName ?schema_alternate_name.
+          BIND(IRI(CONCAT(str(?id),md5(?schema_alternate_name))) AS ?an)
+        }
+    
+        UNION {
+          ?serie schema:locationCreated/schema:name ?schema_location_created.
+          FILTER langMatches(lang(?schema_location_created), "nl")
+        }
+    
+        UNION { ?serie schema:endDate ?schema_end_date. }
+        UNION { ?serie schema:startDate ?schema_start_date. }
+        UNION { 
+          # TODO: can also result into entry in graph.thing table
+          ?serie schema:publisher/schema:name ?schema_publisher. 
+          FILTER langMatches(lang(?schema_publisher), "nl")
+        }
+    
+        #UNION { ?id bf:preceededBy ?bibframe_preceeded_by }
+    
+        #UNION { ?id bf:succeededBy ?bibframe_succeeded_by }
+    
+        #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
+      }
+    }
+  }
 }

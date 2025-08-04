@@ -1,15 +1,17 @@
-# position: 2
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
-prefix premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
-prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX org: <http://www.w3.org/ns/org#>
 
 PREFIX : <urn:kg-to-postgres:>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 
 CONSTRUCT {
@@ -41,11 +43,17 @@ CONSTRUCT {
 
 }
 WHERE {
+  # GRAPH graph:organization {
+  #   ?schema_maintainer a haOrg:ContentPartner ;
+  #   org:identifier ?maintainer_id
+  # }
+  # BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  # GRAPH ?ORGraph {
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
     ?ie a ?ie_type;
            (schema:license|(rel:isp/schema:license)) ?schema_license;
-           schema:mentions ?person;
+           schema:maintainer ?schema_maintainer;
            prov:wasDerivedFrom/schema:dateModified ?modified .
 
     # Only include the right licenses
@@ -64,45 +72,48 @@ WHERE {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-
-    ?person a schema:Person; 
-        schema:name ?person_schema_name.
-    
-    FILTER langMatches(lang(?person_schema_name), "nl")
-
-    {}
-    UNION {
-        ?person schema:deathDate ?person_schema_death_date
+    GRAPH graph:names-nvgo {
+      ?person a schema:Person; 
+          ^schema:mentions ?ie;
+          schema:name ?person_schema_name.
+      
+      FILTER langMatches(lang(?person_schema_name), "nl")
+  
+      {}
+      UNION {
+          ?person schema:deathDate ?person_schema_death_date
+      }
+  
+      UNION {
+          ?person schema:birthDate ?person_schema_birth_date
+      }
+  
+      UNION {
+          ?person schema:birthPlace/schema:name ?person_schema_birth_place
+      }
+  
+      UNION {
+          ?person schema:deathPlace/schema:name ?person_schema_death_place
+      }
+  
+      ?mention a ebucore:MediaFragment;
+              ebucore:isMediaFragmentOf ?ie;
+              ebucore:width ?mention_width;
+              ebucore:height ?mention_height;
+              ebucore:regionDelimX ?mention_x;
+              ebucore:regionDelimY ?mention_y.
+                  
+      ?mention_resource a ebucore:TextAnnotation;
+              ebucore:hasAnnotationRelatedAgent ?person;
+              ebucore:isAnnotatedMediaResource ?mention.
+  
+      OPTIONAL {
+        ?mention_resource ebucore:annotationConfidence ?confidence;
+      }
+      BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
+  
+      BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
     }
-
-    UNION {
-        ?person schema:birthDate ?person_schema_birth_date
-    }
-
-    UNION {
-        ?person schema:birthPlace/schema:name ?person_schema_birth_place
-    }
-
-    UNION {
-        ?person schema:deathPlace/schema:name ?person_schema_death_place
-    }
-
-    ?mention a ebucore:MediaFragment;
-            ebucore:isMediaFragmentOf ?ie;
-            ebucore:width ?mention_width;
-            ebucore:height ?mention_height;
-            ebucore:regionDelimX ?mention_x;
-            ebucore:regionDelimY ?mention_y.
-                
-    ?mention_resource a ebucore:TextAnnotation;
-            ebucore:hasAnnotationRelatedAgent ?person;
-            ebucore:isAnnotatedMediaResource ?mention.
-
-    OPTIONAL {
-      ?mention_resource ebucore:annotationConfidence ?confidence;
-    }
-    BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
-
-    BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
-
+  # }
+  
 }

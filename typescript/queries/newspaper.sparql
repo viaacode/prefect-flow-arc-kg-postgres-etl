@@ -1,6 +1,6 @@
 # position: 1
-prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX schema: <https://schema.org/>
 PREFIX dct: <http://purl.org/dc/terms/>
@@ -9,19 +9,20 @@ PREFIX haDes: <https://data.hetarchief.be/ns/description/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
-prefix prov: <http://www.w3.org/ns/prov#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
 # EBUCore - the Dublin Core for media
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
 PREFIX org: <http://www.w3.org/ns/org#>
 PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-prefix edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX edm: <http://www.europeana.eu/schemas/edm/>
 PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
-
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 
 PREFIX : <urn:kg-to-postgres:>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 
 CONSTRUCT {
@@ -109,6 +110,18 @@ CONSTRUCT {
 :id ?thing;
 :schema_name ?thing_schema_name.
 
+?collection :tableName "graph.collection";
+:id ?collection;
+:collection_type ?collection_type_name;
+:schema_is_part_of ?collection_schema_is_part_of;
+:schema_name ?collection_schema_name;
+:schema_season_number ?collection_schema_season_number.
+
+?ie_isp :tableName "graph.schema_is_part_of";
+:intellectual_entity_id ?ie;
+:type ?collection_type_name;
+:collection_id ?collection.
+
 ?rep :tableName "graph.representation";
   :id ?rep;
   :edm_is_next_in_sequence  ?rep_edm_is_next_in_sequence ;
@@ -158,6 +171,13 @@ CONSTRUCT {
   :schema_thumbnail_url ?file_schema_thumbnail_url.
 
 } WHERE {
+
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
 
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage}
@@ -276,13 +296,26 @@ CONSTRUCT {
     UNION { ?ie ebucore:synopsis ?ebucore_synopsis }
 
     UNION {
-      ?ie schema:copyrightHolder/(skos:prefLabel|schema:name) ?schema_copyright_holder.
+      ?ie schema:copyrightHolder ?schema_copyright_holder_c.
+      
+      {} UNION {
+        GRAPH graph:thesauri {
+          ?schema_copyright_holder_c skos:prefLabel ?schema_copyright_holder.
+        }
+      }
+      UNION {
+        ?schema_copyright_holder_c schema:name ?schema_copyright_holder.
+      }
+      
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
     }
     # krant
-    UNION{ 
-      ?ie bf:edition/skos:prefLabel ?bibframe_edition .
-      FILTER langMatches(lang(?bibframe_edition), "nl")
+    UNION { 
+      ?ie bf:edition ?bibframe_edition_c.
+      GRAPH graph:thesauri {
+        ?bibframe_edition_c skos:prefLabel ?bibframe_edition .
+        FILTER langMatches(lang(?bibframe_edition), "nl")
+      }
     }
 
     # - roles & things
@@ -305,6 +338,35 @@ CONSTRUCT {
   
     }
 
+    # Collection
+    UNION {
+      ?ie schema:isPartOf ?collection.
+      VALUES ?collection_type { 
+        schema:Episode 
+        schema:ArchiveComponent 
+        schema:CreativeWorkSeries
+        schema:CreativeWorkSeason
+        schema:BroadcastEvent
+      }
+      BIND (
+        COALESCE(
+          IF(?collection_type = schema:Episode, "episode", 1/0),
+          IF(?collection_type = schema:ArchiveComponent, "archive", 1/0),
+          IF(?collection_type = schema:CreativeWorkSeries, "series", 1/0),
+          IF(?collection_type = schema:CreativeWorkSeason, "season", 1/0),
+          IF(?collection_type = schema:BroadcastEvent, "program", 1/0),
+          "collection"
+        ) AS ?collection_type_name
+      )
+      ?collection a ?collection_type; schema:name ?collection_schema_name.
+
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?collection)))) AS ?ie_isp)
+
+      {}    
+      UNION { ?collection schema:seasonNumber ?collection_schema_season_number }
+      UNION { ?collection schema:isPartOf ?collection_schema_is_part_of }
+    }
+
     # 2. Carrier
     # - carrier rep
     UNION {
@@ -316,12 +378,18 @@ CONSTRUCT {
       # - physical carrier
       ?pc a haObj:PhysicalCarrier;
       schema:name ?car_schema_name;
-      premis:medium/skos:prefLabel ?car_premis_medium.
+      premis:medium ?car_premis_medium_c 
+      GRAPH graph:thesauri {
+        ?car_premis_medium_c skos:prefLabel ?car_premis_medium.
+      }
       FILTER (langMatches(lang(?car_schema_name), "nl") && langMatches(lang(?car_premis_medium), "nl"))
 
       {} UNION {
-        ?crep bf:productionMethod/skos:prefLabel ?car_bibframe_production_method.
-        FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        ?crep bf:productionMethod ?car_bibframe_production_method_c.
+        GRAPH graph:thesauri {
+          ?car_bibframe_production_method_c skos:prefLabel ?car_bibframe_production_method.
+          FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        }
       }
 
       UNION {
@@ -365,7 +433,7 @@ CONSTRUCT {
       # 3. Representation
       # - digital reps
       ?rep a haObj:DigitalRepresentation;
-            haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?ie;
+            haObj:isAccessCopyOf|haObj:isTranscriptionCopyOf ?ie;
             schema:name ?rep_schema_name.
       FILTER langMatches(lang(?rep_schema_name), "nl")
 
@@ -392,8 +460,7 @@ CONSTRUCT {
       UNION { ?file schema:duration ?file_schema_duration }
 
       # 4. includes
-      BIND(IRI(
-           CONCAT(str(?file), "/", md5(str(?rep)))
-           ) AS ?inc)
-    }
+      BIND(IRI(CONCAT(str(?file), "/", md5(str(?rep)))) AS ?inc)
+    } 
+  }
 }

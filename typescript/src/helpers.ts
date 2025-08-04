@@ -18,14 +18,14 @@ const __dirname = dirname(__filename)
 
 // Helper function to add a SPARQL Query to TriplyDB as Saved Query; needed to run them as Query Job
 export async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
-    // Remove query if it exists
+    // Add version if query exists
     try {
         const query = await account.getQuery(queryName)
-        await query.delete()
-        logInfo(`Query ${queryName} deleted.\n`)
+        return query.addVersion({...params, ...{ldFrame: undefined}})
     } catch (err) {
-        logInfo(`Query ${queryName} does not exist.\n`)
+        logInfo(`Query ${queryName} does not exist; adding it.\n`)
     }
+    
     return account.addQuery(queryName, params)
 }
 
@@ -52,6 +52,13 @@ export async function addJobQueries(account: Account, dataset: Dataset) {
             output: 'response',
             variables: [
                 // The 'since' parameter is used for incremental loading
+                {
+                    name: 'prefix_id_base',
+                    required: false,
+                    termType: 'Literal',
+                    datatype: 'http://www.w3.org/2001/XMLSchema#string',
+                    defaultValue: 'https://data.hetarchief.be/id/entity/'
+                },
                 {
                     name: 'since',
                     required: false,

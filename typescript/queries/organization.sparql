@@ -4,9 +4,10 @@ PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 PREFIX haPref: <https://data.hetarchief.be/id/organization-preferences/>
-prefix schema: <https://schema.org/>
+PREFIX schema: <https://schema.org/>
 
 PREFIX : <urn:kg-to-postgres:>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
 CONSTRUCT {
 ?org :tableName "graph.organization";
@@ -31,7 +32,11 @@ CONSTRUCT {
 :schema_email ?schema_email;
 :schema_telephone ?schema_telephone.
 
-}WHERE {
+} 
+FROM graph:organization
+FROM graph:organization-static-bavo
+FROM graph:organization-preferences
+WHERE {
 
    ?org a org:Organization;
             org:identifier ?org_identifier;
