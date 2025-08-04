@@ -43,17 +43,18 @@ CONSTRUCT {
   :collection_id ?id.
 }
 WHERE {
-  # GRAPH graph:organization {
-  #   ?schema_maintainer a haOrg:ContentPartner ;
-  #   org:identifier ?maintainer_id
-  # }
-  # BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
-  # GRAPH ?ORGraph {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     # Only get collections where the IEs are disseminated
    VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage }
    ?ie a ?ie_type;
       (schema:license|(rel:isp/schema:license)) ?schema_license;
       prov:wasDerivedFrom/schema:dateModified ?modified;
+      schema:maintainer ?schema_maintainer;
       schema:isPartOf ?id.
 
     # Only include the right licenses
@@ -71,36 +72,16 @@ WHERE {
 
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
-
-    VALUES ?collection_type {
-      schema:Newspaper
-      schema:Episode 
-      schema:ArchiveComponent 
-      schema:CreativeWorkSeries
-      schema:CreativeWorkSeason
-      schema:BroadcastEvent
-    }
-    BIND (
-      COALESCE(
-        IF(?collection_type = schema:Newspaper, "newspaper", 1/0),
-        IF(?collection_type = schema:Episode, "episode", 1/0),
-        IF(?collection_type = schema:ArchiveComponent, "archive", 1/0),
-        IF(?collection_type = schema:CreativeWorkSeries, "series", 1/0),
-        IF(?collection_type = schema:CreativeWorkSeason, "season", 1/0),
-        IF(?collection_type = schema:BroadcastEvent, "program", 1/0),
-        "collection"
-      ) AS ?collection_type_name
-    )
-    ?id a ?collection_type; schema:name ?schema_name.
-
-    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
     
     {}
-    UNION { ?id schema:seasonNumber ?schema_season_number }
-    UNION { ?id schema:isPartOf ?schema_is_part_of }
     UNION {
+      ?ie schema:isPartOf ?id.
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
+      BIND ("newspaper" AS ?collection_type_name)
       GRAPH graph:anet {
+        
         ?id a schema:Newspaper;
+            schema:name ?schema_name;
             schema:identifier ?schema_identifier;
             schema:hasPart ?serie.
         {}
@@ -134,5 +115,5 @@ WHERE {
         #UNION { ?id bf:supplementTo ?bibframe_supplement_to } 
       }
     }
-  #}
+  }
 }
