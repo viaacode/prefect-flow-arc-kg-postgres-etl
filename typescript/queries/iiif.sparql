@@ -23,14 +23,10 @@ PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 
 PREFIX : <urn:kg-to-postgres:>
 PREFIX graph: <https://data.hetarchief.be/graph/>
+PREFIX mgraph: <https://data.hetarchief.be/graph/metadata/>
 
 
 CONSTRUCT {
-
-
-?ie_fragment :tableName "graph.mh_fragment_identifier";
-  :intellectual_entity_id ?ie;
-  :mh_fragment_identifier ?mh_fragment_identifier.
 
 ?rep :tableName "graph.representation";
   :id ?rep;
@@ -73,7 +69,8 @@ CONSTRUCT {
     VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage}
     ?ie a ?ie_type;
            schema:maintainer ?schema_maintainer;
-           (schema:license|(rel:isp/schema:license)) ?schema_license_res.
+           (schema:license|(rel:isp/schema:license)) ?schema_license_res;
+           prov:wasDerivedFrom/schema:dateModified ?modified.
 
     # Only include the right licenses
     FILTER (?schema_license_res IN ( 
@@ -93,7 +90,7 @@ CONSTRUCT {
 
     {}
     UNION {
-      GRAPH graph:post {
+      GRAPH mgraph:post {
         # 3. Representation
         # - digital reps
         ?rep a haObj:DigitalRepresentation;
