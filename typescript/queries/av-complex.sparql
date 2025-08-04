@@ -8,12 +8,12 @@ PREFIX haDes: <https://data.hetarchief.be/ns/description/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
-prefix prov: <http://www.w3.org/ns/prov#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
 PREFIX org: <http://www.w3.org/ns/org#>
 PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-prefix edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX edm: <http://www.europeana.eu/schemas/edm/>
 PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
 PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
 PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>

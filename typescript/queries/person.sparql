@@ -1,13 +1,12 @@
-# position: 2
 PREFIX schema: <https://schema.org/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
-prefix premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
-prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 PREFIX org: <http://www.w3.org/ns/org#>
 

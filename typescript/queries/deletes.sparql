@@ -1,28 +1,27 @@
-# position: 1
-prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-prefix premis: <http://www.loc.gov/premis/rdf/v3/>
-prefix schema: <https://schema.org/>
-prefix dct: <http://purl.org/dc/terms/>
-prefix haObj: <https://data.hetarchief.be/ns/object/>
-prefix haDes: <https://data.hetarchief.be/ns/description/>
-prefix haLicId: <https://data.hetarchief.be/id/license/>
-prefix rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/>
-prefix ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
-prefix prov: <http://www.w3.org/ns/prov#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/>
+PREFIX haDes: <https://data.hetarchief.be/ns/description/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/>
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
 # EBUCore - the Dublin Core for media
-prefix xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
-prefix org: <http://www.w3.org/ns/org#>
-prefix bf: <http://id.loc.gov/ontologies/bibframe/>
-prefix skos: <http://www.w3.org/2004/02/skos/core#>
-prefix edm: <http://www.europeana.eu/schemas/edm/>
-prefix haEvt: <https://data.hetarchief.be/id/event-type/>
-prefix eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
-prefix mh: <https://data.hetarchief.be/ns/mediahaven/>
-prefix haOrg: <https://data.hetarchief.be/ns/organization/>
-prefix graph: <https://data.hetarchief.be/graph/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
+PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
+PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX graph: <https://data.hetarchief.be/graph/>
 
-prefix : <urn:kg-to-postgres:>
+PREFIX : <urn:kg-to-postgres:>
 
 
 CONSTRUCT {
@@ -31,13 +30,13 @@ CONSTRUCT {
         :mh_fragment_identifier ?mh_fragment_identifier;
         :is_deleted true
 }
-where {
-  graph graph:organization {
+WHERE {
+  GRAPH graph:organization {
     ?schema_maintainer a haOrg:ContentPartner ;
       org:identifier ?maintainer_id
   }
-  bind(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
-  graph ?ORGraph {
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     {
       ?fragment a mh:Fragment;
         schema:identifier ?mh_fragment_identifier;
@@ -46,24 +45,24 @@ where {
         schema:dateDeleted ?date_deleted.
 
       # only run for fragments that were modified since
-      filter (bound(?since) && ?modified >= ?since )
-      BIND(iri(concat(?prefix_id_base, ?pid)) as ?ie)
-    } union {
+      FILTER (bound(?since) && ?modified >= ?since )
+      BIND(iri(concat(?PREFIX_id_base, ?pid)) as ?ie)
+    } UNION {
       ?fragment a mh:Fragment;
         schema:identifier ?mh_fragment_identifier;
         schema:dateModified ?modified.
       # only run for fragments that were modified since
-      filter (bound(?since) && ?modified >= ?since )
-      values ?ie_type {
+      FILTER (bound(?since) && ?modified >= ?since )
+      VALUES ?ie_type {
         haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage
       }
 
       ?ie a ?ie_type;
         prov:wasDerivedFrom ?fragment ;
 
-      filter not exists {
+      FILTER NOT EXISTS {
         ?ie (schema:license | (rel:isp/schema:license)) ?excluded_license .
-        filter(?excluded_license in (
+        FILTER(?excluded_license in (
           haLicId:VIAA-PUBLIEK-METADATA-LTD,
           haLicId:VIAA-PUBLIEK-METADATA-ALL,
           haLicId:VIAA-PUBLIEK-CONTENT,
