@@ -60,9 +60,7 @@ where {
 
       ?ie a ?ie_type;
         prov:wasDerivedFrom ?fragment ;
-      optional {
-        ?ie  (schema:license|(rel:isp/schema:license)) ?schema_license .
-      }
+
       filter not exists {
         ?ie (schema:license | (rel:isp/schema:license)) ?excluded_license .
         filter(?excluded_license in (
