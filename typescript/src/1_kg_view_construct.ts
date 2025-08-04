@@ -52,7 +52,7 @@ async function main() {
 
 main().catch(async err => {
     logError('Error in main function', err)
-    process.exit(1)
+    throw err; // Re-throw to ensure the error is caught by the disaster handling
 })
 
 // Disaster handling
