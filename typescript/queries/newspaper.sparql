@@ -392,7 +392,7 @@ CONSTRUCT {
       # 3. Representation
       # - digital reps
       ?rep a haObj:DigitalRepresentation;
-            haObj:isAccessCopyOf|^haObj:hasIIIFCopy|haObj:isTranscriptionCopyOf ?ie;
+            haObj:isAccessCopyOf|haObj:isTranscriptionCopyOf ?ie;
             schema:name ?rep_schema_name.
       FILTER langMatches(lang(?rep_schema_name), "nl")
 

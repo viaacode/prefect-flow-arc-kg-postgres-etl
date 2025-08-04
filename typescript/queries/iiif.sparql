@@ -1,0 +1,132 @@
+# position: 1
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+prefix prov: <http://www.w3.org/ns/prov#>
+# EBUCore - the Dublin Core for media
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+prefix edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
+PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
+PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+
+PREFIX : <urn:kg-to-postgres:>
+PREFIX graph: <https://data.hetarchief.be/graph/>
+
+
+CONSTRUCT {
+
+
+?ie_fragment :tableName "graph.mh_fragment_identifier";
+  :intellectual_entity_id ?ie;
+  :mh_fragment_identifier ?mh_fragment_identifier.
+
+?rep :tableName "graph.representation";
+  :id ?rep;
+  :edm_is_next_in_sequence  ?rep_edm_is_next_in_sequence ;
+  :premis_represents  ?ie ;
+  :relation_has_root  ?rep_relation_has_root ;
+  :relation_has_source  ?rep_relation_has_source ;
+  :schema_caption  ?rep_schema_caption ;
+  :schema_in_language  ?rep_schema_in_language ;
+  :schema_name  ?rep_schema_name ;
+  :schema_transcript ?rep_schema_transcript;
+  :is_media_fragment_of ?fr_is_media_fragment_of;
+  :schema_end_time ?fr_schema_end_time;
+  :schema_start_time ?fr_schema_start_time.
+
+?inc :tableName "graph.includes";
+  :representation_id ?rep;
+  :file_id ?file.
+
+?file :tableName "graph.file";
+  :id ?file;
+  :ebucore_has_mime_type ?file_ebucore_has_mime_type;
+  :edm_is_next_in_sequence ?file_edm_is_next_in_sequence;
+  :premis_original_name ?file_premis_original_name;
+  :premis_stored_at ?file_premis_stored_at;
+  :schema_duration ?file_schema_duration;
+  :schema_name ?file_schema_name;
+  :schema_thumbnail_url ?file_schema_thumbnail_url.
+
+} WHERE {
+
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
+
+    # 1. Intellectual Entity data
+    VALUES ?ie_type { haDes:NewspaperIssue haDes:NewspaperIssuePage}
+    ?ie a ?ie_type;
+           schema:maintainer ?schema_maintainer;
+           (schema:license|(rel:isp/schema:license)) ?schema_license_res.
+
+    # Only include the right licenses
+    FILTER (?schema_license_res IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ))
+
+    # for incremental 
+    FILTER (!BOUND(?since) || ?modified >= ?since )
+
+    {}
+    UNION {
+      GRAPH graph:post {
+        # 3. Representation
+        # - digital reps
+        ?rep a haObj:DigitalRepresentation;
+              ^haObj:hasIIIFCopy ?ie;
+              schema:name ?rep_schema_name.
+        FILTER langMatches(lang(?rep_schema_name), "nl")
+
+        # 3. File
+        ?file a premis:File;
+            schema:name ?file_schema_name ;
+            premis:originalName ?file_premis_original_name;
+            premis:storedAt/rdf:value ?file_premis_stored_at ;
+            rel:isi ?rep;
+            ebucore:hasMimeType "image/jp2" .
+
+        FILTER (langMatches(lang(?file_schema_name), "nl"))
+
+        {} UNION { ?rep schema:inLanguage ?rep_schema_in_language }
+        UNION { ?rep rel:hsr ?rep_relation_has_root }
+        UNION { ?rep rel:hss ?rep_relation_has_source }
+        UNION { 
+            ?rep edm:isNextInSequence ?rep_edm_is_next_in_sequence 
+        }
+        UNION { ?rep schema:caption ?rep_schema_caption }
+        UNION { ?rep schema:transcript ?rep_schema_transcript }
+
+        UNION { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
+        UNION { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
+        UNION { ?file schema:duration ?file_schema_duration }
+
+        # 4. includes
+        BIND(IRI(CONCAT(str(?file), "/", md5(str(?rep)))) AS ?inc)
+      }
+    } 
+  }
+}
