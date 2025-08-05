@@ -43,12 +43,12 @@ CONSTRUCT {
 
 }
 WHERE {
-  # GRAPH graph:organization {
-  #   ?schema_maintainer a haOrg:ContentPartner ;
-  #   org:identifier ?maintainer_id
-  # }
-  # BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
-  # GRAPH ?ORGraph {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
     ?ie a ?ie_type;
@@ -72,7 +72,7 @@ WHERE {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    GRAPH graph:names-nvgo {
+    GRAPH graph:namenlijst {
       ?person a schema:Person; 
           ^schema:mentions ?ie;
           schema:name ?person_schema_name.
@@ -114,6 +114,5 @@ WHERE {
   
       BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
     }
-  # }
-  
+   }
 }

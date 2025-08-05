@@ -21,6 +21,8 @@ export async function addQuery(account: Account, queryName: string, params: AddQ
     // Add version if query exists
     try {
         const query = await account.getQuery(queryName)
+        // TODO: Explicitely set dataset to make sure there are no conflicts
+        // query.update({dataset: params.dataset.})
         return query.addVersion({...params, ...{ldFrame: undefined}})
     } catch (err) {
         logInfo(`Query ${queryName} does not exist; adding it.\n`)
