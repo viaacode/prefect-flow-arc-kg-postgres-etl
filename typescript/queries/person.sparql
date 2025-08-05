@@ -3,10 +3,10 @@ PREFIX haLicId: <https://data.hetarchief.be/id/license/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
-PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+prefix premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
 PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 PREFIX org: <http://www.w3.org/ns/org#>
 
@@ -43,12 +43,12 @@ CONSTRUCT {
 
 }
 WHERE {
-  # GRAPH graph:organization {
-  #   ?schema_maintainer a haOrg:ContentPartner ;
-  #   org:identifier ?maintainer_id
-  # }
-  # BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
-  # GRAPH ?ORGraph {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
     # 1. Intellectual Entity data
     VALUES ?ie_type { haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage}
     ?ie a ?ie_type;
@@ -72,7 +72,7 @@ WHERE {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    GRAPH graph:names-nvgo {
+    GRAPH graph:namenlijst {
       ?person a schema:Person; 
           ^schema:mentions ?ie;
           schema:name ?person_schema_name.
@@ -114,6 +114,5 @@ WHERE {
   
       BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
     }
-  # }
-  
+   }
 }
