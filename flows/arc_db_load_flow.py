@@ -137,7 +137,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         for row in deleted_partitions:
             deleted_partition = row["partition"]
             try:
-                sql_query = sql.SQL("DROP {db_table};").format(
+                sql_query = sql.SQL("DROP TABLE {db_table};").format(
                     db_table=sql.Identifier("graph", deleted_partition),
                 )
                 cursor.execute(sql_query)
