@@ -423,15 +423,17 @@ CONSTRUCT {
       UNION {
         ?pc a ?type_res.
         VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
-        ?type_res rdfs:label ?car_type.
+        GRAPH graph:ontologies {
+          ?type_res rdfs:label ?car_type.
+        }
         FILTER (langMatches(lang(?car_type), "nl"))
         OPTIONAL {
           ?pc haDes:coloringType ?ha_des_coloring_type_c
           GRAPH graph:thesauri {
             ?ha_des_coloring_type_c skos:prefLabel  ?ha_des_coloring_type
+            FILTER (langMatches(lang(?ha_des_coloring_type), "nl"))
           }
-          FILTER (langMatches(lang(?ha_des_coloring_type), "nl"))
-           BIND(IRI(CONCAT(str(?pc),md5(str(?ha_des_coloring_type)))) AS ?pc_ct)
+          BIND(IRI(CONCAT(str(?pc),md5(str(?ha_des_coloring_type)))) AS ?pc_ct)
         }
       }
     }
