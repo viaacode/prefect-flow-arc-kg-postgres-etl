@@ -66,6 +66,7 @@ export async function addJobQueries(account: Account, dataset: Dataset) {
                     required: false,
                     termType: 'Literal',
                     datatype: 'http://www.w3.org/2001/XMLSchema#dateTime',
+                    defaultValue: '0001-01-01T00:00:01'
                 }
             ]
         }
