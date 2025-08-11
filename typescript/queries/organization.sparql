@@ -36,6 +36,7 @@ CONSTRUCT {
 FROM graph:organization
 FROM graph:organization-static-bavo
 FROM graph:organization-preferences
+FROM graph:thesauri
 WHERE {
 
    ?org a org:Organization;
