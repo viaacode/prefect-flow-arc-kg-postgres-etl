@@ -1,0 +1,488 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX schema: <https://schema.org/>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/> 
+PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> 
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> # XML Schema Definition
+PREFIX bf: <http://id.loc.gov/ontologies/bibframe/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX edm: <http://www.europeana.eu/schemas/edm/>
+PREFIX haEvt: <https://data.hetarchief.be/id/event-type/>
+PREFIX eror: <http://id.loc.gov/vocabulary/preservation/eventRelatedObjectRole/>
+PREFIX mh: <https://data.hetarchief.be/ns/mediahaven/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX graph: <https://data.hetarchief.be/graph/>
+
+PREFIX : <urn:kg-to-postgres:>
+
+CONSTRUCT {
+
+?ie :tableName "graph.intellectual_entity";
+:id ?ie;
+:dcterms_available ?dcterms_available;
+:dcterms_rights ?dcterms_rights;
+:ebucore_has_cast_member ?ebucore_has_cast_member;
+:ebucore_has_object_type ?ebucore_has_object_type;
+:ebucore_synopsis ?ebucore_synopsis;
+:relation_is_part_of ?relation_is_part_of;
+:schema_abstract ?schema_abstract;
+:schema_copyright_notice ?schema_copyright_notice;
+:schema_copyright_year ?schema_copyright_year;
+:schema_credit_text ?schema_credit_text;
+:schema_date_created ?schema_date_created;
+:ha_des_min_date_created ?ha_des_min_date_created; 
+:ha_des_max_date_created ?ha_des_max_date_created; 
+:ha_des_min_date_published ?ha_des_min_date_published; 
+:ha_des_max_date_published ?ha_des_max_date_published; 
+:schema_date_published ?schema_date_published;
+:schema_description ?schema_description;
+:schema_identifier ?schema_identifier;
+:schema_issue_number ?schema_issue_number;
+:schema_maintainer ?schema_maintainer;
+:schema_name ?schema_name;
+:schema_position ?schema_position;
+:bibframe_edition ?bibframe_edition.
+
+?ie_format :tableName "graph.dcterms_format";
+ :intellectual_entity_id ?ie;
+ :dcterms_format ?dcterms_format.
+
+?ie_fragment :tableName "graph.mh_fragment_identifier";
+  :intellectual_entity_id ?ie;
+  :mh_fragment_identifier ?mh_fragment_identifier.
+
+?ie_lic :tableName "graph.schema_license";
+:intellectual_entity_id ?ie;
+:schema_license ?schema_license.
+
+?ie_an :tableName "graph.schema_alternate_name";
+:intellectual_entity_id ?ie;
+:schema_alternate_name ?schema_alternate_name.
+
+?ie_il :tableName "graph.schema_in_language";
+:intellectual_entity_id ?ie;
+:schema_in_language ?schema_in_language.
+
+?ie_kw :tableName "graph.schema_keywords";
+:intellectual_entity_id ?ie;
+:schema_keywords ?schema_keywords.
+
+?ie_g :tableName "graph.schema_genre";
+:intellectual_entity_id ?ie;
+:schema_genre ?schema_genre.
+
+?ie_spat :tableName "graph.schema_spatial";
+:intellectual_entity_id ?ie;
+:schema_spatial ?schema_spatial.
+
+?ie_temp :tableName "graph.schema_temporal";
+:intellectual_entity_id ?ie;
+:schema_temporal ?schema_temporal.
+
+?ie_ch :tableName "graph.schema_copyright_holder";
+:intellectual_entity_id ?ie;
+:schema_copyright_holder ?schema_copyright_holder.
+
+?role :tableName "graph.schema_role";
+:id ?role;
+:type ?role_type; 
+:intellectual_entity_id  ?ie; 
+:schema_role_name ?schema_role_name;
+:thing_id ?thing.
+
+?ie_local_id :tableName "graph.premis_identifier";
+:intellectual_entity_id ?ie;
+:type ?premis_identifier_type;
+:value ?premis_identifier_value.
+
+?thing :tableName "graph.thing";
+:id ?thing;
+:schema_name ?thing_schema_name.
+
+?collection :tableName "graph.collection";
+:id ?collection;
+:collection_type ?collection_type_name;
+:schema_is_part_of ?collection_schema_is_part_of;
+:schema_name ?collection_schema_name;
+:schema_season_number ?collection_schema_season_number.
+
+?ie_isp :tableName "graph.schema_is_part_of";
+:intellectual_entity_id ?ie;
+:type ?collection_type_name;
+:collection_id ?collection.
+
+?rep :tableName "graph.representation";
+  :id ?rep;
+  :edm_is_next_in_sequence  ?rep_edm_is_next_in_sequence ;
+  :premis_represents  ?ie ;
+  :relation_has_root  ?rep_relation_has_root ;
+  :relation_has_source  ?rep_relation_has_source ;
+  :schema_caption  ?rep_schema_caption ;
+  :schema_in_language  ?rep_schema_in_language ;
+  :schema_name  ?rep_schema_name ;
+  :schema_transcript ?rep_schema_transcript;
+  :is_media_fragment_of ?fr_is_media_fragment_of;
+  :schema_end_time ?fr_schema_end_time;
+  :schema_start_time ?fr_schema_start_time.
+
+?pc :tableName "graph.carrier";
+  :id ?pc;
+  :bibframe_production_method ?car_bibframe_production_method;
+  :ebucore_has_captioning ?car_ebucore_has_captioning;
+  :intellectual_entity_id ?ie;
+  :premis_medium ?car_premis_medium;
+  :schema_height ?car_schema_height;
+  :schema_identifier ?car_schema_identifier;
+  :schema_material ?car_schema_material;
+  :schema_material_extent ?car_schema_material_extent;
+  :schema_name ?car_schema_name;
+  :schema_width ?car_schema_width;
+  :digitization_date ?car_digitization_date;
+  :type ?car_type.
+
+?pc_ct :tableName "graph.ha_des_coloring_type";
+  :carrier_id ?pc;
+  :ha_des_coloring_type ?ha_des_coloring_type.
+
+
+?inc :tableName "graph.includes";
+  :representation_id ?rep;
+  :file_id ?file.
+
+?file :tableName "graph.file";
+  :id ?file;
+  :ebucore_has_mime_type ?file_ebucore_has_mime_type;
+  :edm_is_next_in_sequence ?file_edm_is_next_in_sequence;
+  :premis_original_name ?file_premis_original_name;
+  :premis_stored_at ?file_premis_stored_at;
+  :schema_duration ?file_schema_duration;
+  :schema_name ?file_schema_name;
+  :schema_thumbnail_url ?file_schema_thumbnail_url.
+
+} WHERE {
+
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+    org:identifier ?maintainer_id
+  }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
+
+    # 1. Intellectual Entity data
+    VALUES ?ie_type { haDes:Video }
+    ?ie a ?ie_type;
+           schema:identifier ?schema_identifier ;
+           schema:name ?schema_name ;
+           schema:maintainer ?schema_maintainer;
+           schema:license ?schema_license_res;
+           dct:format ?dcterms_format ;
+           prov:wasDerivedFrom ?ie_fragment.
+           
+    ?ie_fragment a mh:Fragment;
+              schema:dateModified ?modified;
+              schema:identifier ?mh_fragment_identifier.
+
+    # Only include the right licenses
+    FILTER (?schema_license_res IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ))
+
+    # for incremental 
+    FILTER (!BOUND(?since) || ?modified >= ?since )
+
+    BIND(IF(
+      # Do not include haLicId:VIAA-PUBLIEK-CONTENT or haLicId:Publiek-Domein when object is AV
+      ?schema_license_res IN (haLicId:VIAA-PUBLIEK-CONTENT, haLicId:Publiek-Domein),
+      ?unbound,
+      REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
+    ) as ?schema_license)
+    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_license)))) AS ?ie_lic)
+    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?dcterms_format)))) AS ?ie_format)
+
+    {} UNION {
+        ?ie schema:alternateName ?schema_alternate_name.
+        FILTER langMatches(lang(?schema_alternate_name), "nl")
+        
+        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_alternate_name)))) AS ?ie_an)
+    }
+
+    UNION {
+        ?ie schema:inLanguage ?schema_in_language.
+        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_in_language)))) AS ?ie_il)
+    }
+
+    UNION {
+      ?ie schema:keywords ?schema_keywords.
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_keywords)))) AS ?ie_kw)
+    }
+
+    UNION {
+        ?ie schema:genre ?schema_genre.
+        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_genre)))) AS ?ie_g)
+    }
+    UNION {
+        ?ie schema:spatial/schema:name ?schema_spatial.
+        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_spatial)))) AS ?ie_spat)
+    }
+    UNION {
+        ?ie schema:temporal ?schema_temporal.
+        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_temporal)))) AS ?ie_temp)
+    }
+  
+    UNION {
+      ?ie schema:dateCreated ?schema_date_created .
+      
+      OPTIONAL { ?ie haDes:minDateCreated ?ha_des_min_date_created }
+      OPTIONAL { ?ie haDes:maxDateCreated ?ha_des_max_date_created }
+    }
+
+    UNION { 
+      ?ie schema:datePublished ?schema_date_published .
+
+      OPTIONAL { ?ie haDes:minDatePublished ?ha_des_min_date_published }
+      OPTIONAL { ?ie haDes:maxDatePublished ?ha_des_max_date_published }
+    }
+
+    UNION{ 
+      ?ie schema:description ?schema_description
+      FILTER langMatches(lang(?schema_description), "nl")
+    }
+  
+    UNION{ 
+      ?ie schema:abstract ?schema_abstract 
+      FILTER langMatches(lang(?schema_abstract), "nl")
+    }
+
+    UNION {
+        ?ie premis:identifier ?premis_identifier.
+
+        ?premis_identifier a ?premis_identifier_type_res; rdf:value ?premis_identifier_value.
+        BIND (
+          IF(
+            EXISTS{ ?ie haObj:primaryIdentifier ?premis_identifier }, 
+            "primary", 
+            IF(?premis_identifier_type_res != haObj:LocalIdentifier, REPLACE(STR(?premis_identifier_type_res), "^.*/([^/]*)$", "$1"), ?unbound)
+          ) 
+          as ?premis_identifier_type)
+
+        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?premis_identifier)))) AS ?ie_local_id)
+    }
+  
+    UNION { ?ie rel:isp ?relation_is_part_of }
+    UNION { ?ie dct:available ?dcterms_available }
+    UNION { ?ie ebucore:hasObjectType ?ebucore_has_object_type }
+    UNION { ?ie ebucore:hasCastMember ?ebucore_has_cast_member }
+    UNION { ?ie schema:copyrightYear ?schema_copyright_year }
+    UNION { ?ie schema:copyrightNotice ?schema_copyright_notice }
+    UNION { ?ie dct:rights ?dcterms_rights }
+    UNION { ?ie schema:creditText ?schema_credit_text }    
+    UNION { ?ie ebucore:synopsis ?ebucore_synopsis }
+
+    UNION {
+      ?ie schema:copyrightHolder ?schema_copyright_holder_c.
+      
+      {} UNION {
+        GRAPH graph:thesauri {
+          ?schema_copyright_holder_c skos:prefLabel ?schema_copyright_holder.
+        }
+      }
+      UNION {
+        ?schema_copyright_holder_c schema:name ?schema_copyright_holder.
+      }
+      
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
+    }
+
+    # - roles & things
+
+    UNION {
+      ?ie ?role_pred ?role.
+
+      BIND (
+        IF(?role_pred = schema:creator,"schema_creator", 
+        IF(?role_pred = schema:contributor, "schema_contributor", 
+        IF(?role_pred = schema:publisher, "schema_publisher", "unknown")
+      ) ) as ?role_type)
+      
+      ?role a schema:Role;
+            schema:roleName ?schema_role_name;
+            schema:creator|schema:contributor|schema:publisher ?thing.
+      
+      ?thing a schema:Thing; 
+            schema:name ?thing_schema_name.
+  
+    }
+
+    # Collection
+    UNION {
+      ?ie schema:isPartOf ?collection.
+      VALUES ?collection_type { 
+        schema:Episode 
+        schema:ArchiveComponent 
+        schema:CreativeWorkSeries
+        schema:CreativeWorkSeason
+        schema:BroadcastEvent
+      }
+      BIND (
+        COALESCE(
+          IF(?collection_type = schema:Episode, "episode", 1/0),
+          IF(?collection_type = schema:ArchiveComponent, "archive", 1/0),
+          IF(?collection_type = schema:CreativeWorkSeries, "series", 1/0),
+          IF(?collection_type = schema:CreativeWorkSeason, "season", 1/0),
+          IF(?collection_type = schema:BroadcastEvent, "program", 1/0),
+          "collection"
+        ) AS ?collection_type_name
+      )
+      ?collection a ?collection_type; schema:name ?collection_schema_name.
+
+      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?collection)))) AS ?ie_isp)
+
+      {}    
+      UNION { ?collection schema:seasonNumber ?collection_schema_season_number }
+      UNION { ?collection schema:isPartOf ?collection_schema_is_part_of }
+    }
+
+  
+    UNION {
+      # 2. Carrier
+      # - carrier rep
+
+      ?ie rel:isr ?crep.
+      ?crep a haObj:CarrierRepresentation; 
+          premis:storedAt ?pc.
+      
+      # - physical carrier
+      ?pc a haObj:PhysicalCarrier;
+      schema:name ?car_schema_name;
+      premis:medium ?car_premis_medium_c 
+      GRAPH graph:thesauri {
+        ?car_premis_medium_c skos:prefLabel ?car_premis_medium.
+      }
+      FILTER (langMatches(lang(?car_schema_name), "nl") && langMatches(lang(?car_premis_medium), "nl"))
+
+      BIND(EXISTS {
+        ?pc ebucore:hasCaptioning/rdf:type ebucore:OpenCaptions 
+      } AS ?car_ebucore_has_captioning)
+
+
+      {} UNION {
+        ?crep bf:productionMethod ?car_bibframe_production_method_c.
+        GRAPH graph:thesauri {
+          ?car_bibframe_production_method_c skos:prefLabel ?car_bibframe_production_method.
+          FILTER (langMatches(lang(?car_bibframe_production_method), "nl"))
+        }
+      }
+      
+      UNION {
+        ?pc schema:identifier ?car_schema_identifier
+      }
+
+      UNION {
+        ?pc ^eror:sou ?event.
+        ?event a haEvt:digitization; 
+          prov:startedAtTime ?car_digitization_date; 
+      }
+    
+      UNION {
+        ?pc schema:height ?height.
+        ?height schema:value ?height_value;
+                schema:unitText ?height_unit.
+        BIND( CONCAT(?height_value, ' ', ?height_unit) as ?car_schema_height)
+      }
+      
+    
+      UNION {
+        ?pc schema:width ?width.
+        ?width schema:value ?width_value;
+                schema:unitText ?width_unit.
+        BIND( CONCAT(?width_value, ' ', ?width_unit) as ?car_schema_width)
+      }
+      
+      UNION {
+        ?pc schema:materialExtent ?car_schema_material_extent
+      }
+      UNION {
+        ?pc schema:material ?car_schema_material
+      }
+
+      UNION {
+        ?pc a ?type_res.
+        VALUES ?type_res { haDes:ImageReel haDes:AudioReel}
+        GRAPH graph:ontologies {
+          ?type_res rdfs:label ?car_type.
+        }
+        FILTER (langMatches(lang(?car_type), "nl"))
+        OPTIONAL {
+          ?pc haDes:coloringType ?ha_des_coloring_type_c
+          GRAPH graph:thesauri {
+            ?ha_des_coloring_type_c skos:prefLabel  ?ha_des_coloring_type
+            FILTER (langMatches(lang(?ha_des_coloring_type), "nl"))
+          }
+          BIND(IRI(CONCAT(str(?pc),md5(str(?ha_des_coloring_type)))) AS ?pc_ct)
+        }
+      }
+    }
+
+
+    # 3. Representation
+
+    UNION {
+      {
+        # - digital reps
+        ?rep a haObj:DigitalRepresentation;
+                haObj:isAccessCopyOf ?ie.
+      } UNION {
+        # - fragment rep 
+        ?rep a haObj:FragmentRepresentation;
+        haObj:isFragmentRepresentationOf ?ie;
+        schema:startTime ?fr_schema_start_time;
+        schema:endTime ?fr_schema_end_time;
+        ebucore:isMediaFragmentOf ?fr_is_media_fragment_of
+      }
+      ?rep schema:name ?rep_schema_name.
+      FILTER langMatches(lang(?rep_schema_name), "nl")
+      
+      {}
+      UNION { ?rep schema:inLanguage ?rep_schema_in_language }
+      UNION { ?rep rel:hsr ?rep_relation_has_root }
+      UNION { ?rep rel:hss ?rep_relation_has_source }
+      UNION { ?rep edm:isNextInSequence ?rep_edm_is_next_in_sequence }
+      UNION { ?rep schema:caption ?rep_schema_caption }
+      UNION { ?rep schema:transcript ?rep_schema_transcript }
+
+      # 3. File
+      ?file a premis:File;
+          schema:name ?file_schema_name ;
+          premis:originalName ?file_premis_original_name;
+          premis:storedAt/rdf:value ?file_premis_stored_at ;
+          rel:isi|^ebucore:isMediaFragmentOf ?rep;
+          ebucore:hasMimeType ?file_ebucore_has_mime_type .
+
+      VALUES ?file_ebucore_has_mime_type { "application/json" "video/mp4" "audio/mp4" "image/jpeg" "audio/mpeg" "audio/m4a" }
+      FILTER (langMatches(lang(?file_schema_name), "nl"))
+
+      {}
+      UNION { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
+      UNION { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
+      UNION { ?file schema:duration ?file_schema_duration }
+
+      # 4. includes
+      BIND(IRI(CONCAT(str(?file), "/", md5(str(?rep)))) AS ?inc)
+    } 
+  }
+}

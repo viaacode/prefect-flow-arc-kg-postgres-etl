@@ -55,6 +55,7 @@ WHERE {
       prov:wasDerivedFrom/schema:dateModified ?modified;
       schema:maintainer ?schema_maintainer;
       schema:isPartOf ?id.
+    FILTER (?id != <https://anet.be/record/opacbnc/#N/A/N>)
 
     # Only include the right licenses
     FILTER (?schema_license IN ( 
@@ -75,6 +76,8 @@ WHERE {
     {}
     UNION {
       ?ie schema:isPartOf ?id.
+      FILTER (?id != <https://anet.be/record/opacbnc/#N/A/N>)
+      
       BIND(IRI(CONCAT(str(?ie),"/",md5(str(?id)))) AS ?ie_isp)
       BIND ("newspaper" AS ?collection_type_name)
       GRAPH graph:anet {

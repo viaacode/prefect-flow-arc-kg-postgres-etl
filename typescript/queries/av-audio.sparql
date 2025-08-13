@@ -176,7 +176,7 @@ CONSTRUCT {
   GRAPH ?ORGraph {
 
     # 1. Intellectual Entity data
-    VALUES ?ie_type { haDes:Audio haDes:Video}
+    VALUES ?ie_type { haDes:Audio}
     ?ie a ?ie_type;
            schema:identifier ?schema_identifier ;
            schema:name ?schema_name ;
@@ -473,7 +473,7 @@ CONSTRUCT {
           rel:isi|^ebucore:isMediaFragmentOf ?rep;
           ebucore:hasMimeType ?file_ebucore_has_mime_type .
 
-      VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "image/jpeg" "audio/mpeg" "audio/m4a" }
+      VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "audio/mpeg" "audio/m4a" }
       FILTER (langMatches(lang(?file_schema_name), "nl"))
 
       {}
