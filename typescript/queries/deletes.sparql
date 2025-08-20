@@ -45,14 +45,14 @@ WHERE {
         schema:dateDeleted ?date_deleted.
 
       # only run for fragments that were modified since
-      FILTER (bound(?since) && ?modified >= ?since )
+      FILTER (!BOUND(?since) || ?modified >= ?since )
       BIND(iri(concat(?PREFIX_id_base, ?pid)) as ?ie)
     } UNION {
       ?fragment a mh:Fragment;
         schema:identifier ?mh_fragment_identifier;
         schema:dateModified ?modified.
       # only run for fragments that were modified since
-      FILTER (bound(?since) && ?modified >= ?since )
+      FILTER (!BOUND(?since) || ?modified >= ?since )
       VALUES ?ie_type {
         haDes:Audio haDes:Video haDes:Film haDes:DVD haDes:DVDChapter haDes:NewspaperIssue haDes:NewspaperIssuePage
       }
