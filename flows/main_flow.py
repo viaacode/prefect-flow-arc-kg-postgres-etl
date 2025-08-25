@@ -88,6 +88,7 @@ def main_flow(
         change_deployment_parameters.submit(
             name=deployment_kg_view_flow.name,
             parameters={
+                "or_ids": or_ids,
                 "last_modified": last_modified,
             },
             wait_for=[kg_view_parameter_change],
