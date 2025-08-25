@@ -46,7 +46,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None,
         count(*) as cnt
         FROM graph.intellectual_entity ie 
         JOIN graph.organization o ON ie.schema_maintainer = o.id
-        {'WHERE ie.schema_maintainer IN %(or_ids)s' if or_ids else ''}
+        {'WHERE org_identifier IN %(or_ids)s' if or_ids else ''}
         GROUP BY 1,2,3 
         ORDER BY 4 ASC
         """),
