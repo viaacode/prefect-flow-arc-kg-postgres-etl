@@ -18,7 +18,7 @@ def get_min_date(format="%Y-%m-%dT%H:%M:%S.%fZ"):
 
 
 @task
-def populate_index_table(db_credentials: DatabaseCredentials, since: str = None):
+def populate_index_table(db_credentials: DatabaseCredentials, since: str = None, or_ids: list[str] = None):
     logger = get_run_logger()
 
     # Connect to ES and Postgres
@@ -38,7 +38,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
 
     # Get list of partitions
     cursor.execute(
-        """
+        sql.SQL(f"""
         SELECT 
         ie.schema_maintainer as id, 
         lower(org_identifier) as index,
@@ -46,9 +46,11 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None)
         count(*) as cnt
         FROM graph.intellectual_entity ie 
         JOIN graph.organization o ON ie.schema_maintainer = o.id
+        {'WHERE org_identifier IN %(or_ids)s' if or_ids else ''}
         GROUP BY 1,2,3 
         ORDER BY 4 ASC
-        """,
+        """),
+        {"or_ids": tuple(or_ids)} if or_ids else None,
     )
     partitions = cursor.fetchall()
     failed = []
@@ -258,6 +260,7 @@ def arc_db_load_flow(
     db_clear_value_tables: list[str] = None,
     record_limit: int = None,
     last_modified: DateTime = None,
+    or_ids: list[str] = None,
     full_sync: bool = False,
     debug_mode: bool = False,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
@@ -304,6 +307,7 @@ def arc_db_load_flow(
     populating = populate_index_table.submit(
         db_credentials=postgres_creds,
         since=last_modified if not full_sync else None,
+        or_ids=or_ids,
         wait_for=loading,
     )
 
