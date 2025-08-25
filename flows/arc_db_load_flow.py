@@ -38,7 +38,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None,
 
     # Get list of partitions
     cursor.execute(
-        f"""
+        sql.SQL(f"""
         SELECT 
         ie.schema_maintainer as id, 
         lower(org_identifier) as index,
@@ -49,7 +49,7 @@ def populate_index_table(db_credentials: DatabaseCredentials, since: str = None,
         {'WHERE ie.schema_maintainer IN %(or_ids)s' if or_ids else ''}
         GROUP BY 1,2,3 
         ORDER BY 4 ASC
-        """,
+        """),
         {"or_ids": tuple(or_ids)} if or_ids else None,
     )
     partitions = cursor.fetchall()
