@@ -98,6 +98,7 @@ def populate_index_table(
     """Update partition data only (creation/truncation handled in main flow)."""
     logger = get_run_logger()
     partition = row["partition"]
+    row = dict(row)
     logger.info(row)
     try:
         with connect(
