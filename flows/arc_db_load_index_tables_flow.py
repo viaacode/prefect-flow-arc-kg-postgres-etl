@@ -100,6 +100,7 @@ def populate_index_table(
     partition = row["partition"]
     row = dict(row)
     logger.info(row)
+    logger.info(UPDATE_PARTITION_SQL)
     try:
         with connect(
             user=db_credentials.username,
