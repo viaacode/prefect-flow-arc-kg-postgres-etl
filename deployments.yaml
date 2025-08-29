@@ -11,3 +11,7 @@ deployments:
     file: flows/arc_db_load_flow.py
     flow: arc_db_load_flow
     queue: q-knowledge-graph
+  - name: db-load-index-tables
+    file: flows/arc_db_load_index_tables_flow.py
+    flow: arc_db_load_index_tables_flow
+    queue: q-knowledge-graph
