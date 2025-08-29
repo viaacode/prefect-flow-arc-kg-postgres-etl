@@ -255,7 +255,7 @@ LEFT JOIN LATERAL (
     JOIN graph.dcterms_format dcf
       ON dcf.intellectual_entity_id = ie_child.id
     WHERE ie_child.relation_is_part_of = ie.id
-      AND dcf.dcterms_format LIKE '%fragment'
+      AND dcf.dcterms_format LIKE '%%fragment'
 ) iec ON true
 LEFT JOIN LATERAL (
     SELECT jsonb_object_agg(sipo.type, sipo.schema_name) AS schema_is_part_of
