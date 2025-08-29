@@ -303,4 +303,4 @@ LEFT JOIN LATERAL (
 ) str ON TRUE
 WHERE ie.relation_is_part_of IS null
 	and ie.updated_at >= %(since)s
-	and org.org_identifier = %(id)s;
+	and org.id = %(id)s;
