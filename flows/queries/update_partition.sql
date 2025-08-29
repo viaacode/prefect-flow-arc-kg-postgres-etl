@@ -302,5 +302,5 @@ LEFT JOIN LATERAL (
     WHERE ie_parent.id = ie.id
 ) str ON TRUE
 WHERE ie.relation_is_part_of IS null
-	and ie.updated_at >= '%(since)s'
-	and org.org_identifier = '%(id)s';
+	and ie.updated_at >= %(since)s
+	and org.org_identifier = %(id)s;
