@@ -48,7 +48,7 @@ SELECT
     ie.updated_at
 FROM graph.intellectual_entity ie
 LEFT JOIN graph.schema_maintainer sm ON sm.id = ie.schema_maintainer
-LEFT JOIN organization org
+LEFT JOIN graph.organization org
   ON org.id = ie.schema_maintainer
 JOIN graph.dcterms_format df
 	ON df.intellectual_entity_id = ie.id
