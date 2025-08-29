@@ -136,7 +136,7 @@ def populate_index_table(
     task_runner=ConcurrentTaskRunner(),
     on_completion=[save_last_run_config],
 )
-def arc_db_load_flow(
+def arc_db_load_index_tables_flow(
     db_block_name: str,
     last_modified: DateTime = None,
     or_ids: list[str] = None,
