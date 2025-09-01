@@ -151,7 +151,7 @@ def arc_db_load_index_tables_flow(
 ):
     logger = get_run_logger()
     postgres_creds = DatabaseCredentials.load(db_block_name)
-    partitions = get_partitions.submit(postgres_creds, or_ids).result()
+    partitions = get_partitions.submit(postgres_creds, or_ids, last_modified).result()
 
     for partition in partitions:
 
