@@ -19,7 +19,7 @@ def get_min_date(format: str = "%Y-%m-%dT%H:%M:%S.%fZ") -> str:
 
 @task
 def get_partitions(
-    db_credentials: DatabaseCredentials, or_ids: list[str] = None
+    db_credentials: DatabaseCredentials, or_ids: list[str] = None, since: str = None
 ) -> list[dict[str, Any]]:
     """Fetch partitions and counts from the database."""
     with connect(
@@ -31,7 +31,9 @@ def get_partitions(
         cursor_factory=RealDictCursor,
     ) as db_conn:
         with db_conn.cursor() as cursor:
-            where_clause = "WHERE org_identifier IN %(or_ids)s" if or_ids else ""
+            where_clause = "WHERE 1=1"
+            where_clause += " AND org_identifier IN %(or_ids)s" if or_ids else ""
+            where_clause += " AND ie.last_modified >= %(since)s" if since else ""
             query = sql.SQL(
                 f"""
                 SELECT 
@@ -46,7 +48,12 @@ def get_partitions(
                 ORDER BY 4 ASC
                 """
             )
-            cursor.execute(query, {"or_ids": tuple(or_ids)} if or_ids else None)
+            params = {}
+            if since:
+                params["since"] = since
+            if or_ids:
+                params["or_ids"] = tuple(or_ids)
+            cursor.execute(query, params if params else None)
             return cursor.fetchall()
 
 @task
