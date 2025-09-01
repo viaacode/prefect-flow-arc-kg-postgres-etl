@@ -15,3 +15,7 @@ deployments:
     file: flows/arc_db_load_index_tables_flow.py
     flow: arc_db_load_index_tables_flow
     queue: q-knowledge-graph
+  - name: db-delete
+    file: flows/arc_db_delete_flow.py
+    flow: arc_db_delete_flow
+    queue: q-knowledge-graph
