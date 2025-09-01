@@ -31,7 +31,7 @@ def get_partitions(
         cursor_factory=RealDictCursor,
     ) as db_conn:
         with db_conn.cursor() as cursor:
-            where_clause = "WHERE 1=1"
+            where_clause = "WHERE ie.relation_is_part_of IS null"
             where_clause += " AND org_identifier IN %(or_ids)s" if or_ids else ""
             where_clause += " AND ie.updated_at >= %(since)s" if since else ""
             query = sql.SQL(
