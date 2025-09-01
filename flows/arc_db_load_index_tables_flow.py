@@ -33,7 +33,7 @@ def get_partitions(
         with db_conn.cursor() as cursor:
             where_clause = "WHERE 1=1"
             where_clause += " AND org_identifier IN %(or_ids)s" if or_ids else ""
-            where_clause += " AND ie.last_modified >= %(since)s" if since else ""
+            where_clause += " AND ie.updated_at >= %(since)s" if since else ""
             query = sql.SQL(
                 f"""
                 SELECT 
