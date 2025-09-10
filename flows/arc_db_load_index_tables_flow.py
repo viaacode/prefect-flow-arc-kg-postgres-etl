@@ -139,7 +139,7 @@ def populate_index_table(
 
 
 @flow(
-    name="prefect_flow_arc_db_load",
+    name="arc_db_load_index_tables_flow",
     task_runner=ConcurrentTaskRunner(),
     on_completion=[save_last_run_config],
 )
