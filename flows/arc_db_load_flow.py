@@ -12,232 +12,6 @@ from prefect_sqlalchemy.credentials import DatabaseCredentials
 from psycopg2 import DatabaseError, connect, sql
 from psycopg2.extras import RealDictCursor
 
-
-def get_min_date(format="%Y-%m-%dT%H:%M:%S.%fZ"):
-    return datetime.min.strftime(format)
-
-
-@task
-def populate_index_table(db_credentials: DatabaseCredentials, since: str = None, or_ids: list[str] = None):
-    logger = get_run_logger()
-
-    # Connect to ES and Postgres
-    logger.info("(Re)connecting to postgres")
-    db_conn = connect(
-        user=db_credentials.username,
-        password=db_credentials.password.get_secret_value(),
-        host=db_credentials.host,
-        port=db_credentials.port,
-        database=db_credentials.database,
-        cursor_factory=RealDictCursor,
-    )
-    db_conn.autocommit = False
- 
-    # Create cursor
-    cursor = db_conn.cursor()
-
-    # Get list of partitions
-    cursor.execute(
-        sql.SQL(f"""
-        SELECT 
-        ie.schema_maintainer as id, 
-        lower(org_identifier) as index,
-        lower(replace(org_identifier, '-','_')) as partition,
-        count(*) as cnt
-        FROM graph.intellectual_entity ie 
-        JOIN graph.organization o ON ie.schema_maintainer = o.id
-        {'WHERE org_identifier IN %(or_ids)s' if or_ids else ''}
-        GROUP BY 1,2,3 
-        ORDER BY 4 ASC
-        """),
-        {"or_ids": tuple(or_ids)} if or_ids else None,
-    )
-    partitions = cursor.fetchall()
-    failed = []
-    last_error = None
-    indexes = []
-    for row in partitions:
-        partition = row["partition"]
-        count = row["cnt"]
-        indexes.append(row["index"])
-        try:
-            # Try to create partition
-            create_query = sql.SQL(
-                "CREATE TABLE IF NOT EXISTS {db_table} PARTITION OF graph.index_documents FOR VALUES IN (%(index)s);"
-                ).format(
-                db_table=sql.Identifier("graph", partition),
-            )
-            cursor.execute(create_query, {"index": row["index"]})
-            logger.info(
-                "Created partition %s in index_documents table.",
-                partition,
-            )
-
-            # when full sync, truncate partition first
-            if since is None:
-                sql_query = sql.SQL("TRUNCATE {db_table};").format(
-                    db_table=sql.Identifier("graph", partition),
-                )
-                cursor.execute(sql_query)
-                logger.info(
-                    "Truncated partition %s in index_documents table.",
-                    partition,
-                )
-            # Run query
-            query_vars = {
-                "id": row["id"],
-                "since": since if since is not None else get_min_date(),
-            }
-
-            logger.info(
-                "Start populating index_documents table for partition %s since %s (%s records).",
-                partition,
-                query_vars["since"],
-                count,
-            )
-
-            # Delete the Intellectual Entities
-            cursor.execute(
-                "select graph.update_index_documents_per_cp(%(id)s,%(since)s);",
-                query_vars,
-            )
-            logger.info(
-                "Populated index_documents partition %s (%s records).",
-                partition,
-                cursor.rowcount,
-            )
-            # Commit your changes in the database
-            db_conn.commit()
-
-        except (Exception, DatabaseError) as error:
-            logger.exception(
-                "Error while populating partition %s; rolling back. ",
-                partition,
-            )
-            db_conn.rollback()
-            last_error = error
-            failed.append(partition)
-        else:
-            logger.info(
-                "Partition %s populated successfully with %s records.",
-                partition,
-                cursor.rowcount,
-            )
-
-    # Drop partitions that are no longer there
-    if since is None:
-        # Get all partitions that were not touched
-        cursor.execute(
-            """
-            SELECT DISTINCT lower(replace(index, '-','_')) as partition
-            FROM graph.index_documents 
-            WHERE index NOT IN %(indexes)s
-            """,
-            {"indexes": tuple(indexes)}
-        )
-        deleted_partitions = cursor.fetchall()
-        for row in deleted_partitions:
-            deleted_partition = row["partition"]
-            try:
-                sql_query = sql.SQL("DROP TABLE IF EXISTS {db_table};").format(
-                    db_table=sql.Identifier("graph", deleted_partition),
-                )
-                cursor.execute(sql_query)
-                logger.info(
-                    "Dropped partition %s in index_documents table.",
-                    deleted_partition,
-                )
-                # Commit your changes in the database
-                db_conn.commit()
-
-            except (Exception, DatabaseError):
-                logger.exception(
-                    "Error while populating partition %s; rolling back. ",
-                    partition,
-                )
-                db_conn.rollback()
-                raise
-
-    
-    # closing database connection.
-    if db_conn:
-        cursor.close()
-        db_conn.close()
-        logger.info("PostgreSQL connection is closed")
-
-    total = len(partitions)
-    failed_count = len(failed)
-    if failed_count > 0:
-        logger.error(
-            "Failed to populate %s/%s partitions: %s.", failed_count, total, failed,
-        )
-        raise last_error
-
-    return Completed(message=f"Batch succeeded: {total} partitions populated.")
-
-
-@task
-def delete_records_from_db(
-    db_credentials: DatabaseCredentials,
-):
-    logger = get_run_logger()
-
-    # Connect to ES and Postgres
-    logger.info("(Re)connecting to postgres")
-    db_conn = connect(
-        user=db_credentials.username,
-        password=db_credentials.password.get_secret_value(),
-        host=db_credentials.host,
-        port=db_credentials.port,
-        database=db_credentials.database,
-        cursor_factory=RealDictCursor,
-    )
-    db_conn.autocommit = False
-
-    try:
-        # Create server-side cursor
-        cursor = db_conn.cursor()
-
-        # Run query
-
-        # Delete the Intellectual Entities
-        cursor.execute(
-            """
-        DELETE FROM graph."intellectual_entity" x
-        USING graph."mh_fragment_identifier" y
-        WHERE y.intellectual_entity_id = x.id AND y.is_deleted;"""
-        )
-        logger.info(
-            "Deleted the Intellectual Entities from database(%s records)",
-            cursor.rowcount,
-        )
-
-        # Delete the fragment entries in database
-        cursor.execute('DELETE FROM graph."mh_fragment_identifier" WHERE is_deleted;')
-        logger.info(
-            'Deleted the fragments from table graph."mh_fragment_identifier" (%s records)',
-            cursor.rowcount,
-        )
-
-        # Commit your changes in the database
-        db_conn.commit()
-        logger.info("Database deletes succesful")
-
-    except (Exception, DatabaseError):
-        logger.exception(
-            "Error in transction Reverting all other operations of a transction.",
-        )
-        db_conn.rollback()
-        raise
-
-    finally:
-        # closing database connection.
-        if db_conn:
-            cursor.close()
-            db_conn.close()
-            logger.info("PostgreSQL connection is closed")
-
-
 @flow(
     name="prefect_flow_arc_db_load",
     task_runner=ConcurrentTaskRunner(),
@@ -251,7 +25,6 @@ def arc_db_load_flow(
     triplydb_destination_graph: str = "hetarchief",
     base_path: str = "/opt/prefect/typescript/",
     script_path: str = "lib/",
-    skip_load: bool = False,
     db_block_name: str = "local",
     db_ssl: bool = True,
     db_pool_min: int = 0,
@@ -260,7 +33,6 @@ def arc_db_load_flow(
     db_clear_value_tables: list[str] = None,
     record_limit: int = None,
     last_modified: DateTime = None,
-    or_ids: list[str] = None,
     full_sync: bool = False,
     debug_mode: bool = False,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
@@ -277,8 +49,7 @@ def arc_db_load_flow(
     # Run javascript which loads graph into postgres
     load_db_script: str = "2_database_load.js"
 
-    loading = (
-        run_javascript.with_options(
+    loading = run_javascript.with_options(
             name=f"Sync KG to services with {load_db_script}",
         ).submit(
             script_path=base_path + script_path + load_db_script,
@@ -299,23 +70,6 @@ def arc_db_load_flow(
             postgres_pool_max=db_pool_max,
             db_clear_value_tables=','.join(db_clear_value_tables) if db_clear_value_tables else None,
         )
-        if not skip_load
-        else None
-    )
-
-    # Populate the index table
-    populating = populate_index_table.submit(
-        db_credentials=postgres_creds,
-        since=last_modified if not full_sync else None,
-        or_ids=or_ids,
-        wait_for=loading,
-    )
-
-    # Delete all records from database
-    delete_records_from_db.submit(
-        db_credentials=postgres_creds, wait_for=[loading, populating]
-    )
-
 
 if __name__ == "__main__":
     arc_db_load_flow(
