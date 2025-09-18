@@ -142,7 +142,7 @@ def main_flow(
                 "or_ids": or_ids,
                 "full_sync": full_sync or deployment_arc_db_load_index_tables_flow.full_sync,
             },
-            wait_for=[arc_alto_to_json_result],
+            wait_for=[arc_alto_to_json_result, kg_to_postgres_result],
         )
         if deployment_arc_db_load_index_tables_flow.active
         else None
