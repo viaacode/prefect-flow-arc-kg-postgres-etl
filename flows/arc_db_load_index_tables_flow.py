@@ -17,7 +17,7 @@ UPDATE_PARTITION_SQL = (Path(__file__).parent / "queries" / "update_partition.sq
 def get_min_date(format: str = "%Y-%m-%dT%H:%M:%S.%fZ") -> str:
     return datetime.min.strftime(format)
 
-@task
+@task(tags=["arc-index-loading"])
 def get_partitions(
     db_credentials: DatabaseCredentials, or_ids: list[str] = None, since: str = None
 ) -> list[dict[str, Any]]:
@@ -56,7 +56,7 @@ def get_partitions(
             cursor.execute(query, params if params else None)
             return cursor.fetchall()
 
-@task
+@task(tags=["arc-index-loading"])
 def create_partition(
     db_credentials: DatabaseCredentials, partition: str, index: str
 ) -> None:
@@ -76,7 +76,7 @@ def create_partition(
             cursor.execute(create_query, {"index": index})
             db_conn.commit()
 
-@task
+@task(tags=["arc-index-loading"])
 def truncate_partition(
     db_credentials: DatabaseCredentials, partition: str
 ) -> None:
@@ -96,7 +96,7 @@ def truncate_partition(
             db_conn.commit()
 
 
-@task
+@task(tags=["arc-index-loading"])
 def populate_index_table(
     db_credentials: DatabaseCredentials,
     row: dict[str, Any],
