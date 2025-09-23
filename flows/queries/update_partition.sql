@@ -305,7 +305,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
     ) str ON TRUE
     WHERE ie.relation_is_part_of IS null
         and ie.updated_at >= %(since)s
-        and org.id = %(id)s;
+        and org.id = %(id)s
 
 on conflict (id,index) do update set
           document = excluded.document,
