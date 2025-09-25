@@ -173,7 +173,7 @@ def check_if_org_name_changed(
                 """
                     SELECT EXISTS (
                     SELECT 1
-                        from graph.%(partition)s ind
+                        from %(db_table)s ind
                     join graph.organization o
                         ON lower(o.org_identifier) = ind."index"
                     WHERE o.org_identifier = %(id)s
@@ -181,10 +181,10 @@ def check_if_org_name_changed(
                     LIMIT 1
                     ) AS has_mismatch;
                 """
-            )
+            ).format(db_table=sql.Identifier("graph", partition["partition"]))
             cursor.execute(
                 query,
-                {"partition": partition["partition"], "id": partition["id"]},
+                {"id": partition["id"]},
             )
             result = cursor.fetchone()
             if not result["has_mismatch"]:
