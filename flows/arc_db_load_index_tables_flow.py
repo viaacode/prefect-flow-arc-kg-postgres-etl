@@ -143,6 +143,7 @@ def check_if_org_name_changed(
     partition: dict[str, Any],
 ) -> bool:
     """Check if any of the organization names have changed."""
+    logger = get_run_logger()   
     with connect(
         user=db_credentials.username,
         password=db_credentials.password.get_secret_value(),
@@ -156,10 +157,10 @@ def check_if_org_name_changed(
                 """
                     SELECT EXISTS (
                     SELECT 1
-                        from graph."$(partition)s" ind
+                        from graph."%(partition)s" ind
                     join graph.organization o
                         ON lower(o.org_identifier) = ind."index"
-                    WHERE o.org_identifier = $(id)s
+                    WHERE o.org_identifier = %(id)s
                         AND ind.document->'schema_maintainer'->>'schema_name' != o.skos_pref_label
                     LIMIT 1
                     ) AS has_mismatch;
@@ -170,9 +171,10 @@ def check_if_org_name_changed(
                 {"partition": partition["partition"], "id": partition["id"]},
             )
             result = cursor.fetchone()
+            if not result["has_mismatch"]:
+                logger.info("No organization name change for %s", partition["id"])
             return result["has_mismatch"]
             
-
 @flow(
     name="arc_db_load_index_tables_flow",
     task_runner=ConcurrentTaskRunner(),
