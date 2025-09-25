@@ -153,6 +153,22 @@ def check_if_org_name_changed(
         cursor_factory=RealDictCursor,
     ) as db_conn:
         with db_conn.cursor() as cursor:
+            # check if table exists
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_tables
+                    WHERE schemaname = 'graph'
+                    AND tablename = %(partition)s
+                ) AS table_exists;
+                """,
+                {"partition": partition["partition"]},
+            )
+            result = cursor.fetchone()
+            if not result["table_exists"]:
+                logger.info("Partition %s does not exist yet", partition["partition"])
+                return False
             query = sql.SQL(
                 """
                     SELECT EXISTS (
