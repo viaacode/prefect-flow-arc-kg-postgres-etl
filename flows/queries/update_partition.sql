@@ -15,7 +15,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             'ebucore_object_type', ie.ebucore_has_object_type,
             'schema_identifier', ie.schema_identifier,
             'premis_identifier', pi.premis_identifier,
-            'schema_maintainer', sm.schema_maintainer,
+            'schema_maintainer', org.schema_maintainer,
             'premis_is_part_of', ie.relation_is_part_of,
             'schema_is_part_of', ipo.schema_is_part_of,
             'schema_date_created', ie.ha_des_min_date_created,
@@ -49,18 +49,26 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         mf.is_deleted,
         ie.updated_at
     FROM graph.intellectual_entity ie
-    LEFT JOIN graph.schema_maintainer sm ON sm.id = ie.schema_maintainer
-    LEFT JOIN graph.organization org
-    ON org.id = ie.schema_maintainer
+    -- schema_maintainer
+    JOIN (
+    	SELECT
+	    	o.id,
+	    	o.org_identifier,
+		    jsonb_build_object('schema_identifier', o.org_identifier, 'schema_name', o.skos_pref_label, 'organization_sector', o.ha_org_sector, 'organization_type', o.org_classification, 'alt_label', graph.create_slug(o.skos_pref_label)) AS schema_maintainer
+		FROM graph.organization o
+    ) org on org.id = ie.schema_maintainer 
+    -- dcterms_format filter
     JOIN graph.dcterms_format df
         ON df.intellectual_entity_id = ie.id
         AND df.dcterms_format NOT IN ('set', ' document', 'newspaperpage')
+    -- premis_identifier
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(json_build_object(pi.type, pi.value)) AS premis_identifier
         FROM graph.premis_identifier pi
         WHERE pi.intellectual_entity_id = ie.id
     ) pi ON true
+    -- schema_duration
     LEFT JOIN LATERAL (
         SELECT MAX(d) AS schema_duration
         FROM (
@@ -82,7 +90,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             AND rep.is_media_fragment_of IS NOT NULL
         ) all_durations
     ) sd ON true
-    -- thumbnails lateral
+    -- thumbnails
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(DISTINCT thumbs.schema_thumbnail_url) AS schema_thumbnail_url,
@@ -136,6 +144,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             WHERE first_position.rn = 1
         ) thumbs
     ) thu ON true
+    -- schema_creator, schema_contributor, schema_publisher
     LEFT JOIN LATERAL (
         SELECT
             jsonb_agg(r.roles) FILTER (WHERE r.type = 'schema_contributor') AS schema_contributor,
@@ -151,6 +160,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             GROUP BY sr_1.type, sr_1.schema_role_name
         ) r
     ) sr ON true
+    -- schema_creator_text
     LEFT JOIN LATERAL (
         SELECT 
             array_agg(thing.schema_name) AS schema_creator_array
@@ -159,6 +169,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE role.type = 'schema_creator'::text
         and role.intellectual_entity_id = ie.id
     ) sct ON true
+    -- schema_publisher_text
     LEFT JOIN LATERAL (
         SELECT 
             array_agg(thing.schema_name) AS schema_publisher_array
@@ -167,36 +178,42 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE role.type = 'schema_publisher'::text
         and role.intellectual_entity_id = ie.id
     ) spt ON true
+    -- schema_spatial_coverage
     left join lateral (
         SELECT
             jsonb_agg(sp.schema_spatial) AS schema_spatial
         FROM graph.schema_spatial sp
         where sp.intellectual_entity_id = ie.id
     ) ss on true
+    -- schema_temporal_coverage
     left join lateral (
         SELECT 
             jsonb_agg(st.schema_temporal) AS schema_temporal
         FROM graph.schema_temporal st
         where st.intellectual_entity_id = ie.id
     ) st on true
+    -- schema_keywords
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(sk.schema_keywords) AS schema_keywords
     FROM graph.schema_keywords sk
         WHERE sk.intellectual_entity_id = ie.id
     ) sk ON true
+    -- schema_genre
     LEFT JOIN LATERAL (
         SELECT
             jsonb_agg(sg.schema_genre) AS schema_genre
         FROM graph.schema_genre sg
         WHERE sg.intellectual_entity_id = ie.id
     ) sg ON TRUE
+    -- schema_in_language
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(sil.schema_in_language) AS schema_in_language
     FROM graph.schema_in_language sil
         WHERE sil.intellectual_entity_id = ie.id
     ) sil ON true
+    -- meemoofilm_color
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(ct.ha_des_coloring_type) AS ha_des_coloring_type
@@ -204,12 +221,14 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             LEFT JOIN graph.carrier carr ON carr.id = ct.carrier_id
         where carr.intellectual_entity_id = ie.id
     ) ct ON true
+    -- schema_license
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(sl.schema_license) AS schema_license
         FROM graph.schema_license sl
         where sl.intellectual_entity_id = ie.id
     ) sl ON true
+    -- audio (true = geluidsspoel, false = beeldspoel, null = unknown/neither)
     LEFT JOIN LATERAL (
         SELECT
             CASE
@@ -224,6 +243,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE ca.intellectual_entity_id = ie.id
         AND df.dcterms_format = 'film'
     ) fha ON true
+    -- schema_mentions
     LEFT JOIN LATERAL (
         SELECT 
             array_agg(DISTINCT thing.schema_name) AS schema_name
@@ -232,6 +252,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         LEFT JOIN graph.intellectual_entity smeie ON smeie.id = sme.intellectual_entity_id
         where smeie.relation_is_part_of = ie.id
     ) sme ON true
+    -- dcterms_rights_statement
     LEFT JOIN LATERAL (
         SELECT
             CASE
@@ -243,6 +264,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE sl.intellectual_entity_id = ie.id
         AND sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
     ) drs ON true
+    -- schema_location_created
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(DISTINCT co.schema_location_created) AS schema_location_created
@@ -251,6 +273,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE co.schema_location_created IS NOT NULL
             AND sipo.intellectual_entity_id = ie.id
     ) slc ON true
+    -- children that are fragments
     LEFT JOIN LATERAL (
         SELECT COUNT(*) AS children
         FROM graph.intellectual_entity ie_child
@@ -259,6 +282,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE ie_child.relation_is_part_of = ie.id
         AND dcf.dcterms_format LIKE '%%fragment'
     ) iec ON true
+    -- schema_is_part_of
     LEFT JOIN LATERAL (
         SELECT jsonb_object_agg(sipo.type, sipo.schema_name) AS schema_is_part_of
         FROM (
@@ -272,6 +296,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             GROUP BY po.type
         ) sipo
     ) ipo ON TRUE
+    -- is_deleted
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(mf.mh_fragment_identifier) AS mh_fragment_identifier,
@@ -279,18 +304,21 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         FROM graph.mh_fragment_identifier mf
         WHERE mf.intellectual_entity_id = ie.id
     ) mf ON TRUE
+    -- premis_medium
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(DISTINCT carr.premis_medium) AS premis_medium
         FROM graph.carrier carr
         WHERE carr.intellectual_entity_id = ie.id
     ) pm ON TRUE
+    -- schema_alternate_name
     LEFT JOIN LATERAL (
         SELECT 
             jsonb_agg(sa.schema_alternate_name) AS schema_alternate_name
         FROM graph.schema_alternate_name sa
         WHERE sa.intellectual_entity_id = ie.id
     ) sa ON TRUE
+    -- schema_transcript
     LEFT JOIN LATERAL (
         SELECT 
             string_agg(st.schema_transcript, E'\n\r' ORDER BY ie_child.schema_position) AS schema_transcript
