@@ -137,7 +137,60 @@ def populate_index_table(
         logger.exception("Error updating partition %s", partition)
         raise
 
-
+@task(tags=["arc-index-loading"])
+def check_if_org_name_changed(
+    db_credentials: DatabaseCredentials,
+    partition: dict[str, Any],
+) -> bool:
+    """Check if any of the organization names have changed."""
+    logger = get_run_logger()   
+    with connect(
+        user=db_credentials.username,
+        password=db_credentials.password.get_secret_value(),
+        host=db_credentials.host,
+        port=db_credentials.port,
+        database=db_credentials.database,
+        cursor_factory=RealDictCursor,
+    ) as db_conn:
+        with db_conn.cursor() as cursor:
+            # check if table exists
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_tables
+                    WHERE schemaname = 'graph'
+                    AND tablename = %(partition)s
+                ) AS table_exists;
+                """,
+                {"partition": partition["partition"]},
+            )
+            result = cursor.fetchone()
+            if not result["table_exists"]:
+                logger.info("Partition %s does not exist yet", partition["partition"])
+                return False
+            query = sql.SQL(
+                """
+                    SELECT EXISTS (
+                    SELECT 1
+                        from {db_table} ind
+                    join graph.organization o
+                        ON lower(o.org_identifier) = ind."index"
+                    WHERE o.org_identifier = %(id)s
+                        AND ind.document->'schema_maintainer'->>'schema_name' != o.skos_pref_label
+                    LIMIT 1
+                    ) AS has_mismatch;
+                """
+            ).format(db_table=sql.Identifier("graph", partition["partition"]))
+            cursor.execute(
+                query,
+                {"id": partition["id"]},
+            )
+            result = cursor.fetchone()
+            if not result["has_mismatch"]:
+                logger.info("No organization name change for %s", partition["id"])
+            return result["has_mismatch"]
+            
 @flow(
     name="arc_db_load_index_tables_flow",
     task_runner=ConcurrentTaskRunner(),
@@ -155,8 +208,16 @@ def arc_db_load_index_tables_flow(
 
     for partition in partitions:
 
-        # --- Truncate if full sync ---
-        if full_sync and not or_ids:
+        # --- Check if org name changed ---
+        org_name_changed = check_if_org_name_changed.submit(postgres_creds, partition).result()
+        if org_name_changed:
+            logger.warning(
+                "Organization name changed for %s, dropping partition %s",
+                partition["id"], partition["partition"]
+            )
+
+        # --- Truncate if full sync or org name changed ---
+        if (full_sync and not or_ids) or org_name_changed:
             partition_trunctation = truncate_partition.submit(postgres_creds, partition["partition"])
             logger.info("Truncated partition %s", partition["partition"])
 
@@ -173,7 +234,7 @@ def arc_db_load_index_tables_flow(
         populate_index_table.submit(
             db_credentials=postgres_creds,
             row=partition,
-            since=last_modified if not full_sync else None,
+            since=last_modified if not full_sync and not org_name_changed else None,
             wait_for=[partition_creation],
         )
 
