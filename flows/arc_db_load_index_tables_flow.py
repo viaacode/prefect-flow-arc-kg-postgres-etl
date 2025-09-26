@@ -173,7 +173,7 @@ def check_if_org_name_changed(
                 """
                     SELECT EXISTS (
                     SELECT 1
-                        from %(db_table)s ind
+                        from {db_table} ind
                     join graph.organization o
                         ON lower(o.org_identifier) = ind."index"
                     WHERE o.org_identifier = %(id)s
