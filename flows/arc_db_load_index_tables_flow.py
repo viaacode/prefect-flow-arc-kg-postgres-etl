@@ -220,7 +220,10 @@ def arc_db_load_index_tables_flow(
 
         # --- Truncate if full sync or org name changed ---
         if (full_sync and not or_ids) or org_name_changed:
-            partition_trunctation = truncate_partition.with_options(name=f"Truncate partition {partition["partition"]}").submit(postgres_creds, partition["partition"])
+            partition_trunctation = truncate_partition.with_options(name=f"Truncate partition {partition["partition"]}").submit(
+                postgres_creds, partition["partition"],
+                wait_for=[org_name_changed] if org_name_changed else None,
+            )
             logger.info("Truncated partition %s", partition["partition"])
 
         # --- Create partition ---
@@ -228,7 +231,7 @@ def arc_db_load_index_tables_flow(
             postgres_creds,
             partition["partition"],
             partition["index"],
-            wait_for=[partition_trunctation] if (full_sync and not or_ids) or org_name_changed else None,
+            wait_for=[partition_trunctation, org_name_changed] if (full_sync and not or_ids) or org_name_changed else None,
         )
         logger.info("Created partition %s", partition["partition"])
 
