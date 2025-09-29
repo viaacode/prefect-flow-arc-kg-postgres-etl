@@ -141,6 +141,7 @@ def main_flow(
             parameters={
                 "or_ids": or_ids,
                 "full_sync": full_sync or deployment_arc_db_load_index_tables_flow.full_sync,
+                "last_modified": last_modified
             },
             wait_for=[arc_alto_to_json_result, kg_to_postgres_result],
         )

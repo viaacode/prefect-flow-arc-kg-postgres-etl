@@ -169,29 +169,46 @@ def check_if_org_name_changed(
             if not result["table_exists"]:
                 logger.info("Partition %s does not exist yet", partition["partition"])
                 return False
+            # get name from org table
             query = sql.SQL(
                 """
-                    SELECT EXISTS (
-                    SELECT 1
-                        from {db_table} ind
-                    join graph.organization o
-                        ON lower(o.org_identifier) = ind."index"
-                    WHERE o.org_identifier = %(id)s
-                        AND ind.document->'schema_maintainer'->>'schema_name' != o.skos_pref_label
-                    LIMIT 1
-                    ) AS has_mismatch;
-                """
-            ).format(db_table=sql.Identifier("graph", partition["partition"]))
+                    SELECT skos_pref_label
+                    FROM graph.organization
+                    WHERE id = %(id)s
+                    LIMIT 1;
+                    """
+            )
             cursor.execute(
                 query,
                 {"id": partition["id"]},
             )
-            result = cursor.fetchone()
-            if not result["has_mismatch"]:
-                logger.info("No organization name change for %s", partition["id"])
+            result_org = cursor.fetchone()["skos_pref_label"]
+            if not result_org:
+                logger.warning("No organization found with id %s", partition["id"])
+                return False
+            logger.info("Organization name from org table: %s", result_org)
+            # get name from index table
+            query = sql.SQL(
+                """
+                    SELECT document->'schema_maintainer'->>'schema_name' AS schema_name
+                    FROM {db_table} ind
+                    LIMIT 1;
+                    """
+            ).format(db_table=sql.Identifier("graph", partition["partition"]))
+            cursor.execute(
+                query,
+            )
+            result_index = cursor.fetchone()["schema_name"]
+            logger.info("Organization name from index table: %s", result_index)
+            if not result_index:
+                logger.info("No records in partition %s yet", partition["partition"])
+                return False
+            has_mismatch = result_org != result_index
+            if has_mismatch:
+                logger.info("Organization name changed for %s", partition["id"])
             else:
-                logger.warning("Organization name changed for %s", partition["id"])
-            return result["has_mismatch"]
+                logger.info("No organization name change for %s", partition["id"])
+            return has_mismatch
             
 @flow(
     name="arc_db_load_index_tables_flow",
