@@ -33,14 +33,14 @@ def get_partitions(
         with db_conn.cursor() as cursor:
             where_clause = "WHERE ie.relation_is_part_of IS null"
             where_clause += " AND org_identifier IN %(or_ids)s" if or_ids else ""
-            where_clause += " AND ie.updated_at >= %(since)s" if since else ""
             query = sql.SQL(
                 f"""
                 SELECT 
                     ie.schema_maintainer as id, 
                     lower(org_identifier) as index,
                     lower(replace(org_identifier, '-','_')) as partition,
-                    count(*) as cnt
+                    count(*) as cnt,
+                    bool_or(ie.updated_at IS NOT NULL AND ie.updated_at > %(since)s) AS is_updated
                 FROM graph.intellectual_entity ie 
                 JOIN graph.organization o ON ie.schema_maintainer = o.id
                 {where_clause}
@@ -49,8 +49,7 @@ def get_partitions(
                 """
             )
             params = {}
-            if since:
-                params["since"] = since
+            params["since"] = since if since else get_min_date()
             if or_ids:
                 params["or_ids"] = tuple(or_ids)
             cursor.execute(query, params if params else None)
@@ -234,6 +233,11 @@ def arc_db_load_index_tables_flow(
                 "Organization name changed for %s, dropping partition %s",
                 partition["id"], partition["partition"]
             )
+
+        # --- Skip if no updates ---    
+        if not org_name_changed and not partition["is_updated"] and not full_sync:
+            logger.info("No updates for partition %s, skipping.", partition["partition"])
+            continue
 
         # --- Truncate if full sync or org name changed ---
         if (full_sync and not or_ids) or org_name_changed:
