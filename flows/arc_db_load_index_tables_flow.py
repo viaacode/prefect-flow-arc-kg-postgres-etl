@@ -40,7 +40,7 @@ def get_partitions(
                     lower(org_identifier) as index,
                     lower(replace(org_identifier, '-','_')) as partition,
                     count(*) as cnt,
-                    bool_or(ie.updated_at IS NOT NULL AND ie.updated_at > '2025-08-24') AS is_updated
+                    bool_or(ie.updated_at IS NOT NULL AND ie.updated_at > %(since)s) AS is_updated
                 FROM graph.intellectual_entity ie 
                 JOIN graph.organization o ON ie.schema_maintainer = o.id
                 {where_clause}
