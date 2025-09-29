@@ -211,7 +211,7 @@ def arc_db_load_index_tables_flow(
     for partition in partitions:
 
         # --- Check if org name changed ---
-        org_name_changed = check_if_org_name_changed.with_options(name=f"Check name change for {partition["id"]}").submit(postgres_creds, partition).result()
+        org_name_changed = check_if_org_name_changed.with_options(name=f"Check name change for {partition['id']}").submit(postgres_creds, partition).result()
         if org_name_changed:
             logger.warning(
                 "Organization name changed for %s, dropping partition %s",
@@ -220,14 +220,14 @@ def arc_db_load_index_tables_flow(
 
         # --- Truncate if full sync or org name changed ---
         if (full_sync and not or_ids) or org_name_changed:
-            partition_trunctation = truncate_partition.with_options(name=f"Truncate partition {partition["partition"]}").submit(
+            partition_trunctation = truncate_partition.with_options(name=f"Truncate partition {partition['partition']}").submit(
                 postgres_creds, partition["partition"],
                 wait_for=[org_name_changed] if org_name_changed else None,
             )
             logger.info("Truncated partition %s", partition["partition"])
 
         # --- Create partition ---
-        partition_creation = create_partition.with_options(name=f"Create partition {partition["partition"]} if not exists").submit(
+        partition_creation = create_partition.with_options(name=f"Create partition {partition['partition']} if not exists").submit(
             postgres_creds,
             partition["partition"],
             partition["index"],
@@ -236,7 +236,7 @@ def arc_db_load_index_tables_flow(
         logger.info("Created partition %s", partition["partition"])
 
         # --- update task ---
-        populate_index_table.with_options(name=f"Populate index table {partition["partition"]}").submit(
+        populate_index_table.with_options(name=f"Populate index table {partition['partition']}").submit(
             db_credentials=postgres_creds,
             row=partition,
             since=last_modified if not full_sync and not org_name_changed else None,
