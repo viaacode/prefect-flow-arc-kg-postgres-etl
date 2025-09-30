@@ -201,7 +201,7 @@ def check_if_org_name_changed(
             logger.info("Organization name from index table: %s", result_index)
             if not result_index or not result_index["schema_name"]:
                 logger.info("No records in partition %s yet", partition["partition"])
-                return False
+                return True
             has_mismatch = result_org != result_index
             if has_mismatch:
                 logger.info("Organization name changed for %s", partition["id"])
