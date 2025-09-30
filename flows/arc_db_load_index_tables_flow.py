@@ -165,7 +165,7 @@ def check_if_org_name_changed(
                 {"partition": partition["partition"]},
             )
             result = cursor.fetchone()
-            if not result["table_exists"]:
+            if not result or not result["table_exists"]:
                 logger.info("Partition %s does not exist yet", partition["partition"])
                 return False
             # get name from org table
@@ -181,8 +181,8 @@ def check_if_org_name_changed(
                 query,
                 {"id": partition["id"]},
             )
-            result_org = cursor.fetchone()["skos_pref_label"]
-            if not result_org:
+            result_org = cursor.fetchone()
+            if not result_org or not result_org["skos_pref_label"]:
                 logger.warning("No organization found with id %s", partition["id"])
                 return False
             logger.info("Organization name from org table: %s", result_org)
@@ -197,11 +197,11 @@ def check_if_org_name_changed(
             cursor.execute(
                 query,
             )
-            result_index = cursor.fetchone()["schema_name"]
+            result_index = cursor.fetchone()
             logger.info("Organization name from index table: %s", result_index)
-            if not result_index:
+            if not result_index or not result_index["schema_name"]:
                 logger.info("No records in partition %s yet", partition["partition"])
-                return False
+                return True
             has_mismatch = result_org != result_index
             if has_mismatch:
                 logger.info("Organization name changed for %s", partition["id"])
