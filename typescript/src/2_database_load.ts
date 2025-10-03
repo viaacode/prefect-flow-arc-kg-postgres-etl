@@ -72,75 +72,115 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     const batcher = new RecordBatcher()
 
     // Create a stream consumer of batches that writes each batch to the target table
-    function BatchConsumer(): Writable {
-        const writer = new Writable({ objectMode: true })
-        stats.numberOfStatements = numberOfStatements
-        writer._write = async (batch: Batch, _encoding, done) => {
-            try {
-                // Pause the stream so it does not prevent async processRecord function from executing
-                fileStream.pause()
+    // function BatchConsumer(): Writable {
+    //     const writer = new Writable({ objectMode: true })
+    //     stats.numberOfStatements = numberOfStatements
+    //     writer._write = async (batch: Batch, _encoding, done) => {
+    //         try {
+    //             // Pause the stream so it does not prevent async processRecord function from executing
+    //             fileStream.pause()
 
-                // Get table information from the table index, or create a temp table if not exists
-                const tableNode = tableIndex.hasNode(batch.tableInfo.toString()) ? tableIndex.getNodeData(batch.tableInfo.toString()) : await createTableNode(batch.tableInfo)
-                // Copy the batch to database
-                const start = performance.now()
-                stats.unprocessedBatches++
-                logDebug(`Start insert of Batch #${batch.id} (${batch.length} records)`, { paused: fileStream.isPaused() })
-                await batchInsert(tableNode, batch)
-                logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
+    //             // Get table information from the table index, or create a temp table if not exists
+    //             const tableNode = tableIndex.hasNode(batch.tableInfo.toString()) ? tableIndex.getNodeData(batch.tableInfo.toString()) : await createTableNode(batch.tableInfo)
+    //             // Copy the batch to database
+    //             const start = performance.now()
+    //             stats.unprocessedBatches++
+    //             logDebug(`Start insert of Batch #${batch.id} (${batch.length} records)`, { paused: fileStream.isPaused() })
+    //             await batchInsert(tableNode, batch)
+    //             logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
 
-                // Update stats
-                stats.processedBatches++
-                stats.unprocessedBatches--
-                stats.statementIndex = recordConstructor.statementIndex
-                stats.processedRecordIndex = InsertRecord.index
+    //             // Update stats
+    //             stats.processedBatches++
+    //             stats.unprocessedBatches--
+    //             stats.statementIndex = recordConstructor.statementIndex
+    //             stats.processedRecordIndex = InsertRecord.index
 
-                if (stats.processedBatches % 100 === 0) {
-                    const progress = stats.progress
-                    const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
-                    logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
-                    if (DEBUG_MODE) {
-                        logInfo('Debug mode is on.')
-                        logHeap()
-                    }
+    //             if (stats.processedBatches % 100 === 0) {
+    //                 const progress = stats.progress
+    //                 const timeLeft = msToTime(Math.round(((100 - progress) * (performance.now() - startGraph)) / progress))
+    //                 logInfo(`Processed ${stats.processedRecordIndex} records (${Math.round(progress)}% of graph; est. time remaining: ${timeLeft}).`)
+    //                 if (DEBUG_MODE) {
+    //                     logInfo('Debug mode is on.')
+    //                     logHeap()
+    //                 }
 
-                }
-                done()
-            } catch (err: any) {
-                logError('Error while processing batch', err)
-                stats.failedBatches++
-                done(err)
+    //             }
+    //             done()
+    //         } catch (err: any) {
+    //             logError('Error while processing batch', err)
+    //             stats.failedBatches++
+    //             done(err)
+    //         }
+    //         finally {
+    //             // Resume the stream after the async function is done, also when failed.
+    //             fileStream.resume()
+    //         }
+
+    //     }
+    //     return writer
+    // }
+
+    function BatchConsumer() {
+    return Writable.from(async function* (source) {
+        for await (const batch of source) {
+        try {
+            fileStream.pause()
+
+            const tableNode = tableIndex.hasNode(batch.tableInfo.toString())
+            ? tableIndex.getNodeData(batch.tableInfo.toString())
+            : await createTableNode(batch.tableInfo)
+
+            await batchInsert(tableNode, batch)
+
+            // update stats
+            stats.processedBatches++
+            stats.unprocessedBatches--
+            stats.statementIndex = recordConstructor.statementIndex
+            stats.processedRecordIndex = InsertRecord.index
+
+            if (stats.processedBatches % 100 === 0) {
+            const progress = stats.progress
+            const timeLeft = msToTime(
+                Math.round(((100 - progress) * (performance.now() - startGraph)) / progress)
+            )
+            logInfo(`Processed ${stats.processedRecordIndex} records ... est. time: ${timeLeft}`)
+            if (DEBUG_MODE) {
+                logHeap()
             }
-            finally {
-                // Resume the stream after the async function is done, also when failed.
-                fileStream.resume()
             }
+        } catch (err) {
+            logError('Error while processing batch', err)
+            stats.failedBatches++
+            throw err // causes pipeline() to reject
+        } finally {
+            fileStream.resume()
+        }
+        }
+    })
+    }
+
+
+        // Assemble the components above in one pipeline; and
+        // process the local graph as a stream of RDFjs objects
+        try {
+            await pipeline(
+                fileStream, // Read from file
+                createGunzip(), // Unzip
+                new StreamParser(), // Turn into quads
+                recordConstructor, // Turn into records
+                batcher, // Turn into batches
+                BatchConsumer())
+
+            logInfo(`Load pipeline completed ended: ${InsertRecord.index} records processed.`)
+        } catch (err) {
+            logError('Error during parsing or processing', err)
+            throw err
+        } finally {
+            // stream has been completely processed or error, remove the local copy.
+            await rm("graph.ttl.gz", { force: true })
 
         }
-        return writer
     }
-
-    // Assemble the components above in one pipeline; and
-    // process the local graph as a stream of RDFjs objects
-    try {
-        await pipeline(
-            fileStream, // Read from file
-            createGunzip(), // Unzip
-            new StreamParser(), // Turn into quads
-            recordConstructor, // Turn into records
-            batcher, // Turn into batches
-            BatchConsumer())
-
-        logInfo(`Load pipeline completed ended: ${InsertRecord.index} records processed.`)
-    } catch (err) {
-        logError('Error during parsing or processing', err)
-        throw err
-    } finally {
-        // stream has been completely processed or error, remove the local copy.
-        await rm("graph.ttl.gz", { force: true })
-
-    }
-}
 
 // Helper function to remove the created temporary tables
 async function cleanup() {
