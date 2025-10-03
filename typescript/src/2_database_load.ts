@@ -9,7 +9,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Batch, InsertRecord } from './types.js'
-import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, checkClearValueTable } from './database.js'
+import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, checkClearValueTable, db } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -121,43 +121,50 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     // }
 
     function BatchConsumer() {
-    return Writable.from(async function* (source) {
-        for await (const batch of source) {
-        try {
-            fileStream.pause()
+        return Writable.from(async function* (source) {
+            for await (const batch of source) {
+            try {
+                fileStream.pause()
 
-            const tableNode = tableIndex.hasNode(batch.tableInfo.toString())
-            ? tableIndex.getNodeData(batch.tableInfo.toString())
-            : await createTableNode(batch.tableInfo)
+                const tableNode = tableIndex.hasNode(batch.tableInfo.toString())
+                ? tableIndex.getNodeData(batch.tableInfo.toString())
+                : await createTableNode(batch.tableInfo)
 
-            await batchInsert(tableNode, batch)
+                await batchInsert(tableNode, batch)
 
-            // update stats
-            stats.processedBatches++
-            stats.unprocessedBatches--
-            stats.statementIndex = recordConstructor.statementIndex
-            stats.processedRecordIndex = InsertRecord.index
+                // update stats
+                stats.processedBatches++
+                stats.unprocessedBatches--
+                stats.statementIndex = recordConstructor.statementIndex
+                stats.processedRecordIndex = InsertRecord.index
 
-            if (stats.processedBatches % 100 === 0) {
-            const progress = stats.progress
-            const timeLeft = msToTime(
-                Math.round(((100 - progress) * (performance.now() - startGraph)) / progress)
-            )
-            logInfo(`Processed ${stats.processedRecordIndex} records ... est. time: ${timeLeft}`)
-            if (DEBUG_MODE) {
-                logHeap()
+                // Log connection pool stats after each batch
+                const pool = db.$pool
+                logInfo(
+                `Pool stats after batch #${batch.id}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+                )
+
+                if (stats.processedBatches % 100 === 0) {
+                const progress = stats.progress
+                const timeLeft = msToTime(
+                    Math.round(((100 - progress) * (performance.now() - startGraph)) / progress)
+                )
+                logInfo(`Processed ${stats.processedRecordIndex} records ... est. time: ${timeLeft}`)
+                if (DEBUG_MODE) {
+                    logHeap()
+                }
+                }
+            } catch (err) {
+                logError('Error while processing batch', err)
+                stats.failedBatches++
+                throw err // aborts pipeline
+            } finally {
+                fileStream.resume()
             }
             }
-        } catch (err) {
-            logError('Error while processing batch', err)
-            stats.failedBatches++
-            throw err // causes pipeline() to reject
-        } finally {
-            fileStream.resume()
-        }
-        }
-    })
+        })
     }
+
 
 
         // Assemble the components above in one pipeline; and

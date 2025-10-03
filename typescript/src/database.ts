@@ -23,7 +23,7 @@ function sql(file: string, options?: pgplib.IQueryFileOptions) {
 }
 
 // Creating a new database instance from the connection details:
-const db = pgp(dbConfig)
+export const db = pgp(dbConfig)
 
 // Cache all query templates from file
 const qTemplates = {
