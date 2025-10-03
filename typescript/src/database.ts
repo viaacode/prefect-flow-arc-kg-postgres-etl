@@ -23,7 +23,7 @@ function sql(file: string, options?: pgplib.IQueryFileOptions) {
 }
 
 // Creating a new database instance from the connection details:
-const db = pgp(dbConfig)
+export const db = pgp(dbConfig)
 
 // Cache all query templates from file
 const qTemplates = {
@@ -46,9 +46,10 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
     // Construct temp table name
     const { schema, name } = tableInfo
     const tempTableInfo = new TableInfo(schema, `temp_${name}`)
-
+    let connection
     try {
-        await db.tx('create-temp-table', async t => {
+        connection = await db.connect()
+        await connection.tx('create-temp-table', async t => {
             await t.none(qTemplates.dropTable, tempTableInfo)
             await t.none(qTemplates.createTempTable, { tempTableInfo, tableInfo })
         })
@@ -59,17 +60,35 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
         logError(`Error creating table ${tempTableInfo}`, err)
         throw err
     }
+    finally {
+        // release connection
+        const pool = db.$pool
+        if (connection) connection.done()
+        logInfo(
+            `Pool stats after creating temp table ${tempTableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+        )
+    }
 }
 
 // Helper function to drop a table
 export async function dropTable(tableInfo: TableInfo) {
+    let connection
     try {
-        await db.none(qTemplates.dropTable, tableInfo)
+        connection = await db.connect()
+        await connection.none(qTemplates.dropTable, tableInfo)
         logDebug(`Dropped table ${tableInfo} if exists.`)
         return tableInfo
     } catch (err) {
         logError(`Error dropping table ${tableInfo}`, err)
         throw err
+    }
+    finally {
+        // release connection
+        const pool = db.$pool
+        if (connection) connection.done()
+        logInfo(
+            `Pool stats after dropping table ${tableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+        )
     }
 }
 
@@ -123,9 +142,10 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<ColumnS
 // Helper function to upsert a temp table into the final table
 export async function mergeTable(tableNode: TableNode, truncate: boolean = true, useMerge: boolean = true) {
     const { columns, primaryKeys, tempTable, tableInfo, clearValue } = tableNode
-
+    let connection
     try {
-        return await db.tx('process-merge', async t => {
+        connection = await db.connect() 
+        return await connection.tx('process-merge', async t => {
             let rslt = 0
             // Truncate table first if desired
             if (truncate) {
@@ -180,6 +200,13 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
     } catch (err) {
         logError(`Error during merge from '${tempTable}' to '${tableInfo}'`, err)
         throw err
+    } finally {
+        // release connection
+        const pool = db.$pool
+        if (connection) connection.done()
+        logInfo(
+            `Pool stats after merge for table ${tableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+        )
     }
 }
 
@@ -188,19 +215,29 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
     if (!batch.length) return
 
     const { columns, tempTable, tableInfo } = tableNode
-
+    let connection
     try {
+        connection = await db.connect()
         const { insert } = pgp.helpers
+
 
         // generating a multi-row insert query:
         const query = insert(batch.records, columns, { schema: tempTable.schema, table: tempTable.name })
 
         // executing the query:
-        await db.none(query)
+        await connection.none(query)
     } catch (err) {
         logError(`Error during bulk insert for table ${tableInfo}`, err)
         logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
         throw err
+    } 
+    finally {
+        // release connection
+        const pool = db.$pool
+        if (connection) connection.done()
+        logInfo(
+            `Pool stats after batch insert into table ${tableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+        )
     }
 }
 
