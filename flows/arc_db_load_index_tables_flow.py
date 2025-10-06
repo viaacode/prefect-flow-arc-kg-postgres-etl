@@ -88,9 +88,27 @@ def truncate_partition(
         database=db_credentials.database,
     ) as db_conn:
         with db_conn.cursor() as cursor:
+            logger = get_run_logger()
+            # check if table exists
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_tables
+                    WHERE schemaname = 'graph'
+                    AND tablename = %(partition)s
+                ) AS table_exists;
+                """,
+                {"partition": partition},
+            )
+            result = cursor.fetchone()
+            if not result or not result["table_exists"]:
+                logger.info("Partition %s does not exist yet, skipping truncation.", partition)
+                return
             truncate_query = sql.SQL("TRUNCATE {db_table};").format(
                 db_table=sql.Identifier("graph", partition)
             )
+            logger.info("Truncating partition %s", partition)
             cursor.execute(truncate_query)
             db_conn.commit()
 
