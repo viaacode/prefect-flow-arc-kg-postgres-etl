@@ -102,7 +102,7 @@ def truncate_partition(
                 {"partition": partition},
             )
             result = cursor.fetchone()
-            if not result or not result["table_exists"]:
+            if not result or not result[0]:
                 logger.info("Partition %s does not exist yet, skipping truncation.", partition)
                 return
             truncate_query = sql.SQL("TRUNCATE {db_table};").format(
