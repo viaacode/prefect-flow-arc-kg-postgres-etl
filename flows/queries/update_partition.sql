@@ -58,9 +58,19 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
 		FROM graph.organization o
     ) org on org.id = ie.schema_maintainer 
     -- dcterms_format filter
-    JOIN graph.dcterms_format df
-        ON df.intellectual_entity_id = ie.id
-        AND df.dcterms_format NOT IN ('set', ' document', 'newspaperpage')
+    JOIN LATERAL (
+        SELECT df.dcterms_format
+        FROM graph.dcterms_format df
+        WHERE df.intellectual_entity_id = ie.id
+            and df.dcterms_format NOT IN ('set', ' document', 'newspaperpage')
+        ORDER BY 
+            CASE df.dcterms_format
+                WHEN 'newspaper' THEN 1
+                WHEN 'image' THEN 2
+                ELSE 3
+            END
+        LIMIT 1
+    ) df ON true
     -- premis_identifier
     LEFT JOIN LATERAL (
         SELECT 
