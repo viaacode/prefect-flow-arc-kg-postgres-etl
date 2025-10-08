@@ -1,6 +1,5 @@
 import os
 import time
-from datetime import datetime
 
 from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
@@ -10,8 +9,7 @@ from prefect_meemoo.config.last_run import save_last_run_config
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
-from psycopg2 import DatabaseError, connect, sql
-from psycopg2.extras import RealDictCursor
+from flows.arc_db_load_index_tables_flow import get_min_date
 
 @task
 def wait_until_hour(hour: int):
@@ -69,7 +67,7 @@ def arc_db_load_flow(
         logger.info("Starting full sync.")
         last_modified = None
         if or_ids:
-            last_modified = "1970-01-01T00:00:00Z"
+            last_modified = get_min_date()
             logger.info(f"'or_ids' were provided, setting 'last_modified' to {last_modified}. Tables will not be truncated.")
 
     loading = run_javascript.with_options(

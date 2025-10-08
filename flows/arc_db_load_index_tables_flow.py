@@ -4,7 +4,6 @@ from typing import Any
 
 from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
-from prefect.states import Completed, Failed
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_meemoo.config.last_run import save_last_run_config
 from prefect_sqlalchemy.credentials import DatabaseCredentials
