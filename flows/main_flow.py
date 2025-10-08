@@ -60,6 +60,7 @@ def main_flow(
             name=deployment_kg_view_flow.name,
             parameters={
                 # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
+                "or_ids": or_ids,
                 "last_modified": last_modified,
                 "full_sync": full_sync or deployment_kg_view_flow.full_sync,
             },
@@ -84,6 +85,7 @@ def main_flow(
             name=deployment_arc_db_load_flow.name,
             parameters={
                 # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
+                "or_ids": or_ids,
                 "last_modified": last_modified,
                 "full_sync": full_sync or deployment_kg_view_flow.full_sync
             },

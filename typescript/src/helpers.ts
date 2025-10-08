@@ -74,6 +74,12 @@ export async function addJobQueries(account: Account, dataset: Dataset) {
                     required: false,
                     termType: 'Literal',
                     datatype: 'http://www.w3.org/2001/XMLSchema#dateTime',
+                },
+                {
+                    name: 'maintainer_id',
+                    required: false,
+                    termType: 'Literal',
+                    datatype: 'http://www.w3.org/2001/XMLSchema#string',
                 }
             ]
         }

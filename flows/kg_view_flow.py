@@ -24,6 +24,7 @@ def kg_view_flow(
     script_path: str = "lib/",
     last_modified: DateTime = None,
     full_sync: bool = False,
+    or_ids: list[str] = None,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
 ):
     """Flow to query the TriplyDB dataset and update the graphql database.
@@ -49,6 +50,7 @@ def kg_view_flow(
         triplydb_destination_graph=triplydb_destination_graph,
         logging_level=logging_level,
         since=last_modified if not full_sync else None,
+        or_ids=','.join(or_ids) if or_ids else None,
         prefix_id_base=prefix_id_base,
     )
 
