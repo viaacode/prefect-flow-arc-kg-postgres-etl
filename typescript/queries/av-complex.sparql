@@ -212,7 +212,7 @@ CONSTRUCT {
       REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
     ) as ?schema_license)
     BIND(IRI(CONCAT(str(?ie),"/","schema_license","/",md5(str(?schema_license)))) AS ?ie_lic)
-    BIND(IRI(CONCAT(str(?ie),"/","dcterms_format",",",md5(str(?dcterms_format)))) AS ?ie_format)
+    BIND(IRI(CONCAT(str(?ie),"/","dcterms_format","/",md5(str(?dcterms_format)))) AS ?ie_format)
 
     {} UNION {
         ?ie schema:alternateName ?schema_alternate_name.
