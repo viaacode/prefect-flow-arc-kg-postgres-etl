@@ -9,7 +9,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Batch, InsertRecord } from './types.js'
-import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, checkClearValueTable } from './database.js'
+import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -43,8 +43,6 @@ async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
         dependencies: await getDependentTables(tableInfo),
         // Get primary keys
         primaryKeys: await getTablePrimaryKeys(tableInfo),
-        // Check if values should be cleared before inserting
-        clearValue: checkClearValueTable(tableInfo),
     }
     // add node to index
     tableIndex.addNode(tableInfo.toString(), tableNode)

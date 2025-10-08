@@ -42,8 +42,6 @@ export const USE_MERGE = (process.env.POSTGRES_USE_MERGE || 'True')  === 'True'
 export const PREFIX_ID_BASE = process.env.PREFIX_ID_BASE || 'https://data.hetarchief.be/id/entity/'
 
 
-const DB_CLEAR_VALUE_TABLES = process.env.DB_CLEAR_VALUE_TABLES || ""
-export const clearValueTables: string[] = DB_CLEAR_VALUE_TABLES.split(",").map(item => item.trim()).filter(Boolean)
 
 
 
