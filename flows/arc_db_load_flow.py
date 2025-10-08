@@ -14,6 +14,8 @@ from flows.arc_db_load_index_tables_flow import get_min_date
 @task
 def wait_until_hour(hour: int):
     now = DateTime.now('Europe/Brussels')
+    logger = get_run_logger()
+    logger.info(f"Current time is {now}. Waiting until {hour}:00 to start...")
     while now.hour != hour:
         time.sleep(300)  # Sleep for 5 minutes
         now = DateTime.now('Europe/Brussels')
