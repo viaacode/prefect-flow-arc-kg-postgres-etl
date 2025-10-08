@@ -210,37 +210,37 @@ CONSTRUCT {
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     BIND (REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1") as ?schema_license)
-    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_license)))) AS ?ie_lic)
-    BIND(IRI(CONCAT(str(?ie),"/",md5(str(?dcterms_format)))) AS ?ie_format)
+    BIND(IRI(CONCAT(str(?ie),"/","schema_license","/",md5(str(?schema_license)))) AS ?ie_lic)
+    BIND(IRI(CONCAT(str(?ie),"/","dcterms_format","/",md5(str(?dcterms_format)))) AS ?ie_format)
 
     {} UNION {
         ?ie schema:alternateName ?schema_alternate_name.
         FILTER langMatches(lang(?schema_alternate_name), "nl")
         
-        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_alternate_name)))) AS ?ie_an)
+        BIND(IRI(CONCAT(str(?ie),"/","schema_alternate_name","/",md5(str(?schema_alternate_name)))) AS ?ie_an)
     }
 
     UNION {
         ?ie schema:inLanguage ?schema_in_language.
-        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_in_language)))) AS ?ie_il)
+        BIND(IRI(CONCAT(str(?ie),"/","schema_in_language","/",md5(str(?schema_in_language)))) AS ?ie_il)
     }
 
     UNION {
       ?ie schema:keywords ?schema_keywords.
-      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_keywords)))) AS ?ie_kw)
+      BIND(IRI(CONCAT(str(?ie),"/","schema_keywords","/",md5(str(?schema_keywords)))) AS ?ie_kw)
     }
 
     UNION {
         ?ie schema:genre ?schema_genre.
-        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_genre)))) AS ?ie_g)
+        BIND(IRI(CONCAT(str(?ie),"/","schema_genre","/",md5(str(?schema_genre)))) AS ?ie_g)
     }
     UNION {
         ?ie schema:spatial/schema:name ?schema_spatial.
-        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_spatial)))) AS ?ie_spat)
+        BIND(IRI(CONCAT(str(?ie),"/","schema_spatial","/",md5(str(?schema_spatial)))) AS ?ie_spat)
     }
     UNION {
         ?ie schema:temporal ?schema_temporal.
-        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_temporal)))) AS ?ie_temp)
+        BIND(IRI(CONCAT(str(?ie),"/","schema_temporal","/",md5(str(?schema_temporal)))) AS ?ie_temp)
     }
   
     UNION {
@@ -279,7 +279,7 @@ CONSTRUCT {
           ) 
           as ?premis_identifier_type)
 
-        BIND(IRI(CONCAT(str(?ie),"/",md5(str(?premis_identifier)))) AS ?ie_local_id)
+        BIND(IRI(CONCAT(str(?ie),"/","premis_identifier","/",md5(str(?premis_identifier)))) AS ?ie_local_id)
     }
   
     UNION { ?ie haDes:pageNumber ?schema_position }
@@ -307,7 +307,7 @@ CONSTRUCT {
         ?schema_copyright_holder_c schema:name ?schema_copyright_holder.
       }
       
-      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
+      BIND(IRI(CONCAT(str(?ie),"/","schema_copyright_holder","/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
     }
     # krant
     UNION { 
@@ -360,7 +360,7 @@ CONSTRUCT {
       )
       ?collection a ?collection_type; schema:name ?collection_schema_name.
 
-      BIND(IRI(CONCAT(str(?ie),"/",md5(str(?collection)))) AS ?ie_isp)
+      BIND(IRI(CONCAT(str(?ie),"/","collection","/",md5(str(?collection)))) AS ?ie_isp)
 
       {}    
       UNION { ?collection schema:seasonNumber ?collection_schema_season_number }
