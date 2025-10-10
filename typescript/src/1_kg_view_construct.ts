@@ -1,5 +1,6 @@
 import {
     DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, 
+    OR_IDS, 
     PREFIX_ID_BASE, 
     SINCE,
 } from './configuration.js'
@@ -29,23 +30,38 @@ async function main() {
     } catch (err) {
         logInfo(`Graph ${destination.graph} does not exist.\n`)
     }
+    const orIds: string[] = OR_IDS ? OR_IDS.split(',').map(id => id.trim()) : []
 
-    logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph} ${SINCE ? `from ${SINCE}` : '(full sync)'}.`)
+    logInfo(`Starting pipelines for ${queries.map(q => q.slug)} to ${destination.graph} ${SINCE ? `from ${SINCE}` : '(full sync)'}${OR_IDS ? ` for ${OR_IDS}`: ''}.`)
+    const baseVariables = SINCE ? {
+        since: SINCE,
+        prefix_id_base: PREFIX_ID_BASE
+    } : {
+        prefix_id_base: PREFIX_ID_BASE
+    }
 
     // Run the queries as a pipeline in TriplyDB and wait for completion
     await account.runPipeline({
         destination,
         onProgress: progress => logInfo(`Pipeline ${queries.map(q => q.slug)}: ${Math.round(progress.progress * 100)}% complete.`),
-        queries: queries.map(q => ({
-            query: q,
-            // TODO report bug on 'less than one property`
-            ...SINCE ? {
-                variables: {
-                    since: SINCE,
-                    prefix_id_base: PREFIX_ID_BASE
+        queries: queries.flatMap(q => {
+            if (orIds.length > 0) {
+                return orIds.map(orId => ({
+                    query: q,
+                    variables: {
+                        ...baseVariables,
+                        maintainer_id: orId
+                    }
+                }))
+            } else {
+                return {
+                    query: q,
+                    variables: {
+                        ...baseVariables,
+                    }
                 }
-            } : {}
-        })),
+            }
+        })
     })
     logInfo(`View construction completed (${msToTime(performance.now() - start)}).`)
 }

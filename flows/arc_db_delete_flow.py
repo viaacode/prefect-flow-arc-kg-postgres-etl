@@ -1,13 +1,6 @@
-import os
-from datetime import datetime
-
-from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
-from prefect.states import Completed
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_meemoo.config.last_run import save_last_run_config
-from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
-from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from psycopg2 import DatabaseError, connect, sql
 from psycopg2.extras import RealDictCursor
