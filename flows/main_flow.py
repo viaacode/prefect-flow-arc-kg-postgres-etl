@@ -109,19 +109,19 @@ def main_flow(
     )
 
     # Only change the full_sync parameter if the flow is active
-    # arc_alto_to_json_parameter_change = (
-    #     change_deployment_parameters.submit(
-    #         name=deployment_arc_alto_to_json_flow.name,
-    #         parameters={
-    #             # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
-    #             "full_sync": full_sync or deployment_arc_alto_to_json_flow.full_sync,
-    #             "last_modified": last_modified
-    #         },
-    #         wait_for=[kg_to_postgres_result],
-    #     )
-    #     if deployment_arc_alto_to_json_flow.active
-    #     else None
-    # )
+    arc_alto_to_json_parameter_change = (
+        change_deployment_parameters.submit(
+            name=deployment_arc_alto_to_json_flow.name,
+            parameters={
+                # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
+                "full_sync": full_sync or deployment_arc_alto_to_json_flow.full_sync,
+                "last_modified": last_modified
+            },
+            wait_for=[kg_to_postgres_result],
+        )
+        if deployment_arc_alto_to_json_flow.active
+        else None
+    )
 
     # Run the arc alto to json flow if it is active
     arc_alto_to_json_result = (
@@ -129,7 +129,7 @@ def main_flow(
             name=deployment_arc_alto_to_json_flow.name,
             wait_for=[
                 kg_to_postgres_result,
-                # arc_alto_to_json_parameter_change,
+                arc_alto_to_json_parameter_change,
             ],
         )
         if deployment_arc_alto_to_json_flow.active
