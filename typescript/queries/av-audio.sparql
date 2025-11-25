@@ -156,6 +156,10 @@ CONSTRUCT {
   :representation_id ?rep;
   :file_id ?file.
 
+?peak_inc :tableName "graph.includes";
+  :representation_id ?rep;
+  :file_id ?peak.
+  
 ?file :tableName "graph.file";
   :id ?file;
   :ebucore_has_mime_type ?file_ebucore_has_mime_type;
@@ -165,6 +169,16 @@ CONSTRUCT {
   :schema_duration ?file_schema_duration;
   :schema_name ?file_schema_name;
   :schema_thumbnail_url ?file_schema_thumbnail_url.
+
+?peak :tableName "graph.file";
+  :id ?peak;
+  :ebucore_has_mime_type ?peak_ebucore_has_mime_type;
+  :edm_is_next_in_sequence ?peak_edm_is_next_in_sequence;
+  :premis_original_name ?peak_premis_original_name;
+  :premis_stored_at ?peak_premis_stored_at;
+  :schema_duration ?peak_schema_duration;
+  :schema_name ?peak_schema_name;
+  :schema_thumbnail_url ?peak_schema_thumbnail_url.
 
 } WHERE {
 
@@ -473,16 +487,36 @@ CONSTRUCT {
           rel:isi|^ebucore:isMediaFragmentOf ?rep;
           ebucore:hasMimeType ?file_ebucore_has_mime_type .
 
+      
       VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "audio/mpeg" "audio/m4a" }
       FILTER (langMatches(lang(?file_schema_name), "nl"))
 
       {}
+      # search for peak files
+      UNION {
+        ?file rel:isi/rel:inc ?peak.
+
+        ?peak a premis:File;
+          schema:name ?peak_schema_name ;
+          premis:originalName ?peak_premis_original_name;
+          premis:storedAt/rdf:value ?peak_premis_stored_at ;
+          ebucore:hasMimeType "application/json", ?peak_ebucore_has_mime_type .
+        FILTER(contains(?peak_premis_original_name,"peak"))
+        FILTER (langMatches(lang(?peak_schema_name), "nl"))
+
+        {}
+        UNION { ?peak edm:isNextInSequence ?peak_edm_is_next_in_sequence }
+        UNION { ?peak schema:thumbnailUrl ?peak_schema_thumbnail_url }
+        UNION { ?peak schema:duration ?peak_schema_duration }
+  
+      }
       UNION { ?file edm:isNextInSequence ?file_edm_is_next_in_sequence }
       UNION { ?file schema:thumbnailUrl ?file_schema_thumbnail_url }
       UNION { ?file schema:duration ?file_schema_duration }
 
       # 4. includes
       BIND(IRI(CONCAT(str(?file), "/",md5(str(?rep)))) AS ?inc)
+      BIND(IRI(CONCAT(str(?peak), "/",md5(str(?rep)))) AS ?peak_inc)
     } 
   }
 }
