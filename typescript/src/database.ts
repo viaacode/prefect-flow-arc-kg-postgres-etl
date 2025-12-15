@@ -152,6 +152,8 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
                 await t.none(qTemplates.truncateTable, tableInfo)
                 logInfo(`Truncated table ${tableInfo} before merge.`)
                 // Perform simple insert because table is truncated anyway
+                // wait for a moment to avoid deadlocks
+                await new Promise(resolve => setTimeout(resolve, 100))
                 rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
             } else {
                 //  if the primary key set contains the intellectual_entity_id or organization_id column, we need to clear the values in the tables for the given primarykeys in temptable before merging
