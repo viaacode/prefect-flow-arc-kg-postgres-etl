@@ -42,6 +42,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             'schema_number_of_pages', ie.ha_des_number_of_pages,
             'schema_mentions', sme.schema_name,
             'dcterms_rights_statement', drs.dcterms_rights_statement,
+            'reuse_category', reuse.reuse_category,
             'schema_location_created', slc.schema_location_created,
             'children', iec.children,
             'is_deleted', mf.is_deleted
@@ -274,6 +275,41 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE sl.intellectual_entity_id = ie.id
         AND sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
     ) drs ON true
+    -- reuse_category
+    LEFT JOIN LATERAL (
+      SELECT
+        rights.intellectual_entity_id,
+        jsonb_build_object(
+          'id', rights.reuse_category_id,
+          'label', rights.reuse_category_label)
+        as reuse_category
+      FROM
+        (
+          SELECT
+            rig.intellectual_entity_id,
+            rig.reuse_category_id as reuse_category_id,
+            lrc.label as reuse_category_label
+          FROM (
+            SELECT
+              r.intellectual_entity_id,
+              r.reuse_category_id
+            FROM graph.rights r
+            UNION
+            SELECT
+                sl.intellectual_entity_id,
+                CASE
+                    WHEN 'Publiek-Domein' = ANY(array_agg(sl.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'
+                    WHEN 'COPYRIGHT-UNDETERMINED' = ANY(array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0'
+                    ELSE NULL::text
+                END AS reuse_category_id
+            FROM graph.schema_license sl
+            WHERE sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
+            GROUP BY sl.intellectual_entity_id
+          ) as rig
+          LEFT JOIN lookup.reuse_category lrc on lrc.id = rig.reuse_category_id
+        ) as rights
+        WHERE rights.intellectual_entity_id = ie.id
+    ) reuse ON true
     -- schema_location_created
     LEFT JOIN LATERAL (
         SELECT 
