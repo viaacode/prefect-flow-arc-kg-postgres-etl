@@ -32,6 +32,17 @@ CONSTRUCT {
 :schema_email ?schema_email;
 :schema_telephone ?schema_telephone.
 
+?schema_postal_address :tableName "graph.schema_postal_address";
+:id ?schema_postal_address;
+:organization_id ?org;
+:schema_contact_type ?schema_contact_type_postal_address;
+:schema_street_address ?schema_street_address;
+:schema_address_country ?schema_address_country;
+:schema_address_locality ?schema_address_locality;
+:schema_postal_code ?schema_postal_code;
+:schema_address_region ?schema_address_region;
+.
+
 } 
 FROM graph:organization
 FROM graph:organization-static-bavo
@@ -79,5 +90,26 @@ WHERE {
         ?cp schema:telephone ?schema_telephone .
       } 
   }
-  
+
+  OPTIONAL {
+    ?org org:hasSite/org:siteAddress ?schema_postal_address.
+    ?schema_postal_address schema:contactType ?schema_contact_type_postal_address.
+
+    OPTIONAL {
+      ?schema_postal_address schema:streetAddress ?schema_street_address .
+    }
+    OPTIONAL {
+      ?schema_postal_address schema:addressCountry ?schema_address_country .
+    }
+    OPTIONAL {
+      ?schema_postal_address schema:addressLocality ?schema_address_locality .
+    }
+    OPTIONAL {
+      ?schema_postal_address schema:postalCode ?schema_postal_code .
+    }
+    OPTIONAL {
+      ?schema_postal_address schema:addressRegion ?schema_address_region .
+    }
+  }
+
 }
