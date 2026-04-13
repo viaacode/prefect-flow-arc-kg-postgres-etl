@@ -19,11 +19,14 @@ CONSTRUCT {
 :ha_org_sector ?ha_org_sector;
 :org_classification ?org_classification;
 :org_identifier ?org_identifier;
-:skos_pref_label ?skos_pref_label.
+:skos_pref_label ?skos_pref_label;
+:schema_vat_id ?schema_vat_id;
+.
 
 ?org_pref :tableName "graph.organization_has_preference";
 :organization_id ?org;
-:ha_pref ?ha_pref.
+:ha_pref ?ha_pref;
+.
 
 ?cp :tableName "graph.schema_contact_point";
 :id ?cp;
@@ -75,6 +78,9 @@ WHERE {
 
    BIND (REPLACE(STR(?ha_pref_res), "^.*/([^/]*)$", "$1") as ?ha_pref)
    BIND (IRI(CONCAT(str(?org),md5(str(?ha_pref)))) AS ?org_pref)
+  }
+  OPTIONAL {
+    ?org schema:vatID ?schema_vat_id .
   }
 
   OPTIONAL {
