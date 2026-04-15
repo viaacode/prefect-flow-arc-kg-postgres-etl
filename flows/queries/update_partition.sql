@@ -266,43 +266,31 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
     -- dcterms_rights_statement
     LEFT JOIN LATERAL (
         SELECT
-            CASE
-                WHEN 'Publiek-Domein' = ANY(array_agg(sl.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'
-                WHEN 'COPYRIGHT-UNDETERMINED' = ANY(array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0/'
-                ELSE NULL::text
-            END AS dcterms_rights_statement
-        FROM graph.schema_license sl
-        WHERE sl.intellectual_entity_id = ie.id
-        AND sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
+            intellectual_entity_id,
+            dcterms_rights_statement
+        FROM graph._dcterms_rights_statement gdrs
+        WHERE gdrs.intellectual_entity_id = ie.id
     ) drs ON true
     -- reuse rights
-    -- Only select 1 reuse category per intellectual entity, prioritizing
-    -- explicit rights over license-based ones
     LEFT JOIN LATERAL (
+      SELECT
+        jsonb_build_object(
+          'id', rig.reuse_category_id,
+          'label', lrc.label
+        ) AS reuse_category
+      FROM (
         SELECT
-            jsonb_build_object(
-                'id', candidate.reuse_category_id,
-                'label', lrc.label
-            ) AS reuse_category
-        FROM (
-            SELECT
-                r.reuse_category_id,
-                1 AS source_priority
-            FROM graph.rights r
-            WHERE r.intellectual_entity_id = ie.id
-
-            UNION ALL
-
-            SELECT
-                drs.dcterms_rights_statement AS reuse_category_id,
-                2 AS source_priority
-        ) candidate
-        LEFT JOIN lookup.reuse_category lrc
-            ON lrc.id = candidate.reuse_category_id
-        WHERE candidate.reuse_category_id IS NOT NULL
-        ORDER BY candidate.source_priority, candidate.reuse_category_id
-        LIMIT 1
-    ) reuse ON true
+          r.intellectual_entity_id,
+          r.reuse_category_id
+        FROM graph.rights r
+        UNION ALL
+        SELECT
+          drs.intellectual_entity_id,
+          drs.dcterms_rights_statement AS reuse_category_id
+        ) AS rig
+      LEFT JOIN lookup.reuse_category lrc ON lrc.id = rig.reuse_category_id
+      WHERE rig.intellectual_entity_id = ie.id
+    ) reuse on true
     -- schema_location_created
     LEFT JOIN LATERAL (
         SELECT
