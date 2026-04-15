@@ -276,45 +276,40 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         AND sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
     ) drs ON true
     -- reuse rights
+    -- Only select 1 reuse category per intellectual entity, prioritizing
+    -- explicit rights over license-based ones
     LEFT JOIN LATERAL (
-      SELECT
-        rights.intellectual_entity_id,
-        jsonb_build_object(
-          'id', rights.reuse_category_id,
-          'label', rights.reuse_category_label
-        ) AS reuse_category
-      FROM (
         SELECT
-          rig.intellectual_entity_id,
-          rig.reuse_category_id AS reuse_category_id,
-          lrc.label AS reuse_category_label
+            jsonb_build_object(
+                'id', candidate.reuse_category_id,
+                'label', lrc.label
+            ) AS reuse_category
         FROM (
-          SELECT
-            r.intellectual_entity_id,
-            r.reuse_category_id
-          FROM
-            graph.rights r
-          UNION
-          SELECT
-            sl.intellectual_entity_id,
-            CASE
-              WHEN 'Publiek-Domein' = any (array_agg(sl.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'
-              WHEN 'COPYRIGHT-UNDETERMINED' = any (array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0/'
-              ELSE null::text
-            END AS reuse_category_id
-          FROM
-            graph.schema_license sl
-          WHERE
-            sl.schema_license = any (array['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
-          GROUP BY
-            sl.intellectual_entity_id
-          ) AS rig
-        LEFT JOIN lookup.reuse_category lrc ON lrc.id = rig.reuse_category_id
-      ) AS reu
-      WHERE
-        reu.intellectual_entity_id = ie.id
-      ORDER BY intellectual_entity_id
-    ) reuse on true
+            SELECT DISTINCT
+                r.reuse_category_id,
+                1 AS source_priority
+            FROM graph.rights r
+            WHERE r.intellectual_entity_id = ie.id
+
+            UNION ALL
+
+            SELECT
+                CASE
+                    WHEN 'Publiek-Domein' = ANY(array_agg(sl.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'
+                    WHEN 'COPYRIGHT-UNDETERMINED' = ANY(array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0/'
+                    ELSE NULL::text
+                END AS reuse_category_id,
+                2 AS source_priority
+            FROM graph.schema_license sl
+            WHERE sl.intellectual_entity_id = ie.id
+            AND sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
+        ) candidate
+        LEFT JOIN lookup.reuse_category lrc
+            ON lrc.id = candidate.reuse_category_id
+        WHERE candidate.reuse_category_id IS NOT NULL
+        ORDER BY candidate.source_priority, candidate.reuse_category_id
+        LIMIT 1
+    ) reuse ON true
     -- schema_location_created
     LEFT JOIN LATERAL (
         SELECT
