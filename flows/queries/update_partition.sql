@@ -268,7 +268,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         SELECT
             CASE
                 WHEN 'Publiek-Domein' = ANY(array_agg(sl.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'
-                WHEN 'COPYRIGHT-UNDETERMINED' = ANY(array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0'
+                WHEN 'COPYRIGHT-UNDETERMINED' = ANY(array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0/'
                 ELSE NULL::text
             END AS dcterms_rights_statement
         FROM graph.schema_license sl
