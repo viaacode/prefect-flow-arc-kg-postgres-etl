@@ -285,7 +285,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
                 'label', lrc.label
             ) AS reuse_category
         FROM (
-            SELECT DISTINCT
+            SELECT
                 r.reuse_category_id,
                 1 AS source_priority
             FROM graph.rights r
@@ -294,15 +294,8 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             UNION ALL
 
             SELECT
-                CASE
-                    WHEN 'Publiek-Domein' = ANY(array_agg(sl.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'
-                    WHEN 'COPYRIGHT-UNDETERMINED' = ANY(array_agg(sl.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0/'
-                    ELSE NULL::text
-                END AS reuse_category_id,
+                drs.dcterms_rights_statement AS reuse_category_id,
                 2 AS source_priority
-            FROM graph.schema_license sl
-            WHERE sl.intellectual_entity_id = ie.id
-            AND sl.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED', 'Publiek-Domein'])
         ) candidate
         LEFT JOIN lookup.reuse_category lrc
             ON lrc.id = candidate.reuse_category_id
