@@ -283,13 +283,13 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
           r.intellectual_entity_id,
           r.reuse_category_id
         FROM graph.rights r
+        WHERE r.intellectual_entity_id = ie.id
         UNION ALL
         SELECT
           drs.intellectual_entity_id,
           drs.dcterms_rights_statement AS reuse_category_id
         ) AS rig
       LEFT JOIN lookup.reuse_category lrc ON lrc.id = rig.reuse_category_id
-      WHERE rig.intellectual_entity_id = ie.id
     ) reuse on true
     -- schema_location_created
     LEFT JOIN LATERAL (
