@@ -4,6 +4,7 @@ import { AddQueryOptions } from '@triply/triplydb/commonAccountFunctions.js'
 import { readdir, readFile, } from 'fs/promises'
 import { join, extname, parse, dirname } from 'path'
 import Dataset from '@triply/triplydb/Dataset.js'
+import Query from '@triply/triplydb/Query.js'
 import {
     QUERY_PATH,
     ACCOUNT, DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, TOKEN,
@@ -18,25 +19,29 @@ const __dirname = dirname(__filename)
 
 // Helper function to add a SPARQL Query to TriplyDB as Saved Query; needed to run them as Query Job
 export async function addQuery(account: Account, queryName: string, params: AddQueryOptions) {
+
+    let query: Query;
+    
     // Add version if query exists
     try {
-        const query = await account.getQuery(queryName)
+        query = await account.getQuery(queryName)
 
         // Explicitely set dataset to make sure there are no query job conflicts
         query.update({dataset: (await params.dataset.getInfo()).id})
-
-        // If the queryString did not change, don't create a new version
-        if (params.queryString == await query.getString()) {
-            logInfo(`Querystring of ${queryName} did not change; not adding a new version.\n`)
-            return query
-        }
-        
-        return query.addVersion({...params, ...{ldFrame: undefined}})
     } catch (err) {
         logInfo(`Query ${queryName} does not exist; adding it.\n`)
+        return account.addQuery(queryName, params)
     }
+
+
+    // If the queryString did not change, don't create a new version
+    if (params.queryString == await query.getString()) {
+        logInfo(`Querystring of ${queryName} did not change; not adding a new version.\n`)
+        return query
+    }
+        
+    return query.addVersion({...params, ...{ldFrame: undefined}})
     
-    return account.addQuery(queryName, params)
 }
 
 // Function to add SPARQL queries in files to TriplyDB
