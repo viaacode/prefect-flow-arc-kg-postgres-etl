@@ -9,7 +9,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Batch, InsertRecord } from './types.js'
-import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool } from './database.js'
+import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, TEMP_deleteOrphanedTempRepresentation } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -189,6 +189,11 @@ async function main() {
     logInfo(`Upserting tables in order ${tables.join(', ')}.`)
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
+        // Quick fix, delete all rows from graph.temp_representation that do not have is_mediafragment_of present in graph.file (they can be null)
+        if (tableNode.tableInfo.toString() === 'graph."representation"') {
+            logInfo('Deleting orphaned media fragments from temp_representation')
+            await TEMP_deleteOrphanedTempRepresentation()
+        }
         // merge records from temp table into table; truncate tables if full sync
         const startMerge = performance.now()
         const rowCount = await mergeTable(tableNode, !SINCE, USE_MERGE)

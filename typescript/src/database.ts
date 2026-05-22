@@ -254,6 +254,35 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
     }
 }
 
+// tmp function to delete records from graph.temp_representation that do not have is_mediafragment_of present in graph.file (they can be null)
+export async function TEMP_deleteOrphanedTempRepresentation() {
+    let connection
+    try {
+        connection = await db.connect()
+        const deleteQuery = `
+            DELETE FROM graph.temp_representation tr
+            WHERE tr.is_media_fragment_of IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM graph.file f
+                WHERE f.id = tr.is_media_fragment_of
+            );
+        `
+        const result = await connection.result(deleteQuery)
+        logInfo(`Deleted ${result.rowCount} orphaned records from graph.temp_representation.`)
+    }
+    catch (err) {
+        logError(`Error deleting orphaned records from graph.temp_representation`, err)
+        throw err
+    }
+    finally {
+        // release connection
+        const pool = db.$pool
+        if (connection) connection.done()
+        logInfo(
+            `Pool stats after deleting orphaned records from graph.temp_representation: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+        )
+    }
+}
+
 
 // shuts down the connection pool associated with the Database object
 export async function closeConnectionPool() {
