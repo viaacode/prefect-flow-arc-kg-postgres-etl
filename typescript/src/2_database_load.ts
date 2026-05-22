@@ -5,6 +5,7 @@ import {
     SKIP_CLEANUP,
     DEBUG_MODE,
     USE_MERGE,
+    TABLES,
 } from './configuration.js'
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
@@ -80,6 +81,10 @@ async function processGraph(graph: Graph, recordLimit?: number) {
 
                 // Get table information from the table index, or create a temp table if not exists
                 const tableNode = tableIndex.hasNode(batch.tableInfo.toString()) ? tableIndex.getNodeData(batch.tableInfo.toString()) : await createTableNode(batch.tableInfo)
+                if(TABLES && !TABLES.includes(tableNode.tableInfo.toString())) {
+                    done()
+                    return
+                }
                 // Copy the batch to database
                 const start = performance.now()
                 stats.unprocessedBatches++
