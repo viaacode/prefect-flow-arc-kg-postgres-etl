@@ -1,6 +1,6 @@
 import { TableInfo, TableNode, Batch } from './types.js'
 import { logInfo, logError, logDebug, isValidDate } from './util.js'
-import { dbConfig, DEBUG_MODE } from './configuration.js'
+import { dbConfig, DEBUG_MODE, TABLES } from './configuration.js'
 import pgplib, { ColumnSet } from 'pg-promise'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -148,57 +148,60 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
         return await connection.tx('process-merge', async t => {
             let rslt = 0
             // Truncate table first if desired
-            if (truncate) {
-                await t.none(qTemplates.truncateTable, tableInfo)
-                logInfo(`Truncated table ${tableInfo} before merge.`)
-                // Perform simple insert because table is truncated anyway
-                // wait for a moment to avoid deadlocks
-                await new Promise(resolve => setTimeout(resolve, 100))
-                rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
-            } else {
-                //  if the primary key set contains the intellectual_entity_id or organization_id column, we need to clear the values in the tables for the given primarykeys in temptable before merging
-                if (primaryKeys.columns.some(c => c.name === 'intellectual_entity_id')) {
-                    // Build query to clear values in the main table
-                    // Set all columns to NULL where intellectual_entity_id matches
-                    const clearQuery = pgp.as.format(`
-                        DELETE FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
-                        WHERE intellectual_entity_id IN (
-                            SELECT intellectual_entity_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
-                        );
-                    `, { tableInfo, tempTable, columns })
-                    // Perform clearing of values in the main table
-                    let clearResult = await t.result(clearQuery, null, r => r.rowCount)
-                    logInfo(`Cleared ${clearResult} rows in table ${tableInfo} before merge.`)
-                }
-                if (primaryKeys.columns.some(c => c.name === 'organization_id')) {
-                    // Build query to clear values in the main table
-                    // Set all columns to NULL where organization_id matches
-                    const clearQuery = pgp.as.format(`
-                        DELETE FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
-                        WHERE organization_id IN (
-                            SELECT organization_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
-                        );
-                    `, { tableInfo, tempTable, columns })
-                    // Perform clearing of values in the main table
-                    let clearResult = await t.result(clearQuery, null, r => r.rowCount)
-                    logInfo(`Cleared ${clearResult} rows in table ${tableInfo} before merge.`)
-                }
-                // Build query
-                const mergeQuery = useMerge ? pgp.as.format(`
-                MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
-                USING $<tempTable.schema:name>.$<tempTable.name:name> y
-                ON ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')}
-                WHEN MATCHED THEN
-                    UPDATE SET ${columns.assignColumns({ from: 'y' })} 
-                WHEN NOT MATCHED THEN
-                    INSERT (${columns.names}) VALUES (${columns.columns.map(c => `y.${c.escapedName}`).join(',')});
-                `, { tableInfo, tempTable, primaryKeys }) : pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys: primaryKeys.names })
-                + columns.assignColumns({ from: 'EXCLUDED' })
+            // If TABLES  contains the current table:
+            if(!TABLES || TABLES.includes(tableInfo.toString())) {
+                if (truncate) {
+                    await t.none(qTemplates.truncateTable, tableInfo)
+                    logInfo(`Truncated table ${tableInfo} before merge.`)
+                    // Perform simple insert because table is truncated anyway
+                    // wait for a moment to avoid deadlocks
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                    rslt = await t.result(qTemplates.copyTableData, { to: tableInfo, from: tempTable }, r => r.rowCount)
+                } else {
+                    //  if the primary key set contains the intellectual_entity_id or organization_id column, we need to clear the values in the tables for the given primarykeys in temptable before merging
+                    if (primaryKeys.columns.some(c => c.name === 'intellectual_entity_id')) {
+                        // Build query to clear values in the main table
+                        // Set all columns to NULL where intellectual_entity_id matches
+                        const clearQuery = pgp.as.format(`
+                            DELETE FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
+                            WHERE intellectual_entity_id IN (
+                                SELECT intellectual_entity_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
+                            );
+                        `, { tableInfo, tempTable, columns })
+                        // Perform clearing of values in the main table
+                        let clearResult = await t.result(clearQuery, null, r => r.rowCount)
+                        logInfo(`Cleared ${clearResult} rows in table ${tableInfo} before merge.`)
+                    }
+                    if (primaryKeys.columns.some(c => c.name === 'organization_id')) {
+                        // Build query to clear values in the main table
+                        // Set all columns to NULL where organization_id matches
+                        const clearQuery = pgp.as.format(`
+                            DELETE FROM $<tableInfo.schema:name>.$<tableInfo.name:name>
+                            WHERE organization_id IN (
+                                SELECT organization_id FROM $<tempTable.schema:name>.$<tempTable.name:name>
+                            );
+                        `, { tableInfo, tempTable, columns })
+                        // Perform clearing of values in the main table
+                        let clearResult = await t.result(clearQuery, null, r => r.rowCount)
+                        logInfo(`Cleared ${clearResult} rows in table ${tableInfo} before merge.`)
+                    }
+                    // Build query
+                    const mergeQuery = useMerge ? pgp.as.format(`
+                    MERGE INTO $<tableInfo.schema:name>.$<tableInfo.name:name> x
+                    USING $<tempTable.schema:name>.$<tempTable.name:name> y
+                    ON ${primaryKeys.columns.map(c => `x.${c.escapedName} = y.${c.escapedName}`).join(' AND ')}
+                    WHEN MATCHED THEN
+                        UPDATE SET ${columns.assignColumns({ from: 'y' })} 
+                    WHEN NOT MATCHED THEN
+                        INSERT (${columns.names}) VALUES (${columns.columns.map(c => `y.${c.escapedName}`).join(',')});
+                    `, { tableInfo, tempTable, primaryKeys }) : pgp.as.format(qTemplates.upsertTable, { tableInfo, tempTable, primaryKeys: primaryKeys.names })
+                    + columns.assignColumns({ from: 'EXCLUDED' })
 
-                logDebug(mergeQuery)
+                    logDebug(mergeQuery)
 
-                // Perform merge/upsert and catch amount of merged rows
-                rslt = await t.result(mergeQuery, null, r => r.rowCount)
+                    // Perform merge/upsert and catch amount of merged rows
+                    rslt = await t.result(mergeQuery, null, r => r.rowCount)
+                }
             }
 
             // Drop temp table when done
@@ -242,7 +245,19 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
     } catch (err) {
         logError(`Error during bulk insert for table ${tableInfo}`, err)
         logError(`Erroreous batch (JSON)`, err, JSON.stringify(batch))
-        throw err
+        // retry again with new connection
+        try {
+            // wait for 5 minutes
+            await new Promise(resolve => setTimeout(resolve, 300000))
+            connection = await db.connect()
+            const { insert } = pgp.helpers
+            const query = insert(batch.records, columns, { schema: tempTable.schema, table: tempTable.name })
+            await connection.none(query)
+        }
+        catch (err) {
+            logError(`Retry failed during bulk insert for table ${tableInfo}`, err)
+            throw err
+        }
     } 
     finally {
         // release connection
@@ -279,6 +294,35 @@ export async function TEMP_deleteOrphanedTempRepresentation() {
         if (connection) connection.done()
         logInfo(
             `Pool stats after deleting orphaned records from graph.temp_representation: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
+        )
+    }
+}
+
+// tmp function to delete records from graph.temp_representation that do not have is_mediafragment_of present in graph.file (they can be null)
+export async function TEMP_deleteOrphanedTempIncludes() {
+    let connection
+    try {
+        connection = await db.connect()
+        const deleteQuery = `
+            DELETE FROM graph.temp_includes ic
+            WHERE  NOT EXISTS (
+                SELECT 1 FROM graph.representation r
+                WHERE r.id = ic.representation_id
+            );
+        `
+        const result = await connection.result(deleteQuery)
+        logInfo(`Deleted ${result.rowCount} orphaned records from graph.temp_includes.`)
+    }
+    catch (err) {
+        logError(`Error deleting orphaned records from graph.temp_includes`, err)
+        throw err
+    }
+    finally {
+        // release connection
+        const pool = db.$pool
+        if (connection) connection.done()
+        logInfo(
+            `Pool stats after deleting orphaned records from graph.temp_in: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
         )
     }
 }
