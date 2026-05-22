@@ -43,6 +43,7 @@ def arc_db_load_flow(
     last_modified: DateTime = None,
     or_ids: list[str] = None,
     full_sync: bool = False,
+    sync_tables: list[str] = None,
     full_sync_hour: int = 0,
     debug_mode: bool = False,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
@@ -91,6 +92,7 @@ def arc_db_load_flow(
             postgres_ssl=db_ssl,
             postgres_pool_min=db_pool_min,
             postgres_pool_max=db_pool_max,
+            tables=",".join(sync_tables) if sync_tables else None,
             wait_for=[wait_period] if full_sync else None,
         )
 

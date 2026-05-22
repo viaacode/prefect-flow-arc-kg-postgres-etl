@@ -9,7 +9,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Batch, InsertRecord } from './types.js'
-import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, TEMP_deleteOrphanedTempRepresentation } from './database.js'
+import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, TEMP_deleteOrphanedTempRepresentation, TEMP_deleteOrphanedTempIncludes } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -193,6 +193,10 @@ async function main() {
         if (tableNode.tableInfo.toString() === 'graph."representation"') {
             logInfo('Deleting orphaned media fragments from temp_representation')
             await TEMP_deleteOrphanedTempRepresentation()
+        }
+        if (tableNode.tableInfo.toString() === 'graph."includes"') {
+            logInfo('Deleting orphaned includes from temp_includes')
+            await TEMP_deleteOrphanedTempIncludes()
         }
         // merge records from temp table into table; truncate tables if full sync
         const startMerge = performance.now()
