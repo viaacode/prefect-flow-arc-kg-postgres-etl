@@ -10,7 +10,7 @@ import {
 import { logInfo, logError, logDebug, msToTime, logWarning, stats } from './util.js'
 import { DepGraph } from 'dependency-graph'
 import { TableNode, TableInfo, Batch, InsertRecord } from './types.js'
-import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, TEMP_deleteOrphanedTempRepresentation, TEMP_deleteOrphanedTempIncludes } from './database.js'
+import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, TEMP_deleteOrphanedTempRepresentation, TEMP_deleteOrphanedTempIncludes, getIntersectingSchemaTables } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
 import { createGunzip } from 'zlib'
@@ -34,16 +34,19 @@ function logHeap() {
 const tableIndex = new DepGraph<TableNode>()
 
 // Function to bundle all information about a table in one dependency graph node.
-async function createTableNode(tableInfo: TableInfo): Promise<TableNode> {
+async function createTableNode(tableInfo: TableInfo, sourceTable?: TableInfo): Promise<TableNode> {
+    const resolvedSource = sourceTable ?? await createTempTable(tableInfo)
+
     const tableNode = {
         tableInfo,
-        tempTable: await createTempTable(tableInfo),
+        sourceTable: resolvedSource,
         // Get the actual columns from the database
         columns: await getTableColumns(tableInfo),
         // Get dependent tables from the database
         dependencies: await getDependentTables(tableInfo),
         // Get primary keys
         primaryKeys: await getTablePrimaryKeys(tableInfo),
+        sourceTableIsTemp: sourceTable === null
     }
     // add node to index
     tableIndex.addNode(tableInfo.toString(), tableNode)
@@ -90,7 +93,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
                 stats.unprocessedBatches++
                 logDebug(`Start insert of Batch #${batch.id} (${batch.length} records)`, { paused: fileStream.isPaused() })
                 await batchInsert(tableNode, batch)
-                logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.tempTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
+                logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.sourceTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
 
                 // Update stats
                 stats.processedBatches++
@@ -152,9 +155,11 @@ async function cleanup() {
     for (const tableName of tableIndex.overallOrder()) {
         const tableNode = tableIndex.getNodeData(tableName)
 
-        // Drop temp table
-        logInfo(`- Dropping ${tableNode.tempTable}`)
-        await dropTable(tableNode.tempTable)
+        if (tableNode.sourceTableIsTemp) {
+            // Drop temp table
+            logInfo(`- Dropping ${tableNode.sourceTable}`)
+            await dropTable(tableNode.sourceTable)
+        }
     }
 }
 
@@ -188,6 +193,13 @@ async function main() {
         })
     })
 
+    // The static tables should be merged/inserted into the graph tables.
+    // But unlike the temp tables they should not be truncated/dropped afterwards
+    const intersectingTables = await getIntersectingSchemaTables("static", "graph")
+    for (const table of intersectingTables) {
+        const staticTable = new TableInfo("static", table.name)
+        await createTableNode(table, staticTable)
+    }
 
     // Upsert tables in the correct order
     const tables = tableIndex.overallOrder()

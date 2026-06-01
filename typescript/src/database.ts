@@ -32,12 +32,37 @@ const qTemplates = {
     getTableColumns: sql('get_table_columns.sql'),
     getDependentTables: sql('get_dependent_tables.sql'),
     getTablePrimaryKeys: sql('get_table_primary_keys.sql'),
+    getIntersectingSchemaTables: `
+        SELECT t1.table_name AS name
+        FROM information_schema.tables t1
+        JOIN information_schema.tables t2
+          ON t1.table_name = t2.table_name
+        WHERE t1.table_schema = $<sourceSchema>
+          AND t2.table_schema = $<targetSchema>
+          AND t1.table_type = 'BASE TABLE'
+          AND t2.table_type = 'BASE TABLE'
+        ORDER BY t1.table_name
+    `,
     upsertTable: `
         INSERT INTO $<tableInfo.schema:name>.$<tableInfo.name:name>
         SELECT * FROM $<tempTable.schema:name>.$<tempTable.name:name>
         ON CONFLICT ($<primaryKeys:raw>) DO UPDATE SET `,
     truncateTable: sql('truncate_table.sql'),
     copyTableData: sql('copy_table_data.sql')
+}
+
+// Returns the table infos for the tables from the second argument
+export async function getIntersectingSchemaTables(sourceSchema: string, targetSchema: string): Promise<TableInfo[]> {
+    try {
+        const rows = await db.manyOrNone(qTemplates.getIntersectingSchemaTables, {
+            sourceSchema,
+            targetSchema
+        })
+        return rows.map((row: { name: string }) => new TableInfo(targetSchema, row.name))
+    } catch (err) {
+        logError(`Error retrieving intersection of schemas '${sourceSchema}' and '${targetSchema}'`, err)
+        throw err
+    }
 }
 
 
@@ -141,7 +166,7 @@ export async function getTablePrimaryKeys(tableInfo: TableInfo): Promise<ColumnS
 
 // Helper function to upsert a temp table into the final table
 export async function mergeTable(tableNode: TableNode, truncate: boolean = true, useMerge: boolean = true) {
-    const { columns, primaryKeys, tempTable, tableInfo } = tableNode
+    const { columns, primaryKeys, sourceTable: tempTable, tableInfo } = tableNode
     let connection
     try {
         connection = await db.connect() 
@@ -205,11 +230,13 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
             }
 
             // Drop temp table when done
-            if(!DEBUG_MODE) {
-                await t.none(qTemplates.dropTable, tempTable)
-                logInfo(`Dropped temporary table ${tempTable} after merge.`)
-            } else {
-                logDebug(`DEBUG_MODE is enabled, not dropping temporary table ${tempTable}.`)
+            if (tableNode.sourceTableIsTemp) {
+                if(!DEBUG_MODE) {
+                    await t.none(qTemplates.dropTable, tempTable)
+                    logInfo(`Dropped temporary table ${tempTable} after merge.`)
+                } else {
+                    logDebug(`DEBUG_MODE is enabled, not dropping temporary table ${tempTable}.`)
+                }
             }
             return rslt
         })
@@ -230,7 +257,7 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
 export async function batchInsert(tableNode: TableNode, batch: Batch) {
     if (!batch.length) return
 
-    const { columns, tempTable, tableInfo } = tableNode
+    const { columns, sourceTable: tempTable, tableInfo } = tableNode
     let connection
     try {
         connection = await db.connect()
