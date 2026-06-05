@@ -35,6 +35,11 @@ CONSTRUCT {
 :schema_email ?schema_email;
 :schema_telephone ?schema_telephone.
 
+?org_has_postal_address :tableName "graph.organization_has_postal_address";
+:organization_id ?org;
+:postal_address_id ?schema_postal_address;
+.
+
 ?schema_postal_address :tableName "graph.schema_postal_address";
 :id ?schema_postal_address;
 :organization_id ?org;
@@ -100,6 +105,8 @@ WHERE {
   OPTIONAL {
     ?org org:hasSite/org:siteAddress ?schema_postal_address.
     ?schema_postal_address schema:contactType ?schema_contact_type_postal_address.
+
+    BIND(IRI(CONCAT(str(?org), "/", md5(str(?schema_postal_address)))) AS ?org_has_postal_address)
 
     OPTIONAL {
       ?schema_postal_address schema:streetAddress ?schema_street_address .
