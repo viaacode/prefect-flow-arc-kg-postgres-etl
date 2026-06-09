@@ -5,3 +5,5 @@ prefect-sqlalchemy
 prefect==2.20.16
 prefect-aws==0.4.20
 pydantic==1.10.8
+rdflib
+SPARQLWrapper
