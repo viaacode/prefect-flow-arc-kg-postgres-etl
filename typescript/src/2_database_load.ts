@@ -101,7 +101,7 @@ async function processGraph(recordLimit?: number) {
                 stats.unprocessedBatches++
                 logDebug(`Start insert of Batch #${batch.id} (${batch.length} records)`, { paused: fileStream.isPaused() })
                 await batchInsert(tableNode, batch)
-                logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} of ${numberOfStatements} statements) for ${tableNode.tableInfo} inserted using ${tableNode.sourceTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
+                logDebug(`Batch #${batch.id} inserted; ${recordConstructor.statementIndex} statements) for ${tableNode.tableInfo} inserted using ${tableNode.sourceTable} (${msToTime(performance.now() - start)})!`, { paused: fileStream.isPaused() })
 
                 // Update stats
                 stats.processedBatches++
