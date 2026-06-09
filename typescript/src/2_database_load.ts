@@ -1,4 +1,3 @@
-import Graph from '@triply/triplydb/Graph.js'
 import {
     RECORD_LIMIT, 
     SINCE,
@@ -13,14 +12,12 @@ import { TableNode, TableInfo, Batch, InsertRecord } from './types.js'
 import { createTempTable, getTableColumns, getDependentTables, getTablePrimaryKeys, batchInsert, mergeTable, dropTable, closeConnectionPool, TEMP_deleteOrphanedTempRepresentation, TEMP_deleteOrphanedTempIncludes, getIntersectingSchemaTables } from './database.js'
 import { performance } from 'perf_hooks'
 import { RecordBatcher, RecordContructor } from './stream.js'
-import { createGunzip } from 'zlib'
 import { createReadStream } from 'fs'
-import { rm } from 'fs/promises'
+import { readdir } from 'fs/promises'
 import { StreamParser } from 'n3'
-import { Writable } from 'stream'
+import { Readable, Writable } from 'stream'
 import { pipeline } from 'stream/promises'
 import memwatch from '@airbnb/node-memwatch'
-import { getInfo } from './helpers.js'
 
 // Monitor heap usage for memory leak detection
 let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff()
@@ -28,6 +25,25 @@ let heapDiff: memwatch.HeapDiff = new memwatch.HeapDiff()
 function logHeap() {
     logDebug('Heap difference', heapDiff.end())
     heapDiff = new memwatch.HeapDiff()
+}
+
+async function createTtlFolderStream(folderPath: string): Promise<Readable> {
+    const ttlFiles = (await readdir(folderPath, { withFileTypes: true }))
+        .filter(entry => entry.isFile() && entry.name.endsWith('.ttl'))
+        .map(entry => `${folderPath}/${entry.name}`)
+
+    if (ttlFiles.length === 0) {
+        throw new Error(`No .ttl files found in ${folderPath}`)
+    }
+
+    return Readable.from((async function* () {
+        for (const [index, file] of ttlFiles.entries()) {
+            if (index > 0) {
+                yield Buffer.from('\n')
+            }
+            yield* createReadStream(file)
+        }
+    })(), { objectMode: false })
 }
 
 // Create a dependency graph to store information about tables and their FK dependencies
@@ -54,20 +70,11 @@ async function createTableNode(tableInfo: TableInfo, sourceTable?: TableInfo): P
 }
 
 // Function that processes the RDF graph that results from running the different query jobs
-async function processGraph(graph: Graph, recordLimit?: number) {
-    // Retrieve total number of triples
-    const { numberOfStatements } = await graph.getInfo()
-
-    // Download the graph for local processing
-    logInfo(`Downloading graph of ${numberOfStatements} statements.`)
-    const startDownload = performance.now()
-    await graph.toFile("graph.ttl.gz", { compressed: true })
-    logInfo(`Download complete in ${msToTime(performance.now() - startDownload)}. Start parsing as stream (Debug mode is ${DEBUG_MODE}).`)
-
+async function processGraph(recordLimit?: number) {
     const startGraph = performance.now()
 
-    // Create a stream to read from the file
-    const fileStream = createReadStream("graph.ttl.gz")
+    // TODO: below will produce doubles. check if that is a problem
+    const fileStream = await createTtlFolderStream(".")
     // Create a transform stream that turns triples into records
     const recordConstructor = new RecordContructor({ limit: recordLimit }).on('warning', ({ message, language, subject }) => logWarning(message, language, subject))
     // Create a transfrom stream that turns records into batches
@@ -76,7 +83,8 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     // Create a stream consumer of batches that writes each batch to the target table
     function BatchConsumer(): Writable {
         const writer = new Writable({ objectMode: true })
-        stats.numberOfStatements = numberOfStatements
+        // TODO: We don't have an estimate of the total number of triples
+        stats.numberOfStatements = 0
         writer._write = async (batch: Batch, _encoding, done) => {
             try {
                 // Pause the stream so it does not prevent async processRecord function from executing
@@ -130,8 +138,7 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     // process the local graph as a stream of RDFjs objects
     try {
         await pipeline(
-            fileStream, // Read from file
-            createGunzip(), // Unzip
+            fileStream, // Read concatenated TTL files
             new StreamParser(), // Turn into quads
             recordConstructor, // Turn into records
             batcher, // Turn into batches
@@ -141,10 +148,6 @@ async function processGraph(graph: Graph, recordLimit?: number) {
     } catch (err) {
         logError('Error during parsing or processing', err)
         throw err
-    } finally {
-        // stream has been completely processed or error, remove the local copy.
-        await rm("graph.ttl.gz", { force: true })
-
     }
 }
 
@@ -165,8 +168,6 @@ async function cleanup() {
 
 // Main execution function
 async function main() {
-    // Get all TriplyDB information
-    let { destination } = await getInfo()
 
     // Init timer
     let start: number = performance.now()
@@ -174,11 +175,8 @@ async function main() {
     // Parse and process the gzipped TriG file from the URL
     logInfo('--- Step 1: load temporary tables --')
 
-    // Get destination graph
-    const graph = await destination.dataset.getGraph(destination.graph)
-
     // Process and load the view graph and wait for completion
-    await processGraph(graph, RECORD_LIMIT)
+    await processGraph(RECORD_LIMIT)
     logInfo(`Loading completed (${msToTime(performance.now() - start)}).`)
 
     // Init timer
@@ -270,4 +268,3 @@ process.on('unhandledRejection', (reason, promise) => {
     logError(`Unhandled rejection at ${promise}`, reason)
     process.exit(1)
 })
-
