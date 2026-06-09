@@ -1,18 +1,18 @@
 from glob import glob
 import os
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from pendulum.datetime import DateTime
-from prefect import flow, task
+from prefect import flow, get_run_logger, task
+from prefect.blocks.system import Secret
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect_meemoo.config.last_run import save_last_run_config
-from SPARQLWrapper import SPARQLWrapper
 from rdflib import Literal
 
 @task
-def exec_sparql(endpoint, query_name, query_string, **kwargs):
-    
-    sparql = SPARQLWrapper(endpoint)
-
+def exec_sparql(endpoint_url: str, query_name: str, query_string: str, **kwargs):
     # Perform variable replacement if parameters are provided
     processed_query = query_string
     if kwargs:
@@ -21,12 +21,28 @@ def exec_sparql(endpoint, query_name, query_string, **kwargs):
             # TODO: allow passing URIs or customizing datatype
             processed_query = processed_query.replace(f"?{var}", Literal(value).n3())
 
-    sparql.setQuery(processed_query)
+    data = urlencode({"query": processed_query}).encode("utf-8")
+    request = Request(
+        endpoint_url,
+        data=data,
+        headers={
+            "Accept": "text/turtle",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
 
     with open(f"{query_name}.ttl", "w") as result_file:
-        # Write results to file
-        result_file.write(sparql.query())
-    
+        try:
+            with urlopen(request) as response:
+                result_file.write(response.read().decode("utf-8"))
+        except HTTPError as e:
+            error_body = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"SPARQL HTTP request failed for {query_name}: "
+                f"{e.code} {e.reason}\n{error_body}"
+            ) from e
+
 
 @flow(
     name="prefect_flow_arc_kg_view",
@@ -52,7 +68,7 @@ def kg_view_flow(
     endpoint = Secret.load(endpoint_block)
 
       # Find all relevant SPARQL files
-    sparql_files = glob(os.path.join(base_path + "queries", "*.sparql"))
+    sparql_files = glob(os.path.join(base_path, "queries", "*.sparql"))
 
     # Create and submit a task for each .sparql file
     sparql_tasks = []
@@ -71,7 +87,7 @@ def kg_view_flow(
         task_result = exec_sparql.with_options(
             name=f"Execute SPARQL for {query_name}",
         ).submit(
-            endpoint=endpoint,
+            endpoint_url=endpoint.get(),
             query_name=query_name,
             query_string=query_string,
             since=last_modified if not full_sync else None,
@@ -86,7 +102,6 @@ if __name__ == "__main__":
         endpoint_block="sparql-meemoo",
         db_block_name="local-hasura",
         base_path="./typescript/",
-        triplydb_dataset="hetarchief",
         skip_squash=True,
         skip_view=True,
         full_sync=True,
