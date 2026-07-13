@@ -104,23 +104,20 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
     -- thumbnails
     LEFT JOIN LATERAL (
         SELECT
-            jsonb_agg(DISTINCT thumbs.schema_thumbnail_url) AS schema_thumbnail_url,
-            jsonb_agg(thumbs.object_type) AS object_type
+            jsonb_agg(DISTINCT thumbs.schema_thumbnail_url) AS schema_thumbnail_url
         FROM (
             -- thumbnails from fragments
             SELECT rep.premis_represents AS intellectual_entity_id,
-                f.schema_thumbnail_url,
-                'fragment'::text AS object_type
+                f.schema_thumbnail_url
             FROM graph.representation rep
             JOIN graph.file f
             ON f.id = rep.is_media_fragment_of
             AND f.schema_thumbnail_url IS NOT NULL
             WHERE rep.premis_represents = ie.id
-            UNION
+            UNION ALL
             -- thumbnails from representations
             SELECT rep.premis_represents AS intellectual_entity_id,
-                f.schema_thumbnail_url,
-                'representation'::text AS object_type
+                f.schema_thumbnail_url
             FROM graph.file f
             JOIN graph.includes inc
             ON f.id = inc.file_id
@@ -129,11 +126,10 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             ON rep.id = inc.representation_id
             AND rep.is_media_fragment_of IS NULL
             WHERE rep.premis_represents = ie.id
-            UNION
+            UNION ALL
             -- thumbnails from first-position child
             SELECT first_position.intellectual_entity_id,
-                first_position.schema_thumbnail_url,
-                'child'::text AS object_type
+                first_position.schema_thumbnail_url
             FROM (
                 SELECT thie.relation_is_part_of AS intellectual_entity_id,
                     f.schema_thumbnail_url,
@@ -353,13 +349,11 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         SELECT
             string_agg(st.schema_transcript, E'\n\r' ORDER BY ie_child.schema_position) AS schema_transcript
         FROM graph.intellectual_entity ie_child
-        JOIN graph.intellectual_entity ie_parent
-        ON ie_child.relation_is_part_of = ie_parent.id
         LEFT JOIN graph.representation rep
         ON rep.premis_represents = ie_child.id
         LEFT JOIN graph.schema_transcript_url st
         ON st.representation_id = rep.id
-        WHERE ie_parent.id = ie.id
+        WHERE ie_child.relation_is_part_of = ie.id
     ) str ON TRUE
     WHERE ie.relation_is_part_of IS null
         and ie.updated_at >= %(since)s
@@ -369,4 +363,6 @@ on conflict (id,index) do update set
           document = excluded.document,
           is_deleted = excluded.is_deleted,
           updated_at = excluded.updated_at
+        where (index_documents.document, index_documents.is_deleted, index_documents.updated_at)
+          is distinct from (excluded.document, excluded.is_deleted, excluded.updated_at)
         ;
