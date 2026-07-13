@@ -266,10 +266,14 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
     -- dcterms_rights_statement
     LEFT JOIN LATERAL (
         SELECT
-            intellectual_entity_id,
-            dcterms_rights_statement
-        FROM graph._dcterms_rights_statement gdrs
-        WHERE gdrs.intellectual_entity_id = ie.id
+            CASE
+                WHEN 'Publiek-Domein' = ANY (array_agg(sl2.schema_license)) THEN 'https://creativecommons.org/publicdomain/mark/1.0/'::text
+                WHEN 'COPYRIGHT-UNDETERMINED' = ANY (array_agg(sl2.schema_license)) THEN 'https://rightsstatements.org/page/UND/1.0/'::text
+                ELSE NULL::text
+            END AS dcterms_rights_statement
+        FROM graph.schema_license sl2
+        WHERE sl2.intellectual_entity_id = ie.id
+            AND sl2.schema_license = ANY (ARRAY['COPYRIGHT-UNDETERMINED'::text, 'Publiek-Domein'::text])
     ) drs ON true
     -- reuse rights
     LEFT JOIN LATERAL (
@@ -280,16 +284,15 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         ) AS reuse_category
       FROM (
         SELECT
-          r.intellectual_entity_id,
           r.reuse_category_id
         FROM graph.rights r
+        WHERE r.intellectual_entity_id = ie.id
         UNION ALL
         SELECT
-          drs.intellectual_entity_id,
           drs.dcterms_rights_statement AS reuse_category_id
+        WHERE drs.dcterms_rights_statement IS NOT NULL
         ) AS rig
       LEFT JOIN lookup.reuse_category lrc ON lrc.id = rig.reuse_category_id
-      WHERE rig.intellectual_entity_id = ie.id
     ) reuse on true
     -- schema_location_created
     LEFT JOIN LATERAL (
