@@ -1,112 +1,247 @@
-# Prefect Flow: arc-kg-postgres-etl
+# prefect-flow-arc-kg-postgres-etl
 
-This prefect flow syncs the meemoo RDF knowledge graph stored in TriplyDB to a Postgres database used for hetarchief.be V3.
+Prefect ETL that syncs the meemoo RDF **knowledge graph** (stored in [TriplyDB](https://triply.cc/)) into a **PostgreSQL** database and an **Elasticsearch** index that power [hetarchief.be](https://hetarchief.be) V3.
 
-It combines the following techniques:
-- SPARQL CONSTRUCT queries and TriplyDB query pipelines/jobs
-- Typescript and [NodeJS Stream processing](https://nodejs.org/api/stream.html)
-- The [TriplyDB.js](https://docs.triply.cc/triplydb-js/) and [pg-promise](https://github.com/vitaly-t/pg-promise) libraries to communicate with TriplyDB and Postgres, repectively.
-- SQL queries to manipulate the postgres database such as creating tables or inserting data.
-- Prefect flow to orchestrate the loading of tables, the indexing of Elasticsearch and processing deletes.
+The pipeline combines several techniques:
 
-## High-level walkthrough
+- **SPARQL `CONSTRUCT` queries** run as TriplyDB query jobs / pipelines to build a filtered, relational-shaped view over the graph.
+- **TypeScript + [Node.js stream processing](https://nodejs.org/api/stream.html)** to download and load that view into Postgres without holding the full graph in memory.
+- **[TriplyDB.js](https://docs.triply.cc/triplydb-js/)** to talk to TriplyDB and **[pg-promise](https://github.com/vitaly-t/pg-promise)** to talk to Postgres.
+- **SQL** to create/merge tables and maintain index partitions.
+- **[Prefect](https://docs.prefect.io/) flows** to orchestrate view construction, database loading, index-table population, Elasticsearch indexing and delete processing.
 
-The synchronization proces consist of 
-- `flows/main_flow.py`: a Prefect Flow (Python) and 
-- `typescript/index.js`: a data stream processing and loading script (Typescript/NodeJS)
-  
-The latter is run by the former. Here's a quick overview on both components
+---
 
-### 1. flows/main_flow.py
+## Architecture
 
-- The flow first runs the data stream processing and loading script to fill or update the Postgres database with metadata.
-- Then, it runs the indexer to index documents from Postgres into Elasticsearch
-- Finally, it processes the deletes in case of an incremental run.
+The work is split into two layers:
 
-### 2. typescript/index.js
+1. **Prefect flows** (Python, in [flows/](flows/)) — orchestration. They load credentials from Prefect blocks, run the TypeScript scripts as subprocesses, and run pure-SQL maintenance tasks.
+2. **TypeScript scripts** (in [typescript/](typescript/)) — the heavy lifting of constructing the view and streaming it into Postgres.
 
-- The script first runs a couple of commands on the TriplyDB instance
-  - a. copy all graphs in the Knowledge Graph to a single graph to enhance performance
-  - b. create a new graph containing a filtered view over the Knowledge Graph using a number of SPARQL CONSTRUCT queries
-- Then, it downloads the view graph and processes it as a stream of triples
-  - triples with the same subject are turned into a record
-  - records belonging to the same table are grouped into a batch
-  - batches are inserted into temporary copy of the target table as soon as their maximum size is reached. 
-- Next, all temporary tables are merge into their target table
-- Finally, all created graphs and temporary tables are deleted
-
-![alt text](diagram.png)
-
-## How to run?
-
-### Running the loading scripts using nodejs
-
-You can run the database loading script in isolation without executing the indexer and performing deletes. 
-
-First, make sure you have NodeJS > 18 installed.
-Then, from the `./typescript` folder, run
-
-```bash
-npm install # installs dependencies
-npm run build # builds the typescript sources
-dotenvx run -f .env -- node --inspect lib/index.js # runs using env file
+```
+TriplyDB (RDF knowledge graph)
+        │
+        │  ① 1_kg_view_construct.js  — SPARQL CONSTRUCT pipeline
+        ▼
+TriplyDB (filtered "view" graph)
+        │
+        │  ② 2_database_load.js      — stream download + load
+        ▼
+PostgreSQL  ──③ index tables──▶ Elasticsearch
+        │
+        └──④ delete processing
 ```
 
-The `.env` file contains all the necessary configuration, such as connection details to postgres and TriplyDB.
+### Prefect flows
 
-Example .env file:
+| Flow | File | Responsibility |
+| --- | --- | --- |
+| `main_flow` | [flows/main_flow.py](flows/main_flow.py) | Orchestrator. Runs each of the flows below (as deployments) in order, wiring `full_sync` / `last_modified` / `or_ids` through and skipping the run if a blocking deployment is already active. |
+| `kg_view_flow` | [flows/kg_view_flow.py](flows/kg_view_flow.py) | Runs [`1_kg_view_construct.js`](#typescript-scripts) to (re)build the view graph in TriplyDB. |
+| `arc_db_load_flow` | [flows/arc_db_load_flow.py](flows/arc_db_load_flow.py) | Runs [`2_database_load.js`](#typescript-scripts) to load the view into Postgres. For a full sync it waits until `full_sync_hour` before starting. |
+| `arc_db_load_index_tables_flow` | [flows/arc_db_load_index_tables_flow.py](flows/arc_db_load_index_tables_flow.py) | Maintains the `graph.index_documents` partitions (one per organisation): creates/truncates/repopulates partitions, and re-populates a partition when an organisation's name changed. |
+| `arc_db_delete_flow` | [flows/arc_db_delete_flow.py](flows/arc_db_delete_flow.py) | Processes deletes: removes intellectual entities & fragments flagged `is_deleted`, and drops index partitions for organisations that no longer have records. |
+
+> An external indexing flow (`prefect-flow-arc-indexer`) and an ALTO-to-JSON flow are invoked as separate deployments from `main_flow`; they are not part of this repository.
+
+Full-sync vs. incremental behaviour is driven by `full_sync` and `last_modified`/`SINCE`:
+- **Full sync** (`SINCE` unset): target tables are truncated and reloaded (`TRUNCATE+INSERT`).
+- **Incremental** (`SINCE` set): only changed records are constructed and merged (`MERGE INTO` / `INSERT … ON CONFLICT`).
+
+### TypeScript scripts
+
+The two flows above delegate their heavy lifting to these scripts:
+
+| Script | Source | Run by | Purpose |
+| --- | --- | --- | --- |
+| `1_kg_view_construct.js` | [typescript/src/1_kg_view_construct.ts](typescript/src/1_kg_view_construct.ts) | [`kg_view_flow`](#prefect-flows) | Runs the SPARQL `CONSTRUCT` queries as a TriplyDB pipeline, writing a filtered relational view into a single destination graph. Deletes the destination graph first, then runs all queries (optionally scoped to a set of organisation IDs and/or a `SINCE` timestamp for incremental syncs). |
+| `2_database_load.js` | [typescript/src/2_database_load.ts](typescript/src/2_database_load.ts) | [`arc_db_load_flow`](#prefect-flows) | Downloads the view graph as gzipped Turtle and processes it as a stream: triples sharing a subject become a **record**, records for the same table become a **batch**, and batches are `COPY`ed into per-table **temp tables**. Temp tables are then merged into their target `graph.*` tables in FK-dependency order, and finally cleaned up. |
+
+The SPARQL `CONSTRUCT` queries live in [typescript/queries/](typescript/queries/) (`av-audio`, `av-video`, `av-complex`, `newspaper`, `iiif`, `organization`, `person`, …). Supporting SQL snippets used during loading are in [typescript/queries/sql/](typescript/queries/sql/).
+
+The record → batch → temp-table streaming logic lives in [typescript/src/stream.ts](typescript/src/stream.ts), [typescript/src/database.ts](typescript/src/database.ts) and [typescript/src/configuration.ts](typescript/src/configuration.ts).
+
+---
+
+## Running the loading scripts directly (Node.js)
+
+You can run the TypeScript loading scripts in isolation, without Prefect, Elasticsearch, or delete processing — useful for local development and debugging.
+
+Requires **Node.js ≥ 18**. From [typescript/](typescript/):
+
 ```bash
+npm install          # install dependencies
+npm run build        # compile TypeScript into lib/
+
+# construct the view graph in TriplyDB
+dotenvx run -f .env -- node lib/1_kg_view_construct.js
+
+# stream the view into Postgres
+dotenvx run -f .env -- node --inspect lib/2_database_load.js
+```
+
+Configuration is read from environment variables (see [typescript/src/configuration.ts](typescript/src/configuration.ts)). Example `.env`:
+
+```bash
+# TriplyDB
 TRIPLYDB_TOKEN=
 TRIPLYDB_OWNER=meemoo
 TRIPLYDB_DATASET=knowledge-graph
 TRIPLYDB_DESTINATION_DATASET=hetarchief-test
 TRIPLYDB_DESTINATION_GRAPH=hetarchief
+
+# PostgreSQL
 POSTGRES_USERNAME=hetarchief
 POSTGRES_HOST=localhost
 POSTGRES_DATABASE=hetarchief
 POSTGRES_PASSWORD=password
-POSTGRES_PORT=5555
-SKIP_VIEW=True # Skip building the view graph
-SKIP_CLEANUP=True # Do not remove view graph and temp tables when done (for debugging)
-SKIP_SQUASH=True # Do not squash the graphs before constructing the view graph
+POSTGRES_PORT=5432
+POSTGRES_SSL=False
+POSTGRES_POOL_MIN=0
+POSTGRES_POOL_MAX=5
+POSTGRES_USE_MERGE=True      # MERGE INTO (True) vs INSERT ON CONFLICT (False) for incremental upserts
+
+# Behaviour
+BATCH_SIZE=100               # max records inserted per table per query
+# SINCE=2024-12-17T01:08:04.851Z  # incremental sync since timestamp; unset = full sync
+# OR_IDS=OR-xxxxxxx,OR-yyyyyyy    # restrict the view to these organisation ids
+# RECORD_LIMIT=100                # stop early after N records (debugging)
+# TABLES=graph."intellectual_entity"  # load only specific tables
+
+# Debug toggles
+SKIP_CLEANUP=True            # keep view graph + temp tables around for inspection
 LOGGING_LEVEL=DEBUG
-BATCH_SIZE=100 # The maximum number of records that are inserted per table in a single query
-DEBUG_MODE=False # Print memory information in logs
-#SINCE=2024-12-17T01:08:04.851Z # Run an incremental update since 2024-12-17T01:08:04.851Z. If SINCE is not set, a full sync is run.
-#RECORD_LIMIT=100 # Cut the process off early
+DEBUG_MODE=False             # log heap/memory diffs
 ```
 
-### Running the Prefect Flow
+---
 
-The Prefect Flow requires setting the following parameters:
+## Running via Prefect
 
-- `triplydb_block_name`: name of the TriplyDB credentials block (default:`"triplydb"`)
-- `triplydb_owner`: name of the account in  TriplyDB (default:`"meemoo"`)
-- `triplydb_dataset`: name of the dataset in TriplyDB (default:`"knowledge-graph"`)
-- `triplydb_destination_dataset`: name of the dataset to store the view in (default:`"hetarchief"`)
-- `triplydb_destination_graph`: name of the graph to store the view in (default:`"hetarchief"`)
-- `base_path`: folder where javascript files are stored (default:`"/opt/prefect/typescript/"`)
-- `script_path`: folder of the javascript script (default:`"lib/"`)
-- `skip_squash`: skip copying all graphs to a single graph (default:`False`)
-- `skip_view`: skip creating a view graph (default:`False`)
-- `skip_cleanup`: skip cleanup of all graphs (default:`False`)
-- `es_block_name`: name of the elasticsearch block (default:`"arc-elasticsearch"`)
-- `es_chunk_size`: elasticsearch streaming chunk size (default:`500`)
-- `es_request_timeout`: number of seconds before elasticsearch request times out (default:`30`)
-- `es_max_retries`: number of times a failed document should be retried (default:`10`)
-- `es_retry_on_timeout`: retry when a document times out (default:`True`)
-- `db_indexing_batch_size`: size of the database cursor to read documents with (default:`500`)
-- `db_block_name`: name of the database block (default:`"local"`)
-- `db_index_table`: table whene the index documents are stored (default:`"graph._index_intellectual_entity"`)
-- `db_ssl`: enable SSL connection for database (default:`True`)
-- `db_pool_min`: minimum connections in pool (default:`0`)
-- `db_pool_max`: maximum connections in pool (default:`5`)
-- `db_loading_batch_size`: number of records that are inserted in a single query (default:`100`)
-- `record_limit`: limit the number of records that are being loaded (default:`None`)
-- `full_sync`: sync everything (default:`False`)
-- `debug_mode`: print extra logging about memory consumption (default:`False`)
-- `logging_level`: set the logging level of Javascript (default:`os.environ.get("PREFECT_LOGGING_LEVEL")` = same as prefect)
-- `flow_name_indexer`: name of the indexing flow (default:`"prefect-flow-arc-indexer"`)
-- `deployment_name_indexer`: name of the indexing flow deployment (default:`(default: "prefect-flow-arc-indexer-int")`)
+Deployments are declared in [deployments.yaml](deployments.yaml) and all target the `q-knowledge-graph` work queue:
 
+| Deployment | Flow |
+| --- | --- |
+| (main) | `main_flow` |
+| `kg-view` | `kg_view_flow` |
+| `db-load` | `arc_db_load_flow` |
+| `db-load-index-tables` | `arc_db_load_index_tables_flow` |
+| `db-delete` | `arc_db_delete_flow` |
 
+The flows load their secrets from Prefect blocks:
+
+- **`triplydb`** — a `TriplyDBCredentials` block for the TriplyDB connection.
+- **`local`** (or the configured `db_block_name`) — a `DatabaseCredentials` block for Postgres.
+- **`arc-elasticsearch`** — Elasticsearch credentials (used by the external indexer).
+
+### Flow parameters
+
+#### `main_flow` ([flows/main_flow.py](flows/main_flow.py))
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `deployment_kg_view_flow` | — | `DeploymentModel` for the view-construction sub-flow |
+| `deployment_arc_db_load_flow` | — | `DeploymentModel` for the Postgres-load sub-flow |
+| `deployment_arc_db_load_index_tables_flow` | — | `DeploymentModel` for the index-table sub-flow |
+| `deployment_arc_db_delete_flow` | — | `DeploymentModel` for the delete sub-flow |
+| `deployment_arc_alto_to_json_flow` | — | `DeploymentModel` for the (external) ALTO-to-JSON flow |
+| `deployment_arc_indexer_flow` | — | `DeploymentModel` for the (external) Elasticsearch indexer |
+| `last_modified` | `None` | Incremental `SINCE` timestamp, propagated to sub-flows |
+| `or_ids` | `None` | Restrict the run to these organisation ids |
+| `full_sync` | `False` | Force a full reload across the sub-flows |
+
+#### `kg_view_flow` ([flows/kg_view_flow.py](flows/kg_view_flow.py))
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `triplydb_block_name` | `"triplydb"` | TriplyDB credentials block name |
+| `triplydb_owner` | `"meemoo"` | TriplyDB account |
+| `triplydb_dataset` | `"knowledge-graph"` | Source dataset |
+| `triplydb_destination_dataset` | `"hetarchief"` | Dataset holding the view |
+| `triplydb_destination_graph` | `"hetarchief"` | Graph holding the view |
+| `base_path` | `"/opt/prefect/typescript/"` | Location of the JS files |
+| `prefix_id_base` | `"https://data.hetarchief.be/id/entity/"` | Base IRI for entity ids |
+| `script_path` | `"lib/"` | Compiled JS subfolder |
+| `last_modified` | `None` | Incremental `SINCE` timestamp |
+| `full_sync` | `False` | Full reload vs incremental |
+| `or_ids` | `None` | Restrict the view to these organisation ids |
+| `logging_level` | Prefect's level | JS log level |
+
+#### `arc_db_load_flow` ([flows/arc_db_load_flow.py](flows/arc_db_load_flow.py))
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `triplydb_block_name` | `"triplydb"` | TriplyDB credentials block name |
+| `triplydb_owner` | `"meemoo"` | TriplyDB account |
+| `triplydb_dataset` | `"knowledge-graph"` | Source dataset |
+| `triplydb_destination_dataset` | `"hetarchief"` | Dataset holding the view |
+| `triplydb_destination_graph` | `"hetarchief"` | Graph holding the view |
+| `base_path` | `"/opt/prefect/typescript/"` | Location of the JS files |
+| `script_path` | `"lib/"` | Compiled JS subfolder |
+| `db_block_name` | `"local"` | Postgres credentials block |
+| `db_ssl` | `True` | Use SSL for Postgres |
+| `db_pool_min` / `db_pool_max` | `0` / `5` | Connection pool bounds |
+| `db_loading_batch_size` | `100` | Records inserted per query |
+| `record_limit` | `None` | Cap on records loaded (debug) |
+| `last_modified` | `None` | Incremental `SINCE` timestamp |
+| `or_ids` | `None` | Restrict to organisation ids |
+| `full_sync` | `False` | Full reload vs incremental |
+| `sync_tables` | `None` | Restrict loading to specific tables |
+| `full_sync_hour` | `0` | Hour (Europe/Brussels) at which a full sync is allowed to start |
+| `debug_mode` | `False` | Extra memory logging |
+| `logging_level` | Prefect's level | JS log level |
+
+#### `arc_db_load_index_tables_flow` ([flows/arc_db_load_index_tables_flow.py](flows/arc_db_load_index_tables_flow.py))
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `db_block_name` | — | Postgres credentials block |
+| `last_modified` | `None` | Incremental `SINCE` timestamp |
+| `or_ids` | `None` | Restrict to organisation ids |
+| `full_sync` | `False` | Truncate & repopulate all partitions |
+
+#### `arc_db_delete_flow` ([flows/arc_db_delete_flow.py](flows/arc_db_delete_flow.py))
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `db_block_name` | — | Postgres credentials block |
+
+---
+
+## Build & deployment
+
+The container image is built from [Dockerfile](Dockerfile), based on meemoo's `prefect-triplyetl` image. It installs the Python requirements ([requirements.txt](requirements.txt)), copies `flows/` and `typescript/` into `/opt/prefect`, and runs `npm ci && npm run build` to compile the TypeScript. CI is defined in [.openshift/Jenkinsfile](.openshift/Jenkinsfile).
+
+Python dependencies of note (see [requirements.txt](requirements.txt)): `prefect==2.20.16`, `prefect-meemoo[triplydb,config]`, `prefect-sqlalchemy`, `psycopg2-binary`.
+
+---
+
+## Repository layout
+
+```
+flows/                     Prefect flows (Python)
+  main_flow.py             orchestrator
+  kg_view_flow.py          view construction
+  arc_db_load_flow.py      Postgres loading
+  arc_db_load_index_tables_flow.py   index partition maintenance
+  arc_db_delete_flow.py    delete processing
+  queries/update_partition.sql
+typescript/
+  src/                     TypeScript sources
+    1_kg_view_construct.ts view construction entrypoint
+    2_database_load.ts     streaming loader entrypoint
+    stream.ts, database.ts, configuration.ts, helpers.ts, ...
+  queries/                 SPARQL CONSTRUCT queries (+ sql/ helpers)
+  package.json, tsconfig.json, Dockerfile, docker-compose.yml
+Dockerfile                 image build
+deployments.yaml           Prefect deployment definitions
+requirements.txt           Python dependencies
+infra_block.py             Prefect infrastructure block
+```
+
+---
+
+## License
+
+See [LICENSE](LICENSE).
