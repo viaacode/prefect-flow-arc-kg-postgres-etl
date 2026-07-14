@@ -363,6 +363,4 @@ on conflict (id,index) do update set
           document = excluded.document,
           is_deleted = excluded.is_deleted,
           updated_at = excluded.updated_at
-        where (index_documents.document, index_documents.is_deleted, index_documents.updated_at)
-          is distinct from (excluded.document, excluded.is_deleted, excluded.updated_at)
         ;
