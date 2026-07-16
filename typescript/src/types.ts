@@ -120,3 +120,17 @@ export type TableNode = {
 }
 export type Destination = { dataset: Dataset, graph: string }
 export type GraphInfo = { account: User | Org, dataset: Dataset, destination: Destination, }
+
+export type ParameterizedQuery = {
+        queryName: string, queryString: string,
+        variables: {
+            name: string; // parameter name prefixed with ?
+            required: boolean;
+            termType: 'Literal' | 'URI';
+            datatype: string; // the literal datatype
+            defaultValue: string;
+        }[]
+    }
+
+    
+export type QueryVariables = { [key: string]: string }

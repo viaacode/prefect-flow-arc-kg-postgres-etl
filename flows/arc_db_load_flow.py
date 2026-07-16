@@ -5,8 +5,8 @@ from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
 from prefect.states import Completed
 from prefect.task_runners import ConcurrentTaskRunner
+from prefect.blocks.system import Secret
 from prefect_meemoo.config.last_run import save_last_run_config
-from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from flows.arc_db_load_index_tables_flow import get_min_date
@@ -27,11 +27,7 @@ def wait_until_hour(hour: int):
     on_completion=[save_last_run_config],
 )
 def arc_db_load_flow(
-    triplydb_block_name: str = "triplydb",
-    triplydb_owner: str = "meemoo",
-    triplydb_dataset: str = "knowledge-graph",
-    triplydb_destination_dataset: str = "hetarchief",
-    triplydb_destination_graph: str = "hetarchief",
+    endpoint_block: str = "sparql-endpoint",
     base_path: str = "/opt/prefect/typescript/",
     script_path: str = "lib/",
     db_block_name: str = "local",
@@ -54,7 +50,7 @@ def arc_db_load_flow(
         - hetarchief-tst (PostgresCredentials): Credentials to connect to the postgres database
     """
     # Load credentials
-    triply_creds = TriplyDBCredentials.load(triplydb_block_name)
+    endpoint = Secret.load(endpoint_block)
     postgres_creds = DatabaseCredentials.load(db_block_name)
 
     # Run javascript which loads graph into postgres
@@ -78,11 +74,6 @@ def arc_db_load_flow(
         ).submit(
             script_path=base_path + script_path + load_db_script,
             base_path=base_path,
-            triplydb=triply_creds,
-            triplydb_owner=triplydb_owner,
-            triplydb_dataset=triplydb_dataset,
-            triplydb_destination_dataset=triplydb_destination_dataset,
-            triplydb_destination_graph=triplydb_destination_graph,
             postgres=postgres_creds,
             record_limit=record_limit,
             batch_size=db_loading_batch_size,
@@ -98,10 +89,8 @@ def arc_db_load_flow(
 
 if __name__ == "__main__":
     arc_db_load_flow(
-        triplydb_block_name="triplydb-meemoo",
         db_block_name="local-hasura",
         base_path="./typescript/",
-        triplydb_dataset="hetarchief",
         skip_squash=True,
         skip_view=True,
         full_sync=True,
