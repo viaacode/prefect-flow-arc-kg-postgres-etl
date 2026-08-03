@@ -130,7 +130,9 @@ CONSTRUCT {
   :schema_transcript ?rep_schema_transcript;
   :is_media_fragment_of ?fr_is_media_fragment_of;
   :schema_end_time ?fr_schema_end_time;
-  :schema_start_time ?fr_schema_start_time.
+  :schema_start_time ?fr_schema_start_time;
+  :schema_thumbnail_url ?fr_schema_thumnail_url;
+  .
 
 ?pc :tableName "graph.carrier";
   :id ?pc;
@@ -466,7 +468,9 @@ CONSTRUCT {
         haObj:isFragmentRepresentationOf ?ie;
         schema:startTime ?fr_schema_start_time;
         schema:endTime ?fr_schema_end_time;
-        ebucore:isMediaFragmentOf ?fr_is_media_fragment_of
+        ebucore:isMediaFragmentOf ?fr_is_media_fragment_of;
+        schema:thumbnailUrl ?fr_schema_thumnail_url;
+        .
       }
       ?rep schema:name ?rep_schema_name.
       FILTER langMatches(lang(?rep_schema_name), "nl")
