@@ -44,6 +44,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             'dcterms_rights_statement', drs.dcterms_rights_statement,
             'reuse_category', reuse.reuse_category,
             'schema_location_created', slc.schema_location_created,
+            'theme', th.slugs,
             'children', iec.children,
             'is_deleted', mf.is_deleted
         ),
@@ -355,6 +356,14 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         ON st.representation_id = rep.id
         WHERE ie_child.relation_is_part_of = ie.id
     ) str ON TRUE
+    -- theme
+    LEFT JOIN LATERAL(
+        SELECT
+            jsonb_agg(DISTINCT t.slug) as slugs
+            FROM app.theme_intellectual_entity tie
+            JOIN app.theme t ON t.id = tie.theme_id
+            WHERE tie.intellectual_entity_id = ie.id
+    ) th ON TRUE
     WHERE ie.relation_is_part_of IS null
         and ie.updated_at >= %(since)s
         and org.id = %(id)s
