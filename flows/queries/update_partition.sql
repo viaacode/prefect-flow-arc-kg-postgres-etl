@@ -108,17 +108,14 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             jsonb_agg(DISTINCT thumbs.schema_thumbnail_url) AS schema_thumbnail_url
         FROM (
             -- thumbnails from fragments
-            SELECT rep.premis_represents AS intellectual_entity_id,
-                f.schema_thumbnail_url
+            SELECT rep.schema_thumbnail_url
             FROM graph.representation rep
-            JOIN graph.file f
-            ON f.id = rep.is_media_fragment_of
-            AND f.schema_thumbnail_url IS NOT NULL
             WHERE rep.premis_represents = ie.id
+            AND rep.is_media_fragment_of IS NOT NULL
+            AND rep.schema_thumbnail_url IS NOT NULL
             UNION ALL
             -- thumbnails from representations
-            SELECT rep.premis_represents AS intellectual_entity_id,
-                f.schema_thumbnail_url
+            SELECT f.schema_thumbnail_url
             FROM graph.file f
             JOIN graph.includes inc
             ON f.id = inc.file_id
@@ -129,13 +126,10 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             WHERE rep.premis_represents = ie.id
             UNION ALL
             -- thumbnails from first-position child
-            SELECT first_position.intellectual_entity_id,
-                first_position.schema_thumbnail_url
+            SELECT first_position.schema_thumbnail_url
             FROM (
-                SELECT thie.relation_is_part_of AS intellectual_entity_id,
-                    f.schema_thumbnail_url,
+                SELECT f.schema_thumbnail_url,
                     row_number() OVER (
-                        PARTITION BY thie.relation_is_part_of
                         ORDER BY thie.schema_position
                     ) AS rn
                 FROM graph.intellectual_entity thie
@@ -326,7 +320,6 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
     -- is_deleted
     LEFT JOIN LATERAL (
         SELECT
-            jsonb_agg(mf.mh_fragment_identifier) AS mh_fragment_identifier,
             bool_or(mf.is_deleted) AS is_deleted
         FROM graph.mh_fragment_identifier mf
         WHERE mf.intellectual_entity_id = ie.id
@@ -364,7 +357,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             JOIN app.theme t ON t.id = tie.theme_id
             WHERE tie.intellectual_entity_id = ie.id
     ) th ON TRUE
-    WHERE ie.relation_is_part_of IS null
+    WHERE (ie.relation_is_part_of IS null OR df.dcterms_format LIKE '%%fragment')
         and ie.updated_at >= %(since)s
         and org.id = %(id)s
 
