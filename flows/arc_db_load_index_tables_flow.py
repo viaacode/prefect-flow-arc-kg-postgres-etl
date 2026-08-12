@@ -30,8 +30,7 @@ def get_partitions(
         cursor_factory=RealDictCursor,
     ) as db_conn:
         with db_conn.cursor() as cursor:
-            where_clause = "WHERE 1 = 1"
-            where_clause += " AND org_identifier IN %(or_ids)s" if or_ids else ""
+            where_clause = "WHERE org_identifier IN %(or_ids)s" if or_ids else ""
             query = sql.SQL(
                 f"""
                 SELECT 
