@@ -221,12 +221,12 @@ CONSTRUCT {
     # for incremental 
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
-    # BIND(IF(
-    #   # Do not include haLicId:VIAA-PUBLIEK-CONTENT or haLicId:Publiek-Domein when object is AV
-    #   ?schema_license_res IN (haLicId:VIAA-PUBLIEK-CONTENT, haLicId:Publiek-Domein),
-    #   ?unbound,
-    #   REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
-    # ) as ?schema_license)
+    BIND(IF(
+      # Do not include haLicId:VIAA-PUBLIEK-CONTENT or haLicId:Publiek-Domein when object is AV
+      ?schema_license_res IN (haLicId:VIAA-PUBLIEK-CONTENT, haLicId:Publiek-Domein),
+      ?unbound,
+      REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
+    ) as ?schema_license)
     BIND(
       REPLACE(STR(?schema_license_res), "^.*/([^/]*)$", "$1")
     as ?schema_license)
