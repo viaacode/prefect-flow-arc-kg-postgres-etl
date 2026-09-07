@@ -75,6 +75,7 @@ def arc_db_load_flow(
 
     loading = run_javascript.with_options(
             name=f"Sync KG to services with {load_db_script}",
+            retries=1
         ).submit(
             script_path=base_path + script_path + load_db_script,
             base_path=base_path,

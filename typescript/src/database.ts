@@ -87,11 +87,7 @@ export async function createTempTable(tableInfo: TableInfo): Promise<TableInfo> 
     }
     finally {
         // release connection
-        const pool = db.$pool
         if (connection) connection.done()
-        logInfo(
-            `Pool stats after creating temp table ${tempTableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
-        )
     }
 }
 
@@ -109,11 +105,7 @@ export async function dropTable(tableInfo: TableInfo) {
     }
     finally {
         // release connection
-        const pool = db.$pool
         if (connection) connection.done()
-        logInfo(
-            `Pool stats after dropping table ${tableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
-        )
     }
 }
 
@@ -245,11 +237,7 @@ export async function mergeTable(tableNode: TableNode, truncate: boolean = true,
         throw err
     } finally {
         // release connection
-        const pool = db.$pool
         if (connection) connection.done()
-        logInfo(
-            `Pool stats after merge for table ${tableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
-        )
     }
 }
 
@@ -288,11 +276,7 @@ export async function batchInsert(tableNode: TableNode, batch: Batch) {
     } 
     finally {
         // release connection
-        const pool = db.$pool
         if (connection) connection.done()
-        logInfo(
-            `Pool stats after batch insert into table ${tableInfo}: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
-        )
     }
 }
 
@@ -317,11 +301,7 @@ export async function TEMP_deleteOrphanedTempRepresentation() {
     }
     finally {
         // release connection
-        const pool = db.$pool
         if (connection) connection.done()
-        logInfo(
-            `Pool stats after deleting orphaned records from graph.temp_representation: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
-        )
     }
 }
 
@@ -346,11 +326,7 @@ export async function TEMP_deleteOrphanedTempIncludes() {
     }
     finally {
         // release connection
-        const pool = db.$pool
         if (connection) connection.done()
-        logInfo(
-            `Pool stats after deleting orphaned records from graph.temp_in: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`
-        )
     }
 }
 
