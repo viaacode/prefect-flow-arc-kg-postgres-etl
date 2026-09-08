@@ -30,7 +30,7 @@ def wait_until_hour(hour: int, var_name: str = ""):
     now = DateTime.now('Europe/Brussels')
     logger = get_run_logger()
     target = resolve_hour(hour, var_name)
-    logger.info(f"Current time is {now}. Waiting until {target}:00 to start... Change Variable 'arc-full-sync-hour' to overwrite")
+    logger.info(f"Current time is {now}. Waiting until {target}:00 to start... Change Variable 'arc_full_sync_hour' to overwrite")
     while now.hour != target:
         time.sleep(300)  # Sleep for 5 minutes
         now = DateTime.now('Europe/Brussels')
@@ -65,7 +65,7 @@ def arc_db_load_flow(
     full_sync: bool = False,
     sync_tables: list[str] = None,
     full_sync_hour: int = 0,
-    var_name_full_sync_hour: str = "arc-full-sync-hour",
+    var_name_full_sync_hour: str = "arc_full_sync_hour",
     debug_mode: bool = False,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
 ):
