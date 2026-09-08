@@ -30,7 +30,7 @@ def wait_until_hour(hour: int, var_name: str = ""):
     now = DateTime.now('Europe/Brussels')
     logger = get_run_logger()
     target = resolve_hour(hour, var_name)
-    logger.info(f"Current time is {now}. Waiting until {target}:00 to start... Change Variable 'arc-full-sync-hour' to overwirte")
+    logger.info(f"Current time is {now}. Waiting until {target}:00 to start... Change Variable 'arc-full-sync-hour' to overwrite")
     while now.hour != target:
         time.sleep(300)  # Sleep for 5 minutes
         now = DateTime.now('Europe/Brussels')
