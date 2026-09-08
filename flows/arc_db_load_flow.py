@@ -5,20 +5,40 @@ from pendulum.datetime import DateTime
 from prefect import flow, get_run_logger, task
 from prefect.states import Completed
 from prefect.task_runners import ConcurrentTaskRunner
+from prefect.variables import Variable
 from prefect_meemoo.config.last_run import save_last_run_config
 from prefect_meemoo.triplydb.credentials import TriplyDBCredentials
 from prefect_meemoo.triplydb.tasks import run_javascript
 from prefect_sqlalchemy.credentials import DatabaseCredentials
 from flows.arc_db_load_index_tables_flow import get_min_date
 
+def resolve_hour(hour: int, var_name: str = "") -> int:
+    """Return the hour from the Prefect variable 'var_name' if it is set, else 'hour'."""
+    if not var_name:
+        return hour
+    variable = Variable.get(var_name)
+    if variable is None:
+        return hour
+    value = getattr(variable, "value", variable)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return hour
+
 @task
-def wait_until_hour(hour: int):
+def wait_until_hour(hour: int, var_name: str = ""):
     now = DateTime.now('Europe/Brussels')
     logger = get_run_logger()
-    logger.info(f"Current time is {now}. Waiting until {hour}:00 to start...")
-    while now.hour != hour:
+    target = resolve_hour(hour, var_name)
+    logger.info(f"Current time is {now}. Waiting until {target}:00 to start... Change Variable 'arc-full-sync-hour' to overwirte")
+    while now.hour != target:
         time.sleep(300)  # Sleep for 5 minutes
         now = DateTime.now('Europe/Brussels')
+        # The Prefect variable can change while we wait, so re-check it every loop
+        new_target = resolve_hour(hour, var_name)
+        if new_target != target:
+            target = new_target
+            logger.info(f"Target hour changed, now waiting until {target}:00 to start...")
     return Completed()
 
 @flow(
@@ -45,6 +65,7 @@ def arc_db_load_flow(
     full_sync: bool = False,
     sync_tables: list[str] = None,
     full_sync_hour: int = 0,
+    var_name_full_sync_hour: str = "arc-full-sync-hour",
     debug_mode: bool = False,
     logging_level: str = os.environ.get("PREFECT_LOGGING_LEVEL"),
 ):
@@ -65,8 +86,8 @@ def arc_db_load_flow(
 
 
     if full_sync:
-        logger.info(f"Full sync requested, waiting until {full_sync_hour}:00 to start...")
-        wait_period = wait_until_hour.submit(hour=full_sync_hour).result()
+        logger.info("Full sync requested, waiting for the target hour to start...")
+        wait_period = wait_until_hour.submit(hour=full_sync_hour, var_name=var_name_full_sync_hour).result()
         logger.info("Starting full sync.")
         last_modified = None
         if or_ids:
