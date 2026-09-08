@@ -87,7 +87,7 @@ def main_flow(
                 # Change the full_sync parameter based on the input of the main flow or the deploymentmodel's full_sync parameter
                 "or_ids": or_ids,
                 "last_modified": last_modified,
-                "full_sync": full_sync or deployment_kg_view_flow.full_sync
+                "full_sync": full_sync or deployment_arc_db_load_flow.full_sync
             },
             wait_for=[kg_view_flow],
         )
