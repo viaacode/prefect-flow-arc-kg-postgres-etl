@@ -40,7 +40,10 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             'dcterms_rights', ie.schema_copyright_notice,
             'audio', fha.audio,
             'schema_number_of_pages', ie.ha_des_number_of_pages,
-            'schema_mentions', sme.schema_name,
+            'schema_mentions_namenlijst', sme.schema_mentions_namenlijst,
+            'schema_mentions_person_ai', sme.schema_mentions_person_ai,
+            'schema_mentions_place_ai', sme.schema_mentions_place_ai,
+            'schema_mentions_organization_ai', sme.schema_mentions_organization_ai,
             'dcterms_rights_statement', drs.dcterms_rights_statement,
             'reuse_category', reuse.reuse_category,
             'schema_location_created', slc.schema_location_created,
@@ -73,6 +76,25 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             END
         LIMIT 1
     ) df ON true
+    -- schema_name
+    LEFT JOIN LATERAL (
+        SELECT
+            array_agg(iesn.schema_name) AS schema_name
+        FROM graph.intellectual_entity_schema_name iesn
+        WHERE iesn.intellectual_entity_id = ie.id
+            AND (
+                iesn.is_ai_generated = false
+                OR iesn.is_ai_generated IS NULL
+            )
+    ) sn ON true
+    -- schema_name_ai
+    LEFT JOIN LATERAL (
+        SELECT
+            array_agg(iesn.schema_name) AS schema_name
+        FROM graph.intellectual_entity_schema_name iesn
+        WHERE iesn.intellectual_entity_id = ie.id
+            AND iesn.is_ai_generated = true
+    ) sn_ai ON true
     -- premis_identifier
     LEFT JOIN LATERAL (
         SELECT
@@ -246,13 +268,39 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         AND df.dcterms_format = 'film'
     ) fha ON true
     -- schema_mentions
-    LEFT JOIN LATERAL (
+   LEFT JOIN LATERAL (
+        WITH ie_annotation_thing AS (
+            SELECT
+                smeie.id AS ie_id,
+                smeie.relation_is_part_of AS ie_relation_is_part_of,
+                smea.source AS annotation_source,
+                smet.type AS thing_type,
+                smet.schema_name AS thing_name
+            FROM graph.intellectual_entity smeie
+                JOIN graph.representation smer ON smer.premis_represents = smeie.id
+                JOIN graph.includes smeinc ON smeinc.representation_id = smer.id
+                JOIN graph.file smef ON smef.id = smeinc.file_id
+                JOIN graph.ebucore_media_fragment smemf ON smemf.is_media_fragment_of = smef.id
+                JOIN graph.ebucore_annotation_is_annotated_media_resource smeaiam ON smeaiam.ebucore_media_fragment_id = smemf.id
+                JOIN graph.ebucore_annotation smea ON smea.id = smeaiam.ebucore_annotation_id
+                JOIN graph.thing smet ON smet.id = smea.has_annotation_related_artefact
+        )
         SELECT
-            array_agg(DISTINCT thing.schema_name) AS schema_name
-        FROM graph.schema_mentions sme
-        LEFT JOIN graph.thing thing ON thing.id = sme.thing_id
-        LEFT JOIN graph.intellectual_entity smeie ON smeie.id = sme.intellectual_entity_id
-        where smeie.relation_is_part_of = ie.id
+            ARRAY_AGG(DISTINCT ie_annotation_thing.thing_name)
+                FILTER (WHERE ie_annotation_thing.annotation_source = 'namenlijst')
+                AS schema_mentions_namenlijst,
+            ARRAY_AGG(DISTINCT ie_annotation_thing.thing_name)
+                FILTER (WHERE ie_annotation_thing.annotation_source = 'give' AND ie_annotation_thing.thing_type = 'person')
+                AS schema_mentions_person_ai,
+            ARRAY_AGG(DISTINCT ie_annotation_thing.thing_name)
+                FILTER (WHERE ie_annotation_thing.annotation_source = 'give' AND ie_annotation_thing.thing_type = 'place')
+                AS schema_mentions_place_ai,
+            ARRAY_AGG(DISTINCT ie_annotation_thing.thing_name)
+                FILTER (WHERE ie_annotation_thing.annotation_source = 'give' AND ie_annotation_thing.thing_type = 'organization')
+                AS schema_mentions_organization_ai
+        FROM ie_annotation_thing
+        WHERE ie_annotation_thing.ie_relation_is_part_of = ie.id
+            OR ie_annotation_thing.ie_id = ie.id
     ) sme ON true
     -- dcterms_rights_statement
     LEFT JOIN LATERAL (
