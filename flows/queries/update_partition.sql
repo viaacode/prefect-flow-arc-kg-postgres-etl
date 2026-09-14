@@ -5,13 +5,15 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         lower(org.org_identifier),
         jsonb_build_object(
             'iri', ie.id,
-            'schema_name', ie.schema_name,
+            'schema_name', sn.schema_name,
+            'schema_name_ai', sn_ai.schema_name,
             'schema_alternate_name', sa.schema_alternate_name,
             'schema_description', ie.schema_description,
             'schema_abstract', ie.schema_abstract,
             'schema_transcript', str.schema_transcript,
             'meemoo_description_cast', ie.ebucore_has_cast_member,
-            'meemoo_description_programme', ie.ebucore_synopsis,
+            'ebucore_synopsis', es.ebucore_synopsis,
+            'ebucore_synopsis_ai', es_ai.ebucore_synopsis,
             'ebucore_object_type', ie.ebucore_has_object_type,
             'schema_identifier', ie.schema_identifier,
             'premis_identifier', pi.premis_identifier,
@@ -76,6 +78,13 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             END
         LIMIT 1
     ) df ON true
+    -- premis_identifier
+    LEFT JOIN LATERAL (
+        SELECT
+            jsonb_agg(json_build_object(pi.type, pi.value)) AS premis_identifier
+        FROM graph.premis_identifier pi
+        WHERE pi.intellectual_entity_id = ie.id
+    ) pi ON true
     -- schema_name
     LEFT JOIN LATERAL (
         SELECT
@@ -95,13 +104,25 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         WHERE iesn.intellectual_entity_id = ie.id
             AND iesn.is_ai_generated = true
     ) sn_ai ON true
-    -- premis_identifier
+    -- ebucore_synopsis
     LEFT JOIN LATERAL (
         SELECT
-            jsonb_agg(json_build_object(pi.type, pi.value)) AS premis_identifier
-        FROM graph.premis_identifier pi
-        WHERE pi.intellectual_entity_id = ie.id
-    ) pi ON true
+            array_agg(iees.ebucore_synopsis) AS ebucore_synopsis
+        FROM graph.intellectual_entity_ebucore_synopsis iees
+        WHERE iees.intellectual_entity_id = ie.id
+            AND (
+                iees.is_ai_generated = false
+                OR iees.is_ai_generated IS NULL
+            )
+    ) es ON true
+    -- ebucore_synopsis_ai
+    LEFT JOIN LATERAL (
+        SELECT
+            array_agg(iees.ebucore_synopsis) AS ebucore_synopsis
+        FROM graph.intellectual_entity_ebucore_synopsis iees
+        WHERE iees.intellectual_entity_id = ie.id
+            AND iees.is_ai_generated = true
+    ) es_ai ON true
     -- schema_duration
     LEFT JOIN LATERAL (
         SELECT MAX(d) AS schema_duration
