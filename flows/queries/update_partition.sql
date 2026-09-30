@@ -64,7 +64,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
         SELECT df.dcterms_format
         FROM graph.dcterms_format df
         WHERE df.intellectual_entity_id = ie.id
-            and df.dcterms_format NOT IN ('set', ' document', 'newspaperpage')
+            and df.dcterms_format NOT IN ('set', 'document', 'newspaperpage')
         ORDER BY
             CASE df.dcterms_format
                 WHEN 'newspaper' THEN 1
@@ -92,7 +92,7 @@ INSERT INTO graph.index_documents (id, index, document, is_deleted, updated_at)
             JOIN graph.representation rep
             ON rep.id = inc.representation_id
             WHERE rep.premis_represents = ie.id
-            AND file.ebucore_has_mime_type = 'video/mp4'
+            AND (file.ebucore_has_mime_type = 'video/mp4' OR file.ebucore_has_mime_type = 'application/mp4')
             AND file.schema_duration IS NOT NULL
             UNION ALL
             -- media-fragment-based durations

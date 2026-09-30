@@ -487,7 +487,7 @@ CONSTRUCT {
           ebucore:hasMimeType ?file_ebucore_has_mime_type .
 
       
-      VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "audio/mpeg" "audio/m4a" }
+      VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "audio/mpeg" "audio/m4a" "application/mp4" }
       FILTER (langMatches(lang(?file_schema_name), "nl"))
 
       {}
