@@ -54,6 +54,16 @@ CONSTRUCT {
 :schema_position ?schema_position;
 :bibframe_edition ?bibframe_edition.
 
+?ie_schema_name :tableName "graph.intellectual_entity_schema_name";
+:intellectual_entity_id ?ie;
+:schema_name ?schema_name;
+:is_ai_generated false.
+
+?ie_ebucore_synopsis :tableName "graph.intellectual_entity_ebucore_synopsis";
+:intellectual_entity_id ?ie;
+:ebucore_synopsis ?ebucore_synopsis;
+:is_ai_generated false.
+
 ?ie_format :tableName "graph.dcterms_format";
  :intellectual_entity_id ?ie;
  :dcterms_format ?dcterms_format.
@@ -188,6 +198,7 @@ CONSTRUCT {
            (schema:license|(rel:isp/schema:license)) ?schema_license_res;
            dct:format ?dcterms_format ;
            prov:wasDerivedFrom ?ie_fragment.
+    BIND(IRI(CONCAT(str(?ie),"/","schema_name","/",md5(str(?schema_name)))) AS ?ie_schema_name)
            
     ?ie_fragment a mh:Fragment;
               schema:dateModified ?modified;
@@ -293,7 +304,10 @@ CONSTRUCT {
     UNION { ?ie schema:copyrightNotice ?schema_copyright_notice }
     UNION { ?ie dct:rights ?dcterms_rights }
     UNION { ?ie schema:creditText ?schema_credit_text }    
-    UNION { ?ie ebucore:synopsis ?ebucore_synopsis }
+    UNION {
+      ?ie ebucore:synopsis ?ebucore_synopsis.
+      BIND(IRI(CONCAT(str(?ie),"/","ebucore_synopsis","/",md5(str(?ebucore_synopsis)))) AS ?ie_ebucore_synopsis)
+    }
 
     UNION {
       ?ie schema:copyrightHolder ?schema_copyright_holder_c.
