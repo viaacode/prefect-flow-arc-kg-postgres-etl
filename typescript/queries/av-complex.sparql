@@ -100,6 +100,10 @@ CONSTRUCT {
 :intellectual_entity_id ?ie;
 :schema_copyright_holder ?schema_copyright_holder.
 
+?ie_ld :tableName "graph.hades_license_distributor";
+:intellectual_entity_id ?ie;
+:hades_license_distributor ?hades_license_distributor.
+
 ?role :tableName "graph.schema_role";
 :id ?role;
 :type ?role_type; 
@@ -325,6 +329,21 @@ CONSTRUCT {
       }
       
       BIND(IRI(CONCAT(str(?ie),"/","schema_copyright_holder","/",md5(str(?schema_copyright_holder)))) AS ?ie_ch)
+    }
+
+    UNION {
+      ?ie haDes:licenseDistributor ?hades_license_distributor_c.
+      
+      {} UNION {
+        GRAPH graph:thesauri {
+          ?hades_license_distributor_c skos:prefLabel ?hades_license_distributor.
+        }
+      }
+      UNION {
+        ?hades_license_distributor_c schema:name ?hades_license_distributor.
+      }
+      
+      BIND(IRI(CONCAT(str(?ie),"/","hades_license_distributor","/",md5(str(?hades_license_distributor)))) AS ?ie_ld)
     }
 
     # - roles & things
