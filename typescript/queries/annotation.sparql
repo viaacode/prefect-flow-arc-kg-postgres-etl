@@ -4,6 +4,8 @@ PREFIX edm: <http://www.europeana.eu/schemas/edm/>
 PREFIX graph: <https://data.hetarchief.be/graph/>
 PREFIX haDes: <https://data.hetarchief.be/ns/description/>
 PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX org: <http://www.w3.org/ns/org#>
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -12,186 +14,201 @@ PREFIX schema: <https://schema.org/>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
 CONSTRUCT {
-  ?annotation :tableName "graph.ebucore_annotation";
-    :id ?annotation;
-    :has_annotation_related_artefact ?has_annotation_related_artefact;
+  ?annotation :tableName "graph.ebucore_annotation" ;
+    :id ?annotation ;
+    :has_annotation_related_artefact ?has_annotation_related_artefact ;
     # :annotation_confidence ?annotation_confidence;
-    # :character_start_index ?character_start_index;
-    # :character_end_index ?character_end_index;
-    :annotation_type ?annotation_type;
-    :is_ai_generated true;
-    :source "give".
+  # :character_start_index ?character_start_index;
+  # :character_end_index ?character_end_index;
+  :annotation_type ?annotation_type ;
+    :is_ai_generated true ;
+    :source "give" .
 
-  ?annotation_media_fragment :tableName "graph.ebucore_annotation_is_annotated_media_resource";
-    :ebucore_annotation_id ?annotation;
-    :ebucore_media_fragment_id ?media_fragment.
+  ?annotation_media_fragment :tableName "graph.ebucore_annotation_is_annotated_media_resource" ;
+    :ebucore_annotation_id ?annotation ;
+    :ebucore_media_fragment_id ?media_fragment .
 
-  ?captioning :tableName "graph.ebucore_has_captioning";
-    :file_id ?file;
-    :ebucore_has_captioning ?caption_file.
+  ?captioning :tableName "graph.ebucore_has_captioning" ;
+    :file_id ?file ;
+    :ebucore_has_captioning ?caption_file .
 
-  ?media_fragment :tableName "graph.ebucore_media_fragment";
-    :id ?media_fragment;
-    :x ?x;
-    :y ?y;
-    :width ?width;
-    :height ?height;
-    :start_offset ?start_offset;
-    :end_offset ?end_offset;
-    :is_media_fragment_of ?file.
+  ?media_fragment :tableName "graph.ebucore_media_fragment" ;
+    :id ?media_fragment ;
+    :x ?x ;
+    :y ?y ;
+    :width ?width ;
+    :height ?height ;
+    :start_offset ?start_offset ;
+    :end_offset ?end_offset ;
+    :is_media_fragment_of ?file .
 
-  ?projected_file :tableName "graph.file";
-    :id ?projected_file;
-    :ebucore_has_mime_type ?ebucore_has_mime_type;
-    :edm_is_next_in_sequence ?edm_is_next_in_sequence;
-    :premis_original_name ?premis_original_name;
-    :premis_stored_at ?premis_stored_at;
-    :schema_duration ?schema_duration;
-    :schema_name ?file_schema_name;
-    :schema_thumbnail_url ?file_schema_thumbnail_url;
-    :mh_fragment_identifier ?mh_fragment_identifier;
-    :is_ai_generated true.
+  ?projected_file :tableName "graph.file" ;
+    :id ?projected_file ;
+    :ebucore_has_mime_type ?ebucore_has_mime_type ;
+    :edm_is_next_in_sequence ?edm_is_next_in_sequence ;
+    :premis_original_name ?premis_original_name ;
+    :premis_stored_at ?premis_stored_at ;
+    :schema_duration ?schema_duration ;
+    :schema_name ?file_schema_name ;
+    :schema_thumbnail_url ?file_schema_thumbnail_url ;
+    :mh_fragment_identifier ?mh_fragment_identifier ;
+    :is_ai_generated true .
 
-  ?synopsis :tableName "graph.intellectual_entity_ebucore_synopsis";
-    :intellectual_entity_id ?intellectual_entity;
-    :ebucore_synopsis ?ebucore_synopsis;
-    :is_ai_generated true.
+  ?synopsis :tableName "graph.intellectual_entity_ebucore_synopsis" ;
+    :intellectual_entity_id ?ie ;
+    :ebucore_synopsis ?ebucore_synopsis ;
+    :is_ai_generated true .
 
-  ?name :tableName "graph.intellectual_entity_schema_name";
-    :intellectual_entity_id ?intellectual_entity;
-    :schema_name ?intellectual_entity_schema_name;
-    :is_ai_generated true.
+  ?name :tableName "graph.intellectual_entity_schema_name" ;
+    :intellectual_entity_id ?ie ;
+    :schema_name ?ie_schema_name ;
+    :is_ai_generated true .
 
-  ?thing :tableName "graph.thing";
-    :id ?thing;
-    :schema_name ?thing_schema_name;
-    :schema_birth_date ?schema_birth_date;
-    :schema_birth_place ?schema_birth_place;
-    :schema_death_date ?schema_death_date;
-    :schema_death_place ?schema_death_place;
-    :type ?thing_type;
-    :wiki_id ?wiki_id;
-    :schema_thumbnail_url ?thing_schema_thumbnail_url.
+  ?thing :tableName "graph.thing" ;
+    :id ?thing ;
+    :schema_name ?thing_schema_name ;
+    :schema_birth_date ?schema_birth_date ;
+    :schema_birth_place ?schema_birth_place ;
+    :schema_death_date ?schema_death_date ;
+    :schema_death_place ?schema_death_place ;
+    :type ?thing_type ;
+    :wiki_id ?wiki_id ;
+    :schema_thumbnail_url ?thing_schema_thumbnail_url .
 }
-FROM graph:annotations
-FROM graph:visual-name-authority
 WHERE {
-  # Annotations and their optional text positions
-  ?annotation a ebucore:Annotation;
-    ebucore:hasAnnotationRelatedArtefact ?has_annotation_related_artefact;
-    # ebucore:annotationConfidence ?annotation_confidence;
-    ebucore:isAnnotatedMediaResource ?media_fragment.
-  
-  {} UNION { ?annotation ebucore:annotationType ?annotation_type. }
-  # UNION { ?annotation ebucore:characterStartIndex ?character_start_index. }
-  # UNION { ?annotation ebucore:characterEndIndex ?character_end_index. }
-  BIND(IRI(CONCAT(str(?annotation),"/",md5(str(?media_fragment)))) AS ?annotation_media_fragment)
-  
-  # Annotation-to-media-fragment links
-  ?media_fragment a ebucore:MediaFragment;
-    ebucore:isMediaFragmentOf ?file.
 
-  {}
-  UNION { 
-    ?media_fragment ebucore:regionDelimX ?x. 
-    ?media_fragment ebucore:regionDelimY ?y. 
-    ?media_fragment ebucore:width ?width. 
-    ?media_fragment ebucore:height ?height. }
-  UNION { 
-    ?media_fragment schema:startOffset ?start_offset. 
-    ?media_fragment schema:endOffset ?end_offset. }
-  
-  # Files used by annotations and captioning links
-  ?file a premis:File.
-
-  { 
-    BIND(?file AS ?projected_file) 
-  } UNION { 
-    # File-to-caption-file links
-    ?file a premis:File;
-      ebucore:hasCaptioning ?caption_file.
-    ?caption_file a premis:File.
-
-    BIND(IRI(CONCAT(str(?file),"/",md5(str(?caption_file)))) AS ?captioning)
-    BIND(?caption_file AS ?projected_file) 
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+      org:identifier ?maintainer_id
   }
+  BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+  GRAPH ?ORGraph {
 
-  {}
-  UNION { ?projected_file ebucore:hasMimeType ?ebucore_has_mime_type. }
-  UNION { ?projected_file edm:isNextInSequence ?edm_is_next_in_sequence. }
-  UNION { ?projected_file premis:originalName ?premis_original_name. }
-  UNION { ?projected_file premis:storedAt/rdf:value ?premis_stored_at. }
-  UNION {
-    ?projected_file schema:duration ?duration.
-    BIND(STR(?duration) AS ?duration_string)
-    BIND(IF(CONTAINS(?duration_string, "D"), xsd:decimal(REPLACE(?duration_string, "^P([0-9.]+)D.*$", "$1")), 0) AS ?days)
-    BIND(IF(CONTAINS(?duration_string, "H"), xsd:decimal(REPLACE(?duration_string, "^.*T([0-9.]+)H.*$", "$1")), 0) AS ?hours)
-    BIND(IF(CONTAINS(?duration_string, "T") && CONTAINS(STRAFTER(?duration_string, "T"), "M"), xsd:decimal(REPLACE(?duration_string, "^.*T(?:[0-9.]+H)?([0-9.]+)M.*$", "$1")), 0) AS ?minutes)
-    BIND(IF(CONTAINS(?duration_string, "S"), xsd:decimal(REPLACE(?duration_string, "^.*T(?:[0-9.]+H)?(?:[0-9.]+M)?([0-9.]+)S$", "$1")), 0) AS ?seconds)
-    BIND(?days * 86400 + ?hours * 3600 + ?minutes * 60 + ?seconds AS ?schema_duration)
+    # Licensed intellectual-entity synopses
+    VALUES ?ie_type {
+      haDes:Audio
+      haDes:Video
+      haDes:Film
+      haDes:DVD
+      haDes:DVDChapter
+    }
+    VALUES ?schema_license {
+      haLicId:VIAA-PUBLIEK-METADATA-LTD
+      haLicId:VIAA-PUBLIEK-METADATA-ALL
+      haLicId:VIAA-PUBLIEK-CONTENT
+      haLicId:BEZOEKERTOOL-METADATA-ALL
+      haLicId:BEZOEKERTOOL-CONTENT
+      haLicId:VIAA-INTRA_CP-METADATA-ALL
+      haLicId:VIAA-INTRA_CP-CONTENT
+      haLicId:Publiek-Domein
+      haLicId:COPYRIGHT-UNDETERMINED
+    }
+    ?ie a ?ie_type ;
+      (schema:license | (rel:isp / schema:license)) ?schema_license ;
+      prov:wasDerivedFrom ?mh_fragment .
+
+    ?mh_fragment schema:dateModified ?modified .
+
+    FILTER(! BOUND(?since) || ?modified >= ?since)
+
+    GRAPH graph:annotations {
+
+      # Find placeholder IE from same MH fragment
+      ?placeholder_ie a premis:IntellectualEntity ;
+        prov:wasDerivedFrom ?mh_fragment .
+
+      FILTER(?placeholder_ie != ?ie)
+
+      { } UNION {
+        ?placeholder_ie ebucore:synopsis ?ebucore_synopsis ;
+          schema:name ?ie_schema_name .
+      }
+
+      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ebucore_synopsis)))) AS ?synopsis)
+      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ie_schema_name)))) AS ?name)
+
+      # Annotations and their optional text positions
+      ?annotation a ebucore:Annotation ;
+        ebucore:hasAnnotationRelatedArtefact ?has_annotation_related_artefact ;
+        # ebucore:annotationConfidence ?annotation_confidence;
+      ebucore:isAnnotatedMediaResource ?media_fragment .
+
+      { } UNION { ?annotation ebucore:annotationType ?annotation_type . }
+      # UNION { ?annotation ebucore:characterStartIndex ?character_start_index. }
+      # UNION { ?annotation ebucore:characterEndIndex ?character_end_index. }
+      BIND(IRI(CONCAT(str(?annotation), "/", md5(str(?media_fragment)))) AS ?annotation_media_fragment)
+
+      # Annotation-to-media-fragment links
+      ?media_fragment a ebucore:MediaFragment ;
+        ebucore:isMediaFragmentOf ?file .
+
+      { }
+      UNION {
+        ?media_fragment ebucore:regionDelimX ?x .
+        ?media_fragment ebucore:regionDelimY ?y .
+        ?media_fragment ebucore:width ?width .
+        ?media_fragment ebucore:height ?height .
+      }
+      UNION {
+        ?media_fragment schema:startOffset ?start_offset .
+        ?media_fragment schema:endOffset ?end_offset .
+      }
+
+      # Files used by annotations and captioning links
+      ?file a premis:File .
+
+      {
+        BIND(?file AS ?projected_file)
+      }
+      UNION {
+        # File-to-caption-file links
+        ?file a premis:File ;
+          ebucore:hasCaptioning ?caption_file .
+
+        ?caption_file a premis:File .
+
+        BIND(IRI(CONCAT(str(?file), "/", md5(str(?caption_file)))) AS ?captioning)
+        BIND(?caption_file AS ?projected_file)
+      }
+
+      { }
+      UNION { ?projected_file ebucore:hasMimeType ?ebucore_has_mime_type . }
+      UNION { ?projected_file edm:isNextInSequence ?edm_is_next_in_sequence . }
+      UNION { ?projected_file premis:originalName ?premis_original_name . }
+      UNION { ?projected_file premis:storedAt / rdf:value ?premis_stored_at . }
+      UNION {
+        ?projected_file schema:duration ?duration .
+        BIND(STR(?duration) AS ?duration_string)
+        BIND(IF(CONTAINS(?duration_string, "D"), xsd:decimal (REPLACE(?duration_string, "^P([0-9.]+)D.*$", "$1")), 0) AS
+        ?days)
+        BIND(IF(CONTAINS(?duration_string, "H"), xsd:decimal (REPLACE(?duration_string, "^.*T([0-9.]+)H.*$", "$1")), 0)
+        AS ?hours)
+        BIND(IF(CONTAINS(?duration_string, "T") && CONTAINS(STRAFTER(?duration_string, "T"), "M"), xsd:decimal (REPLACE(?duration_string,"^.*T(?:[0-9.]+H)?([0-9.]+)M.*$","$1")),0)
+        AS ?minutes)
+        BIND(IF(CONTAINS(?duration_string, "S"), xsd:decimal (REPLACE(?duration_string,"^.*T(?:[0-9.]+H)?(?:[0-9.]+M)?([0-9.]+)S$","$1")),0)
+        AS ?seconds)
+        BIND(?days * 86400 + ?hours * 3600 + ?minutes * 60 + ?seconds AS ?schema_duration)
+      }
+      UNION { ?projected_file schema:name ?file_schema_name . }
+      UNION { ?projected_file schema:thumbnailUrl ?file_schema_thumbnail_url . }
+      UNION { ?projected_file schema:identifier ?mh_fragment_identifier . }
+
+      # Things referenced by annotations
+      { }
+      UNION { ?thing schema:name ?thing_schema_name . }
+      UNION {
+        ?thing schema:birthDate ?birth_date .
+        BIND(xsd:integer (SUBSTR(STR(?birth_date), 1, 4)) AS ?schema_birth_date)
+      }
+      UNION { ?thing schema:birthPlace / schema:name ?schema_birth_place . }
+      UNION {
+        ?thing schema:deathDate ?death_date .
+        BIND(xsd:integer (SUBSTR(STR(?death_date), 1, 4)) AS ?schema_death_date)
+      }
+      UNION { ?thing schema:deathPlace / schema:name ?schema_death_place . }
+      UNION { ?thing rdf:type ?thing_type . }
+      UNION { ?thing schema:identifier ?wiki_id . }
+      UNION { ?thing schema:thumbnailUrl ?thing_schema_thumbnail_url . }
+    }
   }
-  UNION { ?projected_file schema:name ?file_schema_name. }
-  UNION { ?projected_file schema:thumbnailUrl ?file_schema_thumbnail_url. }
-  UNION { ?projected_file schema:identifier ?mh_fragment_identifier. }
-
-  # Things referenced by annotations
-  {}
-  UNION { ?thing schema:name ?thing_schema_name. }
-  UNION {
-    ?thing schema:birthDate ?birth_date.
-    BIND(xsd:integer(SUBSTR(STR(?birth_date), 1, 4)) AS ?schema_birth_date)
-  }
-  UNION { ?thing schema:birthPlace/schema:name ?schema_birth_place. }
-  UNION {
-    ?thing schema:deathDate ?death_date.
-    BIND(xsd:integer(SUBSTR(STR(?death_date), 1, 4)) AS ?schema_death_date)
-  }
-  UNION { ?thing schema:deathPlace/schema:name ?schema_death_place. }
-  UNION { ?thing rdf:type ?thing_type. }
-  UNION { ?thing schema:identifier ?wiki_id. }
-  UNION { ?thing schema:thumbnailUrl ?thing_schema_thumbnail_url. }
-
-  # Licensed intellectual-entity synopses
-  VALUES ?ie_type {
-    haDes:Audio
-    haDes:Video
-    haDes:Film
-    haDes:DVD
-    haDes:DVDChapter
-    haDes:NewspaperIssue
-    haDes:NewspaperIssuePage
-  }
-  VALUES ?schema_license {
-    haLicId:VIAA-PUBLIEK-METADATA-LTD
-    haLicId:VIAA-PUBLIEK-METADATA-ALL
-    haLicId:VIAA-PUBLIEK-CONTENT
-    haLicId:BEZOEKERTOOL-METADATA-ALL
-    haLicId:BEZOEKERTOOL-CONTENT
-    haLicId:VIAA-INTRA_CP-METADATA-ALL
-    haLicId:VIAA-INTRA_CP-CONTENT
-    haLicId:Publiek-Domein
-    haLicId:COPYRIGHT-UNDETERMINED
-  }
-  ?intellectual_entity a ?ie_type;
-    (schema:license|(rel:isp/schema:license)) ?schema_license;
-    prov:wasDerivedFrom ?mh_fragment.
-
-  ?mh_fragment schema:dateModified ?modified.
-
-  FILTER (!BOUND(?since) || ?modified >= ?since)
-
-  # Find placeholder IE from same MH fragment
-  ?placeholder_ie a premis:IntellectualEntity;
-    prov:wasDerivedFrom ?mh_fragment.
-
-  FILTER (?placeholder_ie != ?intellectual_entity)
-
-  {} UNION {
-    ?placeholder_ie ebucore:synopsis ?ebucore_synopsis;
-    schema:name ?intellectual_entity_schema_name.
-  }
-
-  BIND(IRI(CONCAT(str(?intellectual_entity),"/",md5(str(?ebucore_synopsis)))) AS ?synopsis)
-  BIND(IRI(CONCAT(str(?intellectual_entity),"/",md5(str(?intellectual_entity_schema_name)))) AS ?name)
-  
 }
