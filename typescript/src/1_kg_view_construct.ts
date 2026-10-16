@@ -1,7 +1,7 @@
 import {
-    DATASET, DESTINATION_DATASET, DESTINATION_GRAPH, 
-    OR_IDS, 
-    PREFIX_ID_BASE, 
+    DATASET, DESTINATION_DATASET, DESTINATION_GRAPH,
+    OR_IDS,
+    PREFIX_ID_BASE,
     SINCE,
 } from './configuration.js'
 import { logInfo, logError, msToTime } from './util.js'
