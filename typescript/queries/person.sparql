@@ -4,9 +4,10 @@ PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
-PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/> 
-PREFIX haDes: <https://data.hetarchief.be/ns/description/> 
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/>
+PREFIX haDes: <https://data.hetarchief.be/ns/description/>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/>
 PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
 PREFIX org: <http://www.w3.org/ns/org#>
 
@@ -22,9 +23,21 @@ CONSTRUCT {
     :confidence ?mention_confidence;
     :thing_id ?person.
 
+  ?annotation_resource :tableName "graph.ebucore_annotation";
+    :id ?mention_resource;
+    :has_annotation_related_artefact ?person;
+    :annotation_confidence ?mention_confidence;
+    :annotation_type "named-entity";
+    :is_ai_generated false;
+    :source 'namenlijst'.
+
   ?mention_highlight :tableName "graph.schema_mentions_highlight";
     :schema_mentions_id  ?mention_resource;
     :highlight_id ?mention.
+
+  ?annotation_is_annotated_media_resource_resource :tableName "graph.ebucore_annotation_is_annotated_media_resource";
+    :ebucore_annotation_id ?mention_resource;
+    :media_fragment_id ?mention.
 
   ?mention :tableName "graph.highlight";
     :id ?mention;
@@ -32,7 +45,15 @@ CONSTRUCT {
     :width ?mention_width;
     :x ?mention_x;
     :y ?mention_y.
-  
+
+  ?media_fragment_resource :tableName "graph.ebucore_media_fragment";
+    :id ?mention;
+    :x ?mention_x;
+    :y ?mention_y;
+    :width ?mention_width;
+    :height ?mention_height;
+    :is_media_fragment_of ?file.
+
   ?person :tableName "graph.thing";
     :id ?person;
     :schema_name ?person_schema_name;
@@ -56,9 +77,16 @@ WHERE {
            schema:maintainer ?schema_maintainer;
            prov:wasDerivedFrom/schema:dateModified ?modified .
 
+    ?rep a haObj:DigitalRepresentation;
+      haObj:isAccessCopyOf ?ie;
+      rel:hss ?masterCopy;
+      rel:hsr ?file.
+
+    ?masterCopy haObj:isMasterCopyOf ?ie.
+
     # Only include the right licenses
-    FILTER (?schema_license IN ( 
-        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+    FILTER (?schema_license IN (
+        haLicId:VIAA-PUBLIEK-METADATA-LTD,
         haLicId:VIAA-PUBLIEK-METADATA-ALL,
         haLicId:VIAA-PUBLIEK-CONTENT,
         haLicId:BEZOEKERTOOL-METADATA-ALL,
@@ -69,50 +97,56 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     ))
 
-    # for incremental 
+    # for incremental
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     GRAPH graph:namenlijst {
-      ?person a schema:Person; 
+      ?person a schema:Person;
           ^schema:mentions ?ie;
           schema:name ?person_schema_name.
-      
+
       FILTER langMatches(lang(?person_schema_name), "nl")
-  
+
       {}
       UNION {
           ?person schema:deathDate ?person_schema_death_date
       }
-  
+
       UNION {
           ?person schema:birthDate ?person_schema_birth_date
       }
-  
+
       UNION {
           ?person schema:birthPlace/schema:name ?person_schema_birth_place
       }
-  
+
       UNION {
           ?person schema:deathPlace/schema:name ?person_schema_death_place
       }
-  
+
       ?mention a ebucore:MediaFragment;
               ebucore:isMediaFragmentOf ?ie;
               ebucore:width ?mention_width;
               ebucore:height ?mention_height;
               ebucore:regionDelimX ?mention_x;
               ebucore:regionDelimY ?mention_y.
-                  
+
       ?mention_resource a ebucore:TextAnnotation;
               ebucore:hasAnnotationRelatedAgent ?person;
               ebucore:isAnnotatedMediaResource ?mention.
-  
+
       OPTIONAL {
         ?mention_resource ebucore:annotationConfidence ?confidence;
       }
       BIND(COALESCE(?confidence, "0.0"^^xsd:decimal) AS ?mention_confidence)
-  
+
       BIND(IRI(CONCAT(str(?mention_resource),"/",MD5(str(?mention)))) AS ?mention_highlight)
+
+      BIND(IRI(CONCAt(str(?mention_resource), "/annotation")) AS ?annotation_resource)
+
+      BIND(IRI(CONCAT(str(?mention_resource), "/annotation", "/", MD5(str(?mention)))) AS ?annotation_is_annotated_media_resource_resource)
+
+      BIND(IRI(CONCAT(str(?mention), "/media-fragment")) AS ?media_fragment_resource)
     }
-   }
+  }
 }
