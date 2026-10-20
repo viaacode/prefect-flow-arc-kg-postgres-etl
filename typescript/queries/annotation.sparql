@@ -119,7 +119,7 @@ WHERE {
       # Annotations and their optional text positions
       ?annotation a ebucore:Annotation ;
         ebucore:annotationType ?annotation_type ;
-        ebucore:hasAnnotationRelatedArtefact ?has_annotation_related_artefact ;
+        ebucore:hasAnnotationRelatedArtefact ?thing ;
         ebucore:isAnnotatedMediaResource ?media_fragment .
 
       BIND(IRI(CONCAT(str(?annotation), "/", md5(str(?media_fragment)))) AS ?annotation_media_fragment)
@@ -130,19 +130,24 @@ WHERE {
 
       # Parse Media Fragments components from URL
       BIND(CONCAT("&", STRAFTER(STR(?media_fragment), "#")) AS ?fragment_parameters)
-      FILTER(CONTAINS(?fragment_parameters, "&xywh=") && CONTAINS(?fragment_parameters, "&t="))
-      BIND(STRBEFORE(CONCAT(STRAFTER(?fragment_parameters, "&xywh="), "&"), "&") AS ?xywh_value)
-      BIND(REPLACE(?xywh_value, "^pixel:", "") AS ?xywh)
-      BIND(xsd:integer (STRBEFORE(?xywh, ",")) AS ?x)
-      BIND(STRAFTER(?xywh, ",") AS ?xywh_after_x)
-      BIND(xsd:integer (STRBEFORE(?xywh_after_x, ",")) AS ?y)
-      BIND(STRAFTER(?xywh_after_x, ",") AS ?xywh_after_y)
-      BIND(xsd:integer (STRBEFORE(?xywh_after_y, ",")) AS ?width)
-      BIND(xsd:integer (STRAFTER(?xywh_after_y, ",")) AS ?height)
-      BIND(STRBEFORE(CONCAT(STRAFTER(?fragment_parameters, "&t="), "&"), "&") AS ?time_value)
-      BIND(REPLACE(?time_value, "^npt:", "") AS ?time_range)
-      BIND(xsd:decimal (STRBEFORE(?time_range, ",")) AS ?start_offset)
-      BIND(xsd:decimal (STRAFTER(?time_range, ",")) AS ?end_offset)
+      OPTIONAL {
+        FILTER(CONTAINS(?fragment_parameters, "&xywh="))
+        BIND(STRBEFORE(CONCAT(STRAFTER(?fragment_parameters, "&xywh="), "&"), "&") AS ?xywh_value)
+        BIND(REPLACE(?xywh_value, "^pixel:", "") AS ?xywh)
+        BIND(xsd:integer (STRBEFORE(?xywh, ",")) AS ?x)
+        BIND(STRAFTER(?xywh, ",") AS ?xywh_after_x)
+        BIND(xsd:integer (STRBEFORE(?xywh_after_x, ",")) AS ?y)
+        BIND(STRAFTER(?xywh_after_x, ",") AS ?xywh_after_y)
+        BIND(xsd:integer (STRBEFORE(?xywh_after_y, ",")) AS ?width)
+        BIND(xsd:integer (STRAFTER(?xywh_after_y, ",")) AS ?height)
+      }
+      OPTIONAL {
+        FILTER(CONTAINS(?fragment_parameters, "&t="))
+        BIND(STRBEFORE(CONCAT(STRAFTER(?fragment_parameters, "&t="), "&"), "&") AS ?time_value)
+        BIND(REPLACE(?time_value, "^npt:", "") AS ?time_range)
+        BIND(xsd:decimal (STRBEFORE(?time_range, ",")) AS ?start_offset)
+        BIND(xsd:decimal (STRAFTER(?time_range, ",")) AS ?end_offset)
+      }
 
       # Files used by annotations and captioning links
       ?file a premis:File ; prov:wasDerivedFrom ?mh_fragment .
@@ -211,9 +216,8 @@ WHERE {
           ebucore:synopsis ?ebucore_synopsis ;
           schema:name ?ie_schema_name .
       }
-
-      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ebucore_synopsis)))) AS ?synopsis)
-      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ie_schema_name)))) AS ?name)
     }
+    BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ebucore_synopsis)))) AS ?synopsis)
+    BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ie_schema_name)))) AS ?name)
   }
 }
