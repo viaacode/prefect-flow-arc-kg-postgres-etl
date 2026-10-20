@@ -17,11 +17,8 @@ prefix haObj: <https://data.hetarchief.be/ns/object/>
 CONSTRUCT {
   ?annotation :tableName "graph.ebucore_annotation" ;
     :id ?annotation ;
-    :has_annotation_related_artefact ?has_annotation_related_artefact ;
-    # :annotation_confidence ?annotation_confidence;
-  # :character_start_index ?character_start_index;
-  # :character_end_index ?character_end_index;
-  :annotation_type ?annotation_type ;
+    :has_annotation_related_artefact ?thing ;
+    :annotation_type ?annotation_type ;
     :is_ai_generated true ;
     :source "give" .
 
@@ -30,7 +27,7 @@ CONSTRUCT {
     :ebucore_media_fragment_id ?media_fragment .
 
   ?captioning :tableName "graph.ebucore_has_captioning" ;
-    :file_id ?file ;
+    :file_id ?o_file ;
     :ebucore_has_captioning ?caption_file .
 
   ?media_fragment :tableName "graph.ebucore_media_fragment" ;
@@ -41,7 +38,7 @@ CONSTRUCT {
     :height ?height ;
     :start_offset ?start_offset ;
     :end_offset ?end_offset ;
-    :is_media_fragment_of ?file .
+    :is_media_fragment_of ?o_file .
 
   ?projected_file :tableName "graph.file" ;
     :id ?projected_file ;
@@ -53,16 +50,6 @@ CONSTRUCT {
     :schema_name ?file_schema_name ;
     :schema_thumbnail_url ?file_schema_thumbnail_url ;
     :mh_fragment_identifier ?mh_fragment_identifier ;
-    :is_ai_generated true .
-
-  ?synopsis :tableName "graph.intellectual_entity_ebucore_synopsis" ;
-    :intellectual_entity_id ?ie ;
-    :ebucore_synopsis ?ebucore_synopsis ;
-    :is_ai_generated true .
-
-  ?name :tableName "graph.intellectual_entity_schema_name" ;
-    :intellectual_entity_id ?ie ;
-    :schema_name ?ie_schema_name ;
     :is_ai_generated true .
 
   ?thing :tableName "graph.thing" ;
@@ -77,11 +64,12 @@ CONSTRUCT {
     :schema_thumbnail_url ?thing_schema_thumbnail_url .
 }
 WHERE {
-
+  
   GRAPH graph:organization {
     ?schema_maintainer a haOrg:ContentPartner ;
       org:identifier ?maintainer_id
   }
+  #VALUES ?maintainer_id { "OR-g44hq0v" }
   BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
 
   GRAPH ?ORGraph {
@@ -94,25 +82,29 @@ WHERE {
       haDes:DVD
       haDes:DVDChapter
     }
-    VALUES ?schema_license {
-      haLicId:VIAA-PUBLIEK-METADATA-LTD
-      haLicId:VIAA-PUBLIEK-METADATA-ALL
-      haLicId:VIAA-PUBLIEK-CONTENT
-      haLicId:BEZOEKERTOOL-METADATA-ALL
-      haLicId:BEZOEKERTOOL-CONTENT
-      haLicId:VIAA-INTRA_CP-METADATA-ALL
-      haLicId:VIAA-INTRA_CP-CONTENT
-      haLicId:Publiek-Domein
-      haLicId:COPYRIGHT-UNDETERMINED
-    }
     ?ie a ?ie_type ;
       (schema:license | (rel:isp / schema:license)) ?schema_license ;
       prov:wasDerivedFrom / schema:dateModified ?modified .
 
-    FILTER(! BOUND(?since) || ?modified >= ?since)
+    # Only include the right licenses
+    FILTER (?schema_license IN ( 
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
+        haLicId:VIAA-PUBLIEK-METADATA-ALL,
+        haLicId:VIAA-PUBLIEK-CONTENT,
+        haLicId:BEZOEKERTOOL-METADATA-ALL,
+        haLicId:BEZOEKERTOOL-CONTENT ,
+        haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+        haLicId:VIAA-INTRA_CP-CONTENT ,
+        haLicId:Publiek-Domein,
+        haLicId:COPYRIGHT-UNDETERMINED
+    ))
+
+    # for incremental 
+    FILTER (!BOUND(?since) || ?modified >= ?since )
 
     # Bind files from same MH fragment as the accesscopy
-    ?ie haObj:hasAccessCopy / rel:inc / prov:wasDerivedFrom ?mh_fragment .
+    ?ie haObj:hasAccessCopy / rel:hsr ?o_file.
+    ?o_file prov:wasDerivedFrom / schema:identifier ?fragment_id .
 
     GRAPH graph:annotations {
 
@@ -149,12 +141,14 @@ WHERE {
         BIND(xsd:decimal (STRAFTER(?time_range, ",")) AS ?end_offset)
       }
 
-      # Files used by annotations and captioning links
-      ?file a premis:File ; prov:wasDerivedFrom ?mh_fragment .
+      # Things referenced by annotations
+      # TODO: there are currently no names of things?
+      ?thing a ?thing_type.
 
-      {
-        BIND(?file AS ?projected_file)
-      }
+      # Files used by annotations and captioning links
+      ?file a premis:File ; prov:wasDerivedFrom / schema:identifier ?fragment_id . 
+
+      {}
       UNION {
         # File-to-caption-file links
         ?file a premis:File ;
@@ -163,8 +157,8 @@ WHERE {
         ?caption_file a premis:File .
 
         BIND(IRI(CONCAT(str(?file), "/", md5(str(?caption_file)))) AS ?captioning)
-        BIND(?caption_file AS ?projected_file)
       }
+      BIND(COALESCE(?caption_file, ?file) AS ?projected_file)
 
       { }
       UNION { ?projected_file ebucore:hasMimeType ?ebucore_has_mime_type . }
@@ -191,10 +185,8 @@ WHERE {
       UNION { ?projected_file schema:name ?file_schema_name . }
       UNION { ?projected_file schema:thumbnailUrl ?file_schema_thumbnail_url . }
       UNION { ?projected_file schema:identifier ?mh_fragment_identifier . }
-
-      # Things referenced by annotations
-      ?thing a ?thing_type; schema:name ?thing_schema_name .
-      { }
+      # Thing bindings
+      UNION {?thing schema:name ?thing_schema_name}
       UNION {
         ?thing schema:birthDate ?birth_date .
         BIND(xsd:integer (SUBSTR(STR(?birth_date), 1, 4)) AS ?schema_birth_date)
@@ -207,17 +199,8 @@ WHERE {
       UNION { ?thing schema:deathPlace / schema:name ?schema_death_place . }
       UNION { ?thing schema:identifier ?wiki_id . }
       UNION { ?thing schema:thumbnailUrl ?thing_schema_thumbnail_url . }
-
-      # Name and synopsis
-      { }
-      UNION {
-        ?placeholder_ie a premis:IntellectualEntity ;
-          haObj:hasAccessCopy / rel:inc ?file ;
-          ebucore:synopsis ?ebucore_synopsis ;
-          schema:name ?ie_schema_name .
-      }
     }
-    BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ebucore_synopsis)))) AS ?synopsis)
-    BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ie_schema_name)))) AS ?name)
   }
+  
 }
+#LIMIT 100
