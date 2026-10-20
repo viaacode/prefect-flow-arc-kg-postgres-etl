@@ -12,6 +12,7 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/>
 PREFIX schema: <https://schema.org/>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+prefix haObj: <https://data.hetarchief.be/ns/object/>
 
 CONSTRUCT {
   ?annotation :tableName "graph.ebucore_annotation" ;
@@ -82,6 +83,7 @@ WHERE {
       org:identifier ?maintainer_id
   }
   BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
+
   GRAPH ?ORGraph {
 
     # Licensed intellectual-entity synopses
@@ -105,57 +107,45 @@ WHERE {
     }
     ?ie a ?ie_type ;
       (schema:license | (rel:isp / schema:license)) ?schema_license ;
-      prov:wasDerivedFrom ?mh_fragment .
-
-    ?mh_fragment schema:dateModified ?modified .
+      prov:wasDerivedFrom / schema:dateModified ?modified .
 
     FILTER(! BOUND(?since) || ?modified >= ?since)
 
+    # Bind files from same MH fragment as the accesscopy
+    ?ie haObj:hasAccessCopy / rel:inc / prov:wasDerivedFrom ?mh_fragment .
+
     GRAPH graph:annotations {
-
-      # Find placeholder IE from same MH fragment
-      ?placeholder_ie a premis:IntellectualEntity ;
-        prov:wasDerivedFrom ?mh_fragment .
-
-      FILTER(?placeholder_ie != ?ie)
-
-      { } UNION {
-        ?placeholder_ie ebucore:synopsis ?ebucore_synopsis ;
-          schema:name ?ie_schema_name .
-      }
-
-      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ebucore_synopsis)))) AS ?synopsis)
-      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ie_schema_name)))) AS ?name)
 
       # Annotations and their optional text positions
       ?annotation a ebucore:Annotation ;
+        ebucore:annotationType ?annotation_type ;
         ebucore:hasAnnotationRelatedArtefact ?has_annotation_related_artefact ;
-        # ebucore:annotationConfidence ?annotation_confidence;
-      ebucore:isAnnotatedMediaResource ?media_fragment .
+        ebucore:isAnnotatedMediaResource ?media_fragment .
 
-      { } UNION { ?annotation ebucore:annotationType ?annotation_type . }
-      # UNION { ?annotation ebucore:characterStartIndex ?character_start_index. }
-      # UNION { ?annotation ebucore:characterEndIndex ?character_end_index. }
       BIND(IRI(CONCAT(str(?annotation), "/", md5(str(?media_fragment)))) AS ?annotation_media_fragment)
 
       # Annotation-to-media-fragment links
       ?media_fragment a ebucore:MediaFragment ;
         ebucore:isMediaFragmentOf ?file .
 
-      { }
-      UNION {
-        ?media_fragment ebucore:regionDelimX ?x .
-        ?media_fragment ebucore:regionDelimY ?y .
-        ?media_fragment ebucore:width ?width .
-        ?media_fragment ebucore:height ?height .
-      }
-      UNION {
-        ?media_fragment schema:startOffset ?start_offset .
-        ?media_fragment schema:endOffset ?end_offset .
-      }
+      # Parse Media Fragments components from URL
+      BIND(CONCAT("&", STRAFTER(STR(?media_fragment), "#")) AS ?fragment_parameters)
+      FILTER(CONTAINS(?fragment_parameters, "&xywh=") && CONTAINS(?fragment_parameters, "&t="))
+      BIND(STRBEFORE(CONCAT(STRAFTER(?fragment_parameters, "&xywh="), "&"), "&") AS ?xywh_value)
+      BIND(REPLACE(?xywh_value, "^pixel:", "") AS ?xywh)
+      BIND(xsd:integer (STRBEFORE(?xywh, ",")) AS ?x)
+      BIND(STRAFTER(?xywh, ",") AS ?xywh_after_x)
+      BIND(xsd:integer (STRBEFORE(?xywh_after_x, ",")) AS ?y)
+      BIND(STRAFTER(?xywh_after_x, ",") AS ?xywh_after_y)
+      BIND(xsd:integer (STRBEFORE(?xywh_after_y, ",")) AS ?width)
+      BIND(xsd:integer (STRAFTER(?xywh_after_y, ",")) AS ?height)
+      BIND(STRBEFORE(CONCAT(STRAFTER(?fragment_parameters, "&t="), "&"), "&") AS ?time_value)
+      BIND(REPLACE(?time_value, "^npt:", "") AS ?time_range)
+      BIND(xsd:decimal (STRBEFORE(?time_range, ",")) AS ?start_offset)
+      BIND(xsd:decimal (STRAFTER(?time_range, ",")) AS ?end_offset)
 
       # Files used by annotations and captioning links
-      ?file a premis:File .
+      ?file a premis:File ; prov:wasDerivedFrom ?mh_fragment .
 
       {
         BIND(?file AS ?projected_file)
@@ -180,13 +170,17 @@ WHERE {
         ?projected_file schema:duration ?duration .
         BIND(STR(?duration) AS ?duration_string)
         BIND(IF(CONTAINS(?duration_string, "D"), xsd:decimal (REPLACE(?duration_string, "^P([0-9.]+)D.*$", "$1")), 0) AS
-        ?days)
+          ?days
+        )
         BIND(IF(CONTAINS(?duration_string, "H"), xsd:decimal (REPLACE(?duration_string, "^.*T([0-9.]+)H.*$", "$1")), 0)
-        AS ?hours)
+          AS ?hours
+        )
         BIND(IF(CONTAINS(?duration_string, "T") && CONTAINS(STRAFTER(?duration_string, "T"), "M"), xsd:decimal (REPLACE(?duration_string,"^.*T(?:[0-9.]+H)?([0-9.]+)M.*$","$1")),0)
-        AS ?minutes)
+          AS ?minutes
+        )
         BIND(IF(CONTAINS(?duration_string, "S"), xsd:decimal (REPLACE(?duration_string,"^.*T(?:[0-9.]+H)?(?:[0-9.]+M)?([0-9.]+)S$","$1")),0)
-        AS ?seconds)
+          AS ?seconds
+        )
         BIND(?days * 86400 + ?hours * 3600 + ?minutes * 60 + ?seconds AS ?schema_duration)
       }
       UNION { ?projected_file schema:name ?file_schema_name . }
@@ -194,8 +188,8 @@ WHERE {
       UNION { ?projected_file schema:identifier ?mh_fragment_identifier . }
 
       # Things referenced by annotations
+      ?thing a ?thing_type; schema:name ?thing_schema_name .
       { }
-      UNION { ?thing schema:name ?thing_schema_name . }
       UNION {
         ?thing schema:birthDate ?birth_date .
         BIND(xsd:integer (SUBSTR(STR(?birth_date), 1, 4)) AS ?schema_birth_date)
@@ -206,9 +200,20 @@ WHERE {
         BIND(xsd:integer (SUBSTR(STR(?death_date), 1, 4)) AS ?schema_death_date)
       }
       UNION { ?thing schema:deathPlace / schema:name ?schema_death_place . }
-      UNION { ?thing rdf:type ?thing_type . }
       UNION { ?thing schema:identifier ?wiki_id . }
       UNION { ?thing schema:thumbnailUrl ?thing_schema_thumbnail_url . }
+
+      # Name and synopsis
+      { }
+      UNION {
+        ?placeholder_ie a premis:IntellectualEntity ;
+          haObj:hasAccessCopy / rel:inc ?file ;
+          ebucore:synopsis ?ebucore_synopsis ;
+          schema:name ?ie_schema_name .
+      }
+
+      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ebucore_synopsis)))) AS ?synopsis)
+      BIND(IRI(CONCAT(str(?ie), "/", md5(str(?ie_schema_name)))) AS ?name)
     }
   }
 }
