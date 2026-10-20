@@ -27,7 +27,6 @@ WHERE {
     ?schema_maintainer a haOrg:ContentPartner ;
       org:identifier ?maintainer_id .
   }
-  #VALUES ?maintainer_id { "OR-g44hq0v" }
   BIND(IRI(CONCAT("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) AS ?ORGraph)
 
   GRAPH ?ORGraph {
@@ -55,6 +54,7 @@ WHERE {
     ))
     FILTER (!BOUND(?since) || ?modified >= ?since)
 
+    # TODO: it's probably sufficient to join on prov:wasDerivedFrom ?mh_fragment
     ?ie haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom / schema:identifier ?fragment_id .
 
     GRAPH graph:annotations {

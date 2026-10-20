@@ -69,7 +69,6 @@ WHERE {
     ?schema_maintainer a haOrg:ContentPartner ;
       org:identifier ?maintainer_id
   }
-  #VALUES ?maintainer_id { "OR-g44hq0v" }
   BIND(iri(concat("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) as ?ORGraph)
 
   GRAPH ?ORGraph {
@@ -104,6 +103,7 @@ WHERE {
 
     # Bind files from same MH fragment as the accesscopy
     ?ie haObj:hasAccessCopy / rel:hsr ?o_file.
+    # TODO: it's probably sufficient to join on prov:wasDerivedFrom ?mh_fragment
     ?o_file prov:wasDerivedFrom / schema:identifier ?fragment_id .
 
     GRAPH graph:annotations {
@@ -203,4 +203,3 @@ WHERE {
   }
   
 }
-#LIMIT 100
