@@ -1,0 +1,70 @@
+PREFIX : <https://data.hetarchief.be/ns/table/>
+PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
+PREFIX graph: <https://data.hetarchief.be/graph/>
+PREFIX haDes: <https://data.hetarchief.be/ns/description/>
+PREFIX haLicId: <https://data.hetarchief.be/id/license/>
+PREFIX haObj: <https://data.hetarchief.be/ns/object/>
+PREFIX haOrg: <https://data.hetarchief.be/ns/organization/>
+PREFIX org: <http://www.w3.org/ns/org#>
+PREFIX premis: <http://www.loc.gov/premis/rdf/v3/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX rel: <http://id.loc.gov/vocabulary/preservation/relationshipSubType/>
+PREFIX schema: <https://schema.org/>
+
+CONSTRUCT {
+  ?synopsis :tableName "graph.intellectual_entity_ebucore_synopsis" ;
+    :intellectual_entity_id ?ie ;
+    :ebucore_synopsis ?ebucore_synopsis ;
+    :is_ai_generated true .
+
+  ?name :tableName "graph.intellectual_entity_schema_name" ;
+    :intellectual_entity_id ?ie ;
+    :schema_name ?ie_schema_name ;
+    :is_ai_generated true .
+}
+WHERE {
+  GRAPH graph:organization {
+    ?schema_maintainer a haOrg:ContentPartner ;
+      org:identifier ?maintainer_id .
+  }
+  #VALUES ?maintainer_id { "OR-g44hq0v" }
+  BIND(IRI(CONCAT("https://data.hetarchief.be/graph/metadata/", ?maintainer_id)) AS ?ORGraph)
+
+  GRAPH ?ORGraph {
+    VALUES ?ie_type {
+      haDes:Audio
+      haDes:Video
+      haDes:Film
+      haDes:DVD
+      haDes:DVDChapter
+    }
+    ?ie a ?ie_type ;
+      (schema:license | (rel:isp / schema:license)) ?schema_license ;
+      prov:wasDerivedFrom / schema:dateModified ?modified .
+
+    FILTER (?schema_license IN (
+      haLicId:VIAA-PUBLIEK-METADATA-LTD,
+      haLicId:VIAA-PUBLIEK-METADATA-ALL,
+      haLicId:VIAA-PUBLIEK-CONTENT,
+      haLicId:BEZOEKERTOOL-METADATA-ALL,
+      haLicId:BEZOEKERTOOL-CONTENT,
+      haLicId:VIAA-INTRA_CP-METADATA-ALL,
+      haLicId:VIAA-INTRA_CP-CONTENT,
+      haLicId:Publiek-Domein,
+      haLicId:COPYRIGHT-UNDETERMINED
+    ))
+    FILTER (!BOUND(?since) || ?modified >= ?since)
+
+    ?ie haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom / schema:identifier ?fragment_id .
+
+    GRAPH graph:annotations {
+      ?placeholder_ie a premis:IntellectualEntity ;
+        # ! This should probably be both rel:hsr and rel:inc
+        haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom / schema:identifier ?fragment_id  ;
+        ebucore:synopsis ?ebucore_synopsis ;
+        schema:name ?ie_schema_name .
+    }
+    BIND(IRI(CONCAT(STR(?ie), "/", MD5(STR(?ebucore_synopsis)))) AS ?synopsis)
+    BIND(IRI(CONCAT(STR(?ie), "/", MD5(STR(?ie_schema_name)))) AS ?name)
+  }
+}
