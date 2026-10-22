@@ -103,8 +103,7 @@ WHERE {
 
     # Bind files from same MH fragment as the accesscopy
     ?ie haObj:hasAccessCopy / rel:hsr ?o_file.
-    # TODO: it's probably sufficient to join on prov:wasDerivedFrom ?mh_fragment
-    ?o_file prov:wasDerivedFrom / schema:identifier ?fragment_id .
+    ?o_file prov:wasDerivedFrom ?mh_fragment .
 
     GRAPH graph:annotations {
 
@@ -142,11 +141,11 @@ WHERE {
       }
 
       # Things referenced by annotations
-      # TODO: there are currently no names of things?
-      ?thing a ?thing_type.
+      # all things have a name
+      ?thing a ?thing_type; schema:name ?thing_schema_name .
 
       # Files used by annotations and captioning links
-      ?file a premis:File ; prov:wasDerivedFrom / schema:identifier ?fragment_id . 
+      ?file a premis:File ; prov:wasDerivedFrom ?mh_fragment .
 
       {}
       UNION {
@@ -186,7 +185,6 @@ WHERE {
       UNION { ?projected_file schema:thumbnailUrl ?file_schema_thumbnail_url . }
       UNION { ?projected_file schema:identifier ?mh_fragment_identifier . }
       # Thing bindings
-      UNION {?thing schema:name ?thing_schema_name}
       UNION {
         ?thing schema:birthDate ?birth_date .
         BIND(xsd:integer (SUBSTR(STR(?birth_date), 1, 4)) AS ?schema_birth_date)
