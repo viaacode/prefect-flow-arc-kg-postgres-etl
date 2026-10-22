@@ -52,15 +52,15 @@ WHERE {
       haLicId:Publiek-Domein,
       haLicId:COPYRIGHT-UNDETERMINED
     ))
+    # TODO: does incremental make sense for this query?
     FILTER (!BOUND(?since) || ?modified >= ?since)
 
-    # TODO: it's probably sufficient to join on prov:wasDerivedFrom ?mh_fragment
-    ?ie haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom / schema:identifier ?fragment_id .
+    ?ie haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom ?mh_fragment  .
 
     GRAPH graph:annotations {
       ?placeholder_ie a premis:IntellectualEntity ;
         # ! This should probably be both rel:hsr and rel:inc
-        haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom / schema:identifier ?fragment_id  ;
+        haObj:hasAccessCopy / rel:hsr / prov:wasDerivedFrom ?mh_fragment  ;
         ebucore:synopsis ?ebucore_synopsis ;
         schema:name ?ie_schema_name .
     }

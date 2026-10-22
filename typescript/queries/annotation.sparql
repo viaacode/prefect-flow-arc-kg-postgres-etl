@@ -98,7 +98,7 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     ))
 
-    # for incremental 
+    # TODO: does incremental make sense for this query?
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     # Bind files from same MH fragment as the accesscopy
