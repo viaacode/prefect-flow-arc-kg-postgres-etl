@@ -97,7 +97,7 @@ WHERE {
         haLicId:COPYRIGHT-UNDETERMINED
     ))
 
-    # for incremental
+    # TODO: does incremental make sense for this query?
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     GRAPH graph:namenlijst {
