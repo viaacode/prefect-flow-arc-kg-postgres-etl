@@ -42,7 +42,6 @@ CONSTRUCT {
 
 ?schema_postal_address :tableName "graph.schema_postal_address";
 :id ?schema_postal_address;
-:organization_id ?org;
 :schema_contact_type ?schema_contact_type_postal_address;
 :schema_street_address ?schema_street_address;
 :schema_address_country ?schema_address_country;
@@ -103,6 +102,7 @@ WHERE {
   }
 
   OPTIONAL {
+    # TODO: multiple bindings of ?org can share a single ?schema_postal_address. Make sure they each get a row in 
     ?org org:hasSite/org:siteAddress ?schema_postal_address.
     ?schema_postal_address schema:contactType ?schema_contact_type_postal_address.
 
