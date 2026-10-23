@@ -43,11 +43,11 @@ CONSTRUCT {
 
   ?projected_file :tableName "graph.file" ;
     :id ?projected_file ;
-    :ebucore_has_mime_type ?ebucore_has_mime_type ;
-    :edm_is_next_in_sequence ?edm_is_next_in_sequence ;
-    :premis_original_name ?premis_original_name ;
-    :premis_stored_at ?premis_stored_at ;
-    :schema_duration ?schema_duration ;
+    :ebucore_has_mime_type ?file_ebucore_has_mime_type ;
+    :edm_is_next_in_sequence ?file_edm_is_next_in_sequence ;
+    :premis_original_name ?file_premis_original_name ;
+    :premis_stored_at ?file_premis_stored_at ;
+    :schema_duration ?file_schema_duration ;
     :schema_name ?file_schema_name ;
     :schema_thumbnail_url ?file_schema_thumbnail_url ;
     :mh_fragment_identifier ?mh_fragment_identifier ;
@@ -103,7 +103,12 @@ WHERE {
     FILTER (!BOUND(?since) || ?modified >= ?since )
 
     # Bind files from same MH fragment as the accesscopy
-    ?ie haObj:hasAccessCopy / rel:hsr ?o_file.
+    ?rep a haObj:DigitalRepresentation;
+      haObj:isAccessCopyOf ?ie;
+      rel:hss ?masterCopy;
+      rel:hsr ?o_file.
+
+    ?masterCopy haObj:isMasterCopyOf ?ie.
     ?o_file prov:wasDerivedFrom ?mh_fragment .
 
     GRAPH graph:annotations {
@@ -162,11 +167,18 @@ WHERE {
       }
       BIND(COALESCE(?caption_file, ?file) AS ?projected_file)
 
+      # 3. File
+      ?projected_file a premis:File;
+          schema:name ?file_schema_name ;
+          premis:storedAt/rdf:value ?file_premis_stored_at ;
+          ebucore:hasMimeType ?file_ebucore_has_mime_type .
+
+      VALUES ?file_ebucore_has_mime_type {"application/json" "video/mp4" "audio/mp4" "application/x-subrip" "text/vtt" "audio/mpeg" "audio/m4a" "application/mp4" }
+      FILTER (langMatches(lang(?file_schema_name), "nl"))
+
       { }
-      UNION { ?projected_file ebucore:hasMimeType ?ebucore_has_mime_type . }
-      UNION { ?projected_file edm:isNextInSequence ?edm_is_next_in_sequence . }
-      UNION { ?projected_file premis:originalName ?premis_original_name . }
-      UNION { ?projected_file premis:storedAt / rdf:value ?premis_stored_at . }
+      UNION { ?projected_file premis:originalName ?file_premis_original_name . }
+      UNION { ?projected_file edm:isNextInSequence ?file_edm_is_next_in_sequence . }
       UNION {
         ?projected_file schema:duration ?duration .
         BIND(STR(?duration) AS ?duration_string)
@@ -182,9 +194,8 @@ WHERE {
         BIND(IF(CONTAINS(?duration_string, "S"), xsd:decimal (REPLACE(?duration_string,"^.*T(?:[0-9.]+H)?(?:[0-9.]+M)?([0-9.]+)S$","$1")),0)
           AS ?seconds
         )
-        BIND(?days * 86400 + ?hours * 3600 + ?minutes * 60 + ?seconds AS ?schema_duration)
+        BIND(?days * 86400 + ?hours * 3600 + ?minutes * 60 + ?seconds AS ?file_schema_duration)
       }
-      UNION { ?projected_file schema:name ?file_schema_name . }
       UNION { ?projected_file schema:thumbnailUrl ?file_schema_thumbnail_url . }
       UNION { ?projected_file schema:identifier ?mh_fragment_identifier . }
       # Thing bindings
