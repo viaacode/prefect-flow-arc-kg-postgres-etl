@@ -17,6 +17,7 @@ prefix haObj: <https://data.hetarchief.be/ns/object/>
 CONSTRUCT {
   ?annotation :tableName "graph.ebucore_annotation" ;
     :id ?annotation ;
+    :annotation_confidence 1.0;
     :has_annotation_related_artefact ?thing ;
     :annotation_type ?annotation_type ;
     :is_ai_generated true ;
@@ -109,9 +110,11 @@ WHERE {
 
       # Annotations and their optional text positions
       ?annotation a ebucore:Annotation ;
-        ebucore:annotationType ?annotation_type ;
+        ebucore:annotationType ?annotation_type_uri ;
         ebucore:hasAnnotationRelatedArtefact ?thing ;
         ebucore:isAnnotatedMediaResource ?media_fragment .
+
+      BIND(REPLACE(STR(?annotation_type_uri), "^.*/([^/]*)$", "$1") AS ?annotation_type)
 
       BIND(IRI(CONCAT(str(?annotation), "/", md5(str(?media_fragment)))) AS ?annotation_media_fragment)
 
