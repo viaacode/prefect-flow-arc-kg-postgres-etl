@@ -1,4 +1,4 @@
-PREFIX : <https://data.hetarchief.be/ns/table/>
+PREFIX : <urn:kg-to-postgres:>
 PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>
 PREFIX edm: <http://www.europeana.eu/schemas/edm/>
 PREFIX graph: <https://data.hetarchief.be/graph/>
