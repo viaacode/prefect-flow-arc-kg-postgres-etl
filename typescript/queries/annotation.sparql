@@ -95,7 +95,9 @@ WHERE {
         haLicId:VIAA-INTRA_CP-METADATA-ALL ,
         haLicId:VIAA-INTRA_CP-CONTENT ,
         haLicId:Publiek-Domein,
-        haLicId:COPYRIGHT-UNDETERMINED
+        haLicId:COPYRIGHT-UNDETERMINED,
+        haLicId:VIAA-INTRA_CP-METADATA-AI,
+        haLicId:VIAA-PUBLIEK-METADATA-AI
     ))
 
     # TODO: does incremental make sense for this query?

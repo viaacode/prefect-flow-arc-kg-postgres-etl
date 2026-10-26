@@ -87,7 +87,7 @@ WHERE {
 
     # Only include the right licenses
     FILTER (?schema_license IN (
-        haLicId:VIAA-PUBLIEK-METADATA-LTD,
+        haLicId:VIAA-PUBLIEK-METADATA-LTD, 
         haLicId:VIAA-PUBLIEK-METADATA-ALL,
         haLicId:VIAA-PUBLIEK-CONTENT,
         haLicId:BEZOEKERTOOL-METADATA-ALL,
@@ -95,7 +95,9 @@ WHERE {
         haLicId:VIAA-INTRA_CP-METADATA-ALL ,
         haLicId:VIAA-INTRA_CP-CONTENT ,
         haLicId:Publiek-Domein,
-        haLicId:COPYRIGHT-UNDETERMINED
+        haLicId:COPYRIGHT-UNDETERMINED,
+        haLicId:VIAA-INTRA_CP-METADATA-AI,
+        haLicId:VIAA-PUBLIEK-METADATA-AI
     ))
 
     # TODO: does incremental make sense for this query?

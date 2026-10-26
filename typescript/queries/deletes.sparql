@@ -63,15 +63,17 @@ WHERE {
       FILTER NOT EXISTS {
         ?ie (schema:license | (rel:isp/schema:license)) ?excluded_license .
         FILTER(?excluded_license in (
-          haLicId:VIAA-PUBLIEK-METADATA-LTD,
+          haLicId:VIAA-PUBLIEK-METADATA-LTD, 
           haLicId:VIAA-PUBLIEK-METADATA-ALL,
           haLicId:VIAA-PUBLIEK-CONTENT,
           haLicId:BEZOEKERTOOL-METADATA-ALL,
-          haLicId:BEZOEKERTOOL-CONTENT,
-          haLicId:VIAA-INTRA_CP-METADATA-ALL,
-          haLicId:VIAA-INTRA_CP-CONTENT,
+          haLicId:BEZOEKERTOOL-CONTENT ,
+          haLicId:VIAA-INTRA_CP-METADATA-ALL ,
+          haLicId:VIAA-INTRA_CP-CONTENT ,
           haLicId:Publiek-Domein,
-          haLicId:COPYRIGHT-UNDETERMINED
+          haLicId:COPYRIGHT-UNDETERMINED,
+          haLicId:VIAA-INTRA_CP-METADATA-AI,
+          haLicId:VIAA-PUBLIEK-METADATA-AI
         ))
       }
     }
