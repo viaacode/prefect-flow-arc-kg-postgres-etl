@@ -149,7 +149,12 @@ WHERE {
 
       # Things referenced by annotations
       # all things have a name
-      ?thing a ?thing_type; schema:name ?thing_schema_name .
+      ?thing a ?thing_type_uri; schema:name ?thing_schema_name .
+      FILTER (?thing_type_uri != schema:Thing || NOT EXISTS {
+        ?thing a ?specific_thing_type_uri .
+        FILTER (?specific_thing_type_uri != schema:Thing)
+      })
+      BIND(REPLACE(STR(?thing_type_uri), "^.*/([^/]*)$", "$1") AS ?thing_type)
 
       # Files used by annotations and captioning links
       ?file a premis:File ; prov:wasDerivedFrom ?mh_fragment .

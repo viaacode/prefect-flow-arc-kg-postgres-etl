@@ -56,6 +56,7 @@ CONSTRUCT {
 
   ?person :tableName "graph.thing";
     :id ?person;
+    :type "Person" ;
     :schema_name ?person_schema_name;
     :schema_birth_date ?person_schema_birth_date;
     :schema_birth_place ?person_schema_birth_place;

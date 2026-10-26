@@ -118,6 +118,7 @@ CONSTRUCT {
 
 ?thing :tableName "graph.thing";
 :id ?thing;
+:type ?thing_type ;
 :schema_name ?thing_schema_name.
 
 ?collection :tableName "graph.collection";
@@ -361,8 +362,12 @@ CONSTRUCT {
             schema:roleName ?schema_role_name;
             schema:creator|schema:contributor|schema:publisher ?thing.
       
-      ?thing a schema:Thing; 
-            schema:name ?thing_schema_name.
+      ?thing a ?thing_type_uri; schema:name ?thing_schema_name .
+      FILTER (?thing_type_uri != schema:Thing || NOT EXISTS {
+        ?thing a ?specific_thing_type_uri .
+        FILTER (?specific_thing_type_uri != schema:Thing)
+      })
+      BIND(REPLACE(STR(?thing_type_uri), "^.*/([^/]*)$", "$1") AS ?thing_type)
   
     }
 
