@@ -17,7 +17,7 @@ prefix haObj: <https://data.hetarchief.be/ns/object/>
 CONSTRUCT {
   ?annotation :tableName "graph.ebucore_annotation" ;
     :id ?annotation ;
-    :has_annotation_related_artefact ?thing ;
+    :has_annotation_related_artefact ?projected_thing ;
     :annotation_type ?annotation_type ;
     :is_ai_generated true ;
     :source "give" .
@@ -52,8 +52,8 @@ CONSTRUCT {
     :mh_fragment_identifier ?mh_fragment_identifier ;
     :is_ai_generated true .
 
-  ?thing :tableName "graph.thing" ;
-    :id ?thing ;
+  ?projected_thing :tableName "graph.thing" ;
+    :id ?projected_thing ;
     :schema_name ?thing_schema_name ;
     :schema_birth_date ?schema_birth_date ;
     :schema_birth_place ?schema_birth_place ;
@@ -152,6 +152,8 @@ WHERE {
       # Things referenced by annotations
       # all things have a name
       ?thing schema:name ?thing_schema_name .
+      OPTIONAL { ?thing schema:sameAs ?wdt_thing . }
+      BIND(COALESCE(?wdt_thing, ?thing) AS ?projected_thing)
       OPTIONAL {
         VALUES (?thing_type_uri ?thing_type) {
           (schema:Person "person")
