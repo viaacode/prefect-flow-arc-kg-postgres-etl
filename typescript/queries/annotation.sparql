@@ -54,7 +54,7 @@ CONSTRUCT {
 
   ?projected_thing :tableName "graph.thing" ;
     :id ?projected_thing ;
-    :schema_name ?thing_schema_name ;
+    :schema_name ?projected_thing_name ;
     :schema_birth_date ?schema_birth_date ;
     :schema_birth_place ?schema_birth_place ;
     :schema_death_date ?schema_death_date ;
@@ -150,10 +150,22 @@ WHERE {
       }
 
       # Things referenced by annotations
-      # all things have a name
+      # Requires every referenced thing to have a name and stores it as the fallback name.
       ?thing schema:name ?thing_schema_name .
+      # Looks for an equivalent external entity, typically a Wikidata URI. If found, that URI becomes ?projected_thing; otherwise, the original ?thing URI is used.
       OPTIONAL { ?thing schema:sameAs ?wdt_thing . }
       BIND(COALESCE(?wdt_thing, ?thing) AS ?projected_thing)
+
+      # The ^ reverses the property direction. It finds the VNA equivalent of an already Wikidata URI and gets the name.
+      OPTIONAL {
+        # Only do lookup when no forward Wikidata mapping exists, avoiding an unnecessary join
+        FILTER(!BOUND(?wdt_thing))
+        ?thing ^schema:sameAs ?vna_thing .
+        ?vna_thing schema:name ?vna_schema_name.
+      }
+      # Prefers the VNA name when available; otherwise, it uses the original thing’s name.
+      BIND(COALESCE(?vna_schema_name,?thing_schema_name) AS ?projected_thing_name)
+
       OPTIONAL {
         VALUES (?thing_type_uri ?thing_type) {
           (schema:Person "person")
