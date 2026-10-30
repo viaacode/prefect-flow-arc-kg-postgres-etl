@@ -343,7 +343,7 @@ CONSTRUCT {
         }
       }
       UNION {
-        ?hades_license_distributor_c schema:name ?hades_license_distributor.
+        ?hades_license_distributor_c schema:name|skos:prefLabel ?hades_license_distributor.
       }
       
       BIND(IRI(CONCAT(str(?ie),"/","hades_license_distributor","/",md5(str(?hades_license_distributor)))) AS ?ie_ld)
